@@ -1,7 +1,8 @@
 /**
  * 로그인 상태 스토어 (Pinia)
- * - 토큰과 로그인 사용자 정보를 보관
+ * - 액세스 토큰과 로그인 사용자 정보를 보관
  * - 새로고침해도 유지되도록 utils/storage.js 로 저장·복원
+ * - 리프레시 토큰은 서버가 HttpOnly 쿠키로 관리하므로 여기서 다루지 않음 (API 명세서 A1)
  */
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
@@ -13,29 +14,18 @@ export const useAuthStore = defineStore('auth', () => {
   const saved = loadAuth()
 
   const accessToken = ref(saved?.accessToken ?? null)
-  const refreshToken = ref(saved?.refreshToken ?? null)
-  /** 로그인 사용자: { id, name, role, factoryId } */
+  /** 로그인 사용자: { id, loginId, name, role, scope: { siteId, factoryIds, processIds } } */
   const user = ref(saved?.user ?? null)
 
   const isLoggedIn = computed(() => !!accessToken.value)
   const role = computed(() => user.value?.role ?? null)
 
-  /** 로그인 결과를 상태와 브라우저에 저장 */
-  function setSession(result) {
-    accessToken.value = result.accessToken
-    refreshToken.value = result.refreshToken ?? null
-    user.value = result.user
-    saveAuth({
-      accessToken: accessToken.value,
-      refreshToken: refreshToken.value,
-      user: user.value,
-    })
-  }
-
-  /** 아이디·비밀번호 로그인 */
+  /** 아이디·비밀번호 로그인: 성공하면 상태와 브라우저에 저장 */
   async function login(loginId, password) {
     const result = await authApi.login({ loginId, password })
-    setSession(result)
+    accessToken.value = result.accessToken
+    user.value = result.user
+    saveAuth({ accessToken: accessToken.value, user: user.value })
   }
 
   /** 로그아웃: 서버 요청은 실패해도 화면 쪽 로그인 정보는 반드시 삭제 */
@@ -48,10 +38,9 @@ export const useAuthStore = defineStore('auth', () => {
       }
     }
     accessToken.value = null
-    refreshToken.value = null
     user.value = null
     clearAuth()
   }
 
-  return { accessToken, refreshToken, user, isLoggedIn, role, login, logout }
+  return { accessToken, user, isLoggedIn, role, login, logout }
 })

@@ -7,7 +7,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getFactory } from '@/api/sites'
+import { getFactoryName } from '@/api/sites'
 import { FACTORY_MENUS } from '@/router/menus'
 import { useAuthStore } from '@/stores/auth'
 import { ROLE, ROLE_LABEL } from '@/types/codes'
@@ -26,8 +26,8 @@ watch(
   async (id) => {
     factoryName.value = id
     try {
-      const factory = await getFactory(id)
-      factoryName.value = factory.name
+      const factory = await getFactoryName(id)
+      factoryName.value = `${factory.siteName} ${factory.name}` // 예: 울산공장 5공장
     } catch {
       // 조회 실패 시 ID 표시 유지
     }

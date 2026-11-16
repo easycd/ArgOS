@@ -24,6 +24,27 @@ export function saveAuth(auth) {
   }
 }
 
+const SAVED_ID_KEY = 'argos.savedLoginId'
+
+/** 로그인 화면 '아이디 저장': 저장된 아이디 읽기 (없으면 빈 문자열) */
+export function loadSavedLoginId() {
+  try {
+    return localStorage.getItem(SAVED_ID_KEY) ?? ''
+  } catch {
+    return ''
+  }
+}
+
+/** '아이디 저장' 체크 시 저장, 해제 시 삭제 */
+export function saveLoginId(loginId) {
+  try {
+    if (loginId) localStorage.setItem(SAVED_ID_KEY, loginId)
+    else localStorage.removeItem(SAVED_ID_KEY)
+  } catch {
+    // 저장 실패는 무시
+  }
+}
+
 /** 로그인 정보 삭제 */
 export function clearAuth() {
   try {

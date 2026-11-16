@@ -1,140 +1,97 @@
-# 백엔드 전달 사항 (프론트엔드 기준 API 초안)
+# 백엔드 전달 사항 (프론트엔드 기준)
 
 프론트엔드는 백엔드 개발 전이라 **예시 데이터(mock)** 로 화면을 만들고 있습니다.
-이 문서는 프론트가 부르는 API와 기대하는 요청·응답 모양을 화면별로 정리한 것입니다. 화면을 만들 때마다 계속 추가합니다.
 
-- 예시 데이터 실제 값: `gateway/frontend/src/api/mock/data.js`
+- **기준 문서**: 설계 자료의 `ArgOS_API명세서.html` (API 87개, 프론트 쪽에서 화면 기준으로 먼저 적은 제안)
+  - 설계 자료 묶음은 git에 올리지 않으므로, 필요하면 PM에게 받아 주세요.
+- **이 문서**: 프론트가 실제로 구현한 API, 명세서와 **다르게 한 점 / 추가로 필요한 점 / 정해야 할 점**만 화면별로 정리합니다. 화면을 만들 때마다 계속 추가합니다.
+- 예시 데이터 값: `gateway/frontend/src/api/mock/data.js` (명세서 응답 예시와 같은 모양)
 - API 호출 코드: `gateway/frontend/src/api/*.js` (각 함수의 `http.get/post` 부분이 실제 요청)
-- 표의 **상태**: `가정` = 프론트가 임시로 정한 것(합의 필요), `확정` = 팀 합의 완료
+- 예시 데이터 끄기: `gateway/frontend/.env` 에 `VITE_USE_MOCK=false` → `/api` 요청이 `http://localhost:8080` (gateway/backend) 으로 감
 
 ---
 
-## 1. 공통 규칙
+## 1. 공통 (명세서 '공통 규칙'과 같게 구현)
 
-| 항목 | 내용 | 상태 |
+| 항목 | 프론트 구현 | 위치 |
 | --- | --- | --- |
-| 기본 주소 | `/api/v1` (프론트 개발 서버는 `/api` 를 `http://localhost:8080` 으로 프록시) | 가정 |
-| 성공 응답 | `{ "success": true, "data": ... }` | 가정 |
-| 실패 응답 | `{ "success": false, "error": { "code": "AUTH_INVALID", "message": "사용자에게 보여 줄 문구" } }` | 가정 |
-| 오류 문구 | `error.message` 를 화면에 그대로 표시하므로 짧은 한국어 문장으로 | 가정 |
-| 인증 헤더 | `Authorization: Bearer <accessToken>` | 가정 |
-| 토큰 | 액세스 토큰 30분 + 리프레시 토큰 | 가정 |
-| 401 처리 | 로그인 상태에서 401 → 프론트가 로그아웃 후 로그인 화면으로 이동 | 가정 |
-| 시간 형식 | ISO 8601, `Asia/Seoul` (예: `2026-11-16T14:05:00+09:00`) | 가정 |
-| 실시간 | SSE `GET /stream?scope=...` (아직 프론트 미구현) | 가정 |
+| 기본 주소 | `/api/v1` | `src/api/http.js` |
+| 성공 응답 | `{ success: true, data }` → 화면에는 `data` 만 전달 | `src/api/http.js` |
+| 실패 응답 | `{ success: false, error: { code, message } }` → `error.message` 를 화면에 그대로 표시 | `src/api/http.js` |
+| 인증 | `Authorization: Bearer <accessToken>` | `src/api/http.js` |
+| 401 | 지금은 로그인 상태에서 401 이면 로그아웃 후 로그인 화면으로 | `src/api/http.js` |
+| 단계 | `NORMAL` / `WARN` / `ALARM` / `FIRE` | `src/types/codes.js` |
+| 권한 | `HQ_ADMIN` / `PLANT_ADMIN` / `WORKER` | `src/types/codes.js` |
 
-### 공통 코드
+### 아직 안 한 것
 
-| 코드 | 값 | 의미 |
+- `401 TOKEN_EXPIRED` → `POST /auth/refresh` → 원래 요청 재시도: 백엔드 준비되면 `http.js` 인터셉터에 추가
+- SSE `GET /stream?scope=...`: 대시보드 작업 때 추가
+
+### 부탁
+
+- `error.message` 는 화면에 그대로 나가므로 **짧은 한국어 문장**으로 보내 주세요. (예: `아이디 또는 비밀번호가 맞지 않습니다`)
+
+---
+
+## 2. 로그인 (명세서 A1)
+
+| API | 프론트 사용 | 명세서와 다른 점 |
 | --- | --- | --- |
-| level (상태) | `NORMAL` / `WARN` / `ALARM` / `FIRE` | 정상 / 주의 / 경보 / 화재 |
-| role (권한) | `HQ_ADMIN` / `PLANT_ADMIN` / `WORKER` | 본사 관리자 / 공장 담당자 / 공정 담당자(모바일) |
+| `POST /auth/login` | 요청 `{ loginId, password, client: "WEB" }`. 응답의 `accessToken`, `user` 사용 | 없음 |
+| `POST /auth/logout` | 로그아웃 버튼 | 없음 |
+| `POST /auth/refresh` | 아직 안 씀 | - |
+| `GET /me` | 아직 안 씀 (새로고침 시 지금은 브라우저에 저장한 user 사용) | - |
 
----
+### 프론트가 쓰는 응답 필드
 
-## 2. 로그인 화면
+| 필드 | 쓰는 곳 |
+| --- | --- |
+| `accessToken` | 모든 요청 헤더 |
+| `user.name`, `user.loginId` | 상단 바 사용자 메뉴, 로그인 직후 불러오기 화면 |
+| `user.role` | 첫 화면 분기, 메뉴·화면 권한 |
+| `user.scope.factoryIds` | 공장 담당자의 첫 화면(첫 번째 공장 대시보드), 다른 공장 주소 차단 |
 
-### POST `/auth/login` — 로그인
-
-| 구분 | 필드 | 타입 | 설명 |
-| --- | --- | --- | --- |
-| 요청 | `loginId` | string | 아이디 |
-| 요청 | `password` | string | 비밀번호 |
-| 응답 | `accessToken` | string | 액세스 토큰 |
-| 응답 | `refreshToken` | string | 리프레시 토큰 |
-| 응답 | `user.id` | number | 사용자 ID |
-| 응답 | `user.name` | string | 상단 바에 표시할 이름 |
-| 응답 | `user.role` | string | `HQ_ADMIN` / `PLANT_ADMIN` / `WORKER` |
-| 응답 | `user.factoryId` | string \| null | 공장 담당자의 담당 공장 ID (본사 관리자는 null) |
-
-응답 예시:
-
-```json
-{
-  "success": true,
-  "data": {
-    "accessToken": "eyJ...",
-    "refreshToken": "eyJ...",
-    "user": { "id": 2, "name": "울산 5공장 담당자", "role": "PLANT_ADMIN", "factoryId": "ulsan-5" }
-  }
-}
-```
-
-실패 예시 (아이디·비밀번호 오류):
-
-```json
-{ "success": false, "error": { "code": "AUTH_INVALID", "message": "아이디 또는 비밀번호가 올바르지 않습니다." } }
-```
-
-- 로그인 후 이동: `HQ_ADMIN` → 사업장 선택, `PLANT_ADMIN` → 담당 공장 대시보드, `WORKER` → 웹 진입 불가(모바일 앱 안내)
-- 예시 계정(mock 전용): `hq_admin`, `ulsan5_admin` / 비밀번호 `argos1234`
-
-### POST `/auth/logout` — 로그아웃
-
-- 요청 본문 없음 (헤더의 토큰으로 사용자 식별). 응답 `data` 는 `null`.
-
-### 미정
-
-- 리프레시 토큰 재발급 주소·방식 (예: `POST /auth/refresh`, 본문 전달 / httpOnly 쿠키)
-- 토큰 저장 위치 (지금 프론트는 localStorage)
-
----
-
-## 3. 사업장 선택 화면 (본사 관리자)
-
-### GET `/sites` — 사업장 목록
-
-| 필드 | 타입 | 설명 |
-| --- | --- | --- |
-| `id` | string | 사업장 ID |
-| `name` | string | 사업장 이름 (울산, 아산, 전주) |
-| `lat`, `lng` | number | 지도에 점을 찍기 위한 위도·경도 |
-| `level` | string | 사업장 안 공장 중 가장 높은 상태 |
-| `alarmCount` | number | 현재 처리 중인 알림 건수 |
-| `factories[]` | array | 공장 목록 |
-| `factories[].id` | string | 공장 ID |
-| `factories[].name` | string | 공장 이름 |
-| `factories[].level` | string | 공장 상태 |
-| `factories[].alarmCount` | number | 공장 알림 건수 |
-| `factories[].enabled` | boolean | 진입 가능 여부 (이번 범위는 울산 5공장만 true) |
-
-응답 예시:
-
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": "ulsan", "name": "울산", "lat": 35.54, "lng": 129.31, "level": "WARN", "alarmCount": 2,
-      "factories": [{ "id": "ulsan-5", "name": "울산 5공장", "level": "WARN", "alarmCount": 2, "enabled": true }]
-    },
-    { "id": "asan", "name": "아산", "lat": 36.79, "lng": 127.0, "level": "NORMAL", "alarmCount": 0, "factories": [] }
-  ]
-}
-```
-
----
-
-## 4. 공장 공통 (상단 바)
-
-### GET `/factories/{factoryId}` — 공장 기본 정보
-
-| 필드 | 타입 | 설명 |
-| --- | --- | --- |
-| `id` | string | 공장 ID |
-| `name` | string | 상단 바에 표시할 공장 이름 |
-| `siteId` | string | 소속 사업장 ID |
-| `level` | string | 공장 현재 상태 |
-
-- 권한: 공장 담당자는 자기 `factoryId` 만 조회 가능해야 함 (프론트도 막지만 서버에서 반드시 검증)
-
----
-
-## 5. 확인이 필요한 것
+### 정해야 할 것
 
 | 번호 | 내용 |
 | --- | --- |
-| 1 | ID 형식: 프론트는 임시로 문자열(`ulsan`, `ulsan-5`) 사용. DB가 숫자 ID면 알려 주세요. |
-| 2 | 사업장 `level`·`alarmCount` 를 서버가 계산해서 줄지, 프론트가 공장 값으로 계산할지 |
-| 3 | 사업장 위경도를 DB(`plant` 테이블)에 둘지 |
-| 4 | 사용자 관리·공장 관리 메뉴를 공장 담당자도 쓸 수 있는지 |
+| 1 | `firstPage` 값이 있지만 프론트는 지금 `role` 로 첫 화면을 정함. 둘 중 무엇을 기준으로 할지 |
+| 2 | 에러 `AUTH_LOCKED`(5회 잠김), `USER_INACTIVE`, `CLIENT_NOT_ALLOWED` 는 지금 `error.message` 를 그대로 보여 줌. 남은 횟수(`remaining`)·풀리는 시각(`unlockAt`) 표시가 필요한지 |
+| 3 | `pwResetRequired: true` 일 때 갈 비밀번호 변경 화면이 설계안에 없음 |
+
+- 예시 계정(mock 전용): `hq_admin`(본사 관리자), `ulsan5_admin`(공장 담당자, 5공장) / 비밀번호 `argos1234`
+
+---
+
+## 3. 사업장 선택 (명세서 A2, 본사 관리자)
+
+| API | 프론트 사용 | 명세서와 다른 점 |
+| --- | --- | --- |
+| `GET /sites` | 지도 핀, 도넛, 목록 머리줄 (`id, code, name, address, lat, lng, level, sensorLevels`) | 명세서 예시에서 아산·전주에 `address`, `sensorLevels` 가 빠져 있음 → **모든 사업장에 필요** |
+| `GET /sites/{siteId}/tree` | 목록에서 사업장을 펼칠 때 (처음 한 번만) | 공장마다 **`todayAlarmCount`(오늘 알림 건수) 추가 필요** (화면 '오늘 알림' 칸) |
+| `GET /sites/{siteId}/overview` | 아직 안 씀 ('이동' 은 지금 5공장 대시보드로 감) | - |
+
+### 프론트가 쓰는 `tree` 필드
+
+| 필드 | 쓰는 곳 |
+| --- | --- |
+| `factories[].id`, `name`, `level` | 공장 줄 |
+| `factories[].levelsByType` | 센서 단계 막대·개수 (전류·온도·CO 를 더해서 표시) |
+| `factories[].processes[].name`, `level` | 공정별 단계 칩 (이름 끝의 ' 공정'은 화면에서 줄여서 표시) |
+| `factories[].todayAlarmCount` | 오늘 알림 (**추가 요청**) |
+
+### 정해야 할 것
+
+| 번호 | 내용 |
+| --- | --- |
+| 1 | 지도 핀 위치는 지도 그림 좌표라 프론트에 사업장 코드(`ULS-01` 등)별로 적어 둠. 사업장이 늘면 프론트 수정 필요 |
+| 2 | 이번 범위에서 들어갈 수 있는 곳은 울산공장 5공장(`factoryId 5`)뿐이라 프론트에 고정. 나머지는 '준비 중' 안내 |
+
+---
+
+## 4. 공장 화면 공통 (상단 바)
+
+| API | 프론트 사용 | 메모 |
+| --- | --- | --- |
+| (임시) 공장 이름 | 상단 바 '울산공장 5공장' | 명세서에 공장 하나만 조회하는 API 가 없어서 지금은 예시 데이터에서 찾음. 대시보드 작업 때 `GET /factories/{factoryId}/overview` 로 바꿀 예정 |

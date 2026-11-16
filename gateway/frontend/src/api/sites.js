@@ -22,20 +22,18 @@ export function getSiteTree(siteId) {
 }
 
 /**
- * 공장 이름 (상단 바 표시용)
- * - 명세서에는 공장 하나만 조회하는 API 가 없음
- * - TODO: 공장 대시보드 작업 때 GET /factories/{factoryId}/overview 응답으로 바꿈
- * @returns {Promise<{ id: number, name: string, siteId: number, siteName: string }>}
+ * 사업장 이름 (상단 바의 사업장 표시용)
+ * - 명세서에 이름만 주는 API 가 없어서, 실제 연결 시에는 사업장 현황 응답의 site.name 을 씀
+ *   (공장 담당자는 GET /sites 를 못 부르므로 overview 사용)
+ * - TODO: 백엔드와 '이름만 주는 가벼운 API' 또는 GET /me 의 scope.siteName 사용 여부 합의
+ * @returns {Promise<string>}
  */
-export async function getFactoryName(factoryId) {
-  const id = Number(factoryId)
+export async function getSiteName(siteId) {
+  const id = Number(siteId)
   if (USE_MOCK) {
-    for (const site of MOCK_SITES) {
-      const factory = MOCK_SITE_TREES[site.id]?.factories.find((f) => f.id === id)
-      if (factory) return mockOk({ id, name: factory.name, siteId: site.id, siteName: site.name })
-    }
-    return mockFail({ code: 'NOT_FOUND', message: '공장을 찾을 수 없습니다.', status: 404 })
+    const site = MOCK_SITES.find((s) => s.id === id)
+    return site ? mockOk(site.name) : mockFail({ code: 'NOT_FOUND', message: '사업장을 찾을 수 없습니다.', status: 404 })
   }
-  const overview = await http.get(`/factories/${id}/overview`)
-  return { id, name: overview.name, siteId: overview.siteId, siteName: overview.siteName }
+  const overview = await http.get(`/sites/${id}/overview`)
+  return overview.site.name
 }

@@ -1,12 +1,13 @@
 /**
  * 라우터 (화면 주소 정의 + 권한 가드)
  *
- * 화면 흐름 (설계 기준):
- *  로그인 → 권한 분기
- *   - 본사 관리자(HQ_ADMIN): 사업장 선택 → 공장 진입
- *   - 공장 담당자(PLANT_ADMIN): 담당 공장으로 바로 진입
+ * 화면 흐름 (화면설계안 js/shell.js ROUTES 기준):
+ *  로그인 → 권한 분기 (router/home.js)
+ *   - 본사 관리자(HQ_ADMIN): 사업장 선택(/sites) → 사업장 현황(/sites/1)
+ *   - 공장 담당자(PLANT_ADMIN): 담당 사업장 현황(/sites/1) 으로 바로 (가정, home.js 참고)
  *   - 공정 담당자(WORKER): 모바일 앱 사용 (웹 진입 불가)
- *  공장 진입 후 상단 메뉴 6개
+ *  사업장 현황 → 공장 대시보드(/sites/1/factories/5) → (다음 작업) 공정 → 설비
+ *  상단 메뉴: 대시보드 / 통계·이력 / 점검 / 설비 기준값 + 관리(사용자·공장)
  */
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
@@ -15,8 +16,8 @@ import { ROLE, WEB_ROLES } from '@/types/codes'
 import BlankLayout from '@/layouts/BlankLayout.vue'
 import MainLayout from '@/layouts/MainLayout.vue'
 import PlainLayout from '@/layouts/PlainLayout.vue'
-import { factoryIdsOf, homeRouteOf } from './home'
-import { FACTORY_MENUS } from './menus'
+import { homeRouteOf, scopeOf } from './home'
+import { MENU_ROUTES } from './menus'
 
 // 다른 파일에서 '@/router' 로도 쓸 수 있게 다시 내보냄
 export { homeRouteOf }
@@ -50,18 +51,29 @@ const routes = [
     ],
   },
 
-  // 공장 진입 후: 상단 바 + 본문 레이아웃
+  // 사업장 안: 상단 바(사업장 이름 + 메뉴) + 본문
   {
-    path: '/factories/:factoryId',
+    path: '/sites/:siteId',
     component: MainLayout,
     meta: { roles: WEB_ROLES },
     children: [
-      { path: '', redirect: { name: 'dashboard' } },
-      ...FACTORY_MENUS.map((menu) => ({
+      {
+        path: '',
+        name: 'site-dashboard',
+        component: () => import('@/pages/dashboard/SiteDashboardPage.vue'),
+        meta: { nav: 'dashboard', title: '사업장 현황' },
+      },
+      {
+        path: 'factories/:factoryId',
+        name: 'dashboard',
+        component: () => import('@/pages/dashboard/DashboardPage.vue'),
+        meta: { nav: 'dashboard', title: '공장 대시보드' },
+      },
+      ...MENU_ROUTES.map((menu) => ({
         path: menu.path,
         name: menu.name,
         component: menu.component,
-        meta: { title: menu.label },
+        meta: { nav: menu.nav, title: menu.title },
       })),
     ],
   },
@@ -82,7 +94,7 @@ const router = createRouter({
 router.beforeEach((to) => {
   const auth = useAuthStore()
 
-  // 0) 웹에서 갈 곳이 없는 사용자(WORKER, 담당 공장 없는 공장 담당자)는 저장된 로그인 정보 정리
+  // 0) 웹에서 갈 곳이 없는 사용자(WORKER, 담당 범위 없는 공장 담당자)는 저장된 로그인 정보 정리
   //    (안 하면 로그인 화면 ↔ 첫 화면 사이에서 무한 이동이 생김)
   if (auth.isLoggedIn && homeRouteOf(auth.user).name === 'login') {
     auth.logout({ callServer: false })
@@ -111,13 +123,15 @@ router.beforeEach((to) => {
     return homeRouteOf(auth.user)
   }
 
-  // 5) 공장 담당자는 담당 공장(scope.factoryIds)만 볼 수 있음 (주소의 ID 는 문자열이라 숫자로 바꿔 비교)
-  if (
-    auth.role === ROLE.PLANT_ADMIN &&
-    to.params.factoryId &&
-    !factoryIdsOf(auth.user).includes(Number(to.params.factoryId))
-  ) {
-    return homeRouteOf(auth.user)
+  // 5) 공장 담당자는 담당 사업장(scope.siteId)과 담당 공장(scope.factoryIds)만 볼 수 있음
+  //    (주소의 ID 는 문자열이라 숫자로 바꿔 비교)
+  if (auth.role === ROLE.PLANT_ADMIN) {
+    const { siteId, factoryIds } = scopeOf(auth.user)
+    const wrongSite = to.params.siteId && Number(to.params.siteId) !== siteId
+    const wrongFactory = to.params.factoryId && !factoryIds.includes(Number(to.params.factoryId))
+    if (wrongSite || wrongFactory) {
+      return homeRouteOf(auth.user)
+    }
   }
 
   return true

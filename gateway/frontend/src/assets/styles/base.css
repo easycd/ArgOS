@@ -1,6 +1,7 @@
 /*
  * 전역 기본 스타일
  * - 브라우저 기본 여백 제거, 글꼴 적용, 공통 클래스 몇 개만 정의
+ * - 버튼·숫자 모양은 화면설계안(base.css 의 .btn, .num)과 같게
  */
 *,
 *::before,
@@ -21,16 +22,25 @@ body {
   background: var(--color-bg);
 }
 
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
 button,
 input,
 select,
 textarea {
   font: inherit;
+  color: inherit;
 }
 
-/* 숫자·센서값·코드 표시용 */
+/* 숫자·센서값·코드 표시용 (자릿수 폭 고정) */
 .mono {
   font-family: var(--font-mono);
+  font-feature-settings: 'tnum';
 }
 
 /* 페이지 제목 (모든 페이지 공통) */
@@ -42,12 +52,19 @@ textarea {
 
 /* 기본 버튼 */
 .btn {
-  height: 36px;
-  padding: 0 14px;
-  border: 1px solid var(--color-border);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 40px;
+  padding: 0 16px;
+  border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-sm);
   background: var(--color-surface);
   color: var(--color-text);
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
   cursor: pointer;
 }
 
@@ -60,4 +77,55 @@ textarea {
   border-color: var(--color-primary);
   background: var(--color-primary);
   color: var(--color-primary-text);
+  font-weight: 700;
+}
+
+.btn-primary:not(:disabled):hover {
+  background: var(--color-primary-hover);
+}
+
+/* 공통 애니메이션 (설계안 extra.css 와 같은 이름) */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes softin {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-9px);
+  }
+  40% {
+    transform: translateX(8px);
+  }
+  60% {
+    transform: translateX(-6px);
+  }
+  80% {
+    transform: translateX(4px);
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }

@@ -1,107 +1,115 @@
 <!--
   사업장 선택 화면 (본사 관리자 전용)
-  - 설계: 한반도 지도에 울산·아산·전주 표시 → 사업장 선택 → 공장 진입
-  - 지금은 자리 표시용 목록만. 지도는 다음 단계에서 구현
-  - 이번 범위는 울산 5공장만 진입 가능
+  - 화면설계안 js/v-rev.js vRegion() 의 평상시(화재 아님) 화면 기준
+  - 배치: 왼쪽 위 지도(SiteMapCard) / 왼쪽 아래 센서 단계(SiteSensorCard) / 오른쪽 목록(SiteListCard)
+  - 이 파일은 데이터 불러오기와 화면 이동만 담당, 모양은 features/site 의 각 카드가 담당
+  - 이번 범위는 울산공장 5공장만 진입 가능, 나머지는 '준비 중' 안내
 -->
 <script setup>
+import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
-import { SITES } from '@/features/site/sites'
+import { getSites } from '@/api/sites'
+import AppNotice from '@/components/AppNotice.vue'
+import SiteListCard from '@/features/site/SiteListCard.vue'
+import SiteMapCard from '@/features/site/SiteMapCard.vue'
+import SiteSensorCard from '@/features/site/SiteSensorCard.vue'
+import { useNotice } from '@/utils/useNotice'
 
 const router = useRouter()
-const auth = useAuthStore()
 
-function enterFactory(factoryId) {
-  router.push({ name: 'dashboard', params: { factoryId } })
+/** 지금 진입 가능한 사업장·공장 (설계 범위: 울산공장 5공장만) */
+const AVAILABLE_SITE_ID = 1
+const AVAILABLE_FACTORY_ID = 5
+
+// 사업장 목록 (GET /sites)
+const sites = ref([])
+const loading = ref(true)
+const errorMessage = ref('')
+
+onMounted(async () => {
+  try {
+    sites.value = await getSites()
+  } catch (error) {
+    errorMessage.value = error.message
+  } finally {
+    loading.value = false
+  }
+})
+
+// 짧은 안내 문구
+const { message: noticeMessage, show: showNotice } = useNotice()
+
+/**
+ * 사업장으로 이동 (지도 핀, 도넛 카드, '이동' 버튼)
+ * - 설계안: 울산공장 → 울산공장(사업장) 현황 화면
+ * - TODO: 사업장 현황 화면(GET /sites/{siteId}/overview)이 생기면 그쪽으로.
+ *         지금은 진입 가능한 5공장 대시보드로 이동
+ */
+function enterSite(siteId) {
+  if (siteId !== AVAILABLE_SITE_ID) {
+    const site = sites.value.find((s) => s.id === siteId)
+    showNotice(`${site?.name ?? '이 사업장'} 화면은 준비 중입니다. 지금은 울산공장만 볼 수 있습니다.`)
+    return
+  }
+  router.push({ name: 'dashboard', params: { factoryId: AVAILABLE_FACTORY_ID } })
 }
 
-async function onLogout() {
-  await auth.logout()
-  router.push({ name: 'login' })
+/** 공장 줄을 눌렀을 때 (FactoryRow 가 진입 가능한 공장만 이벤트를 보냄) */
+function enterFactory(factory) {
+  router.push({ name: 'dashboard', params: { factoryId: factory.id } })
 }
 </script>
 
 <template>
-  <section class="site-select">
-    <div class="header">
-      <h1 class="page-title">사업장 선택</h1>
-      <button type="button" class="btn" @click="onLogout">로그아웃</button>
-    </div>
+  <div class="site-select">
+    <p v-if="loading" class="state">불러오는 중</p>
+    <p v-else-if="errorMessage" class="state error">{{ errorMessage }}</p>
 
-    <!-- TODO: 한반도 지도 (다음 단계) -->
-    <div class="map-placeholder">지도 영역</div>
+    <template v-else>
+      <div class="left">
+        <SiteMapCard :sites="sites" :current-id="AVAILABLE_SITE_ID" @select="enterSite" />
+        <SiteSensorCard :sites="sites" @select="enterSite" />
+      </div>
+      <SiteListCard
+        :sites="sites"
+        :current-site-id="AVAILABLE_SITE_ID"
+        :link-factory-id="AVAILABLE_FACTORY_ID"
+        @enter="enterSite"
+        @enter-factory="enterFactory"
+      />
+    </template>
 
-    <ul class="site-list">
-      <li v-for="site in SITES" :key="site.id" class="site">
-        <strong>{{ site.name }}</strong>
-        <div class="factories">
-          <button
-            v-for="factory in site.factories"
-            :key="factory.id"
-            type="button"
-            class="btn btn-primary"
-            :disabled="!factory.enabled"
-            @click="enterFactory(factory.id)"
-          >
-            {{ factory.name }}
-          </button>
-          <span v-if="site.factories.length === 0" class="empty">준비 중</span>
-        </div>
-      </li>
-    </ul>
-  </section>
+    <AppNotice :message="noticeMessage" />
+  </div>
 </template>
 
 <style scoped>
+/* 배치: 왼쪽 700px 열 + 오른쪽 목록 (설계안 1920 화면 기준), 좁은 화면에서는 위아래로 */
 .site-select {
-  width: 100%;
-  max-width: 720px;
+  display: grid;
+  grid-template-columns: minmax(0, 700px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
 }
 
-.header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+@media (max-width: 1200px) {
+  .site-select {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
-.map-placeholder {
-  height: 240px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 16px;
-  border: 1px dashed var(--color-border);
-  border-radius: var(--radius-md);
-  color: var(--color-text-sub);
-  background: var(--color-surface);
-}
-
-.site-list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
+.left {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 16px;
 }
 
-.site {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 16px;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-}
-
-.factories {
-  display: flex;
-  gap: 8px;
-}
-
-.empty {
+.state {
+  grid-column: 1 / -1;
   color: var(--color-text-sub);
+}
+
+.state.error {
+  color: var(--color-level-alarm-text);
 }
 </style>

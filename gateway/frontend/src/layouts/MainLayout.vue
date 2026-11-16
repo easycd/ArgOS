@@ -5,12 +5,12 @@
   - 본문: 선택한 메뉴 화면(RouterView)
 -->
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { getFactoryName } from '@/api/sites'
 import { FACTORY_MENUS } from '@/router/menus'
 import { useAuthStore } from '@/stores/auth'
 import { ROLE, ROLE_LABEL } from '@/types/codes'
-import { getFactoryName } from '@/features/site/sites'
 
 const route = useRoute()
 const router = useRouter()
@@ -18,7 +18,22 @@ const auth = useAuthStore()
 
 // 주소의 공장 ID (/factories/:factoryId/...)
 const factoryId = computed(() => route.params.factoryId)
-const factoryName = computed(() => getFactoryName(factoryId.value))
+
+// 상단 바에 보여 줄 공장 이름: 공장 ID 가 바뀔 때마다 API 로 조회 (실패하면 ID 그대로 표시)
+const factoryName = ref('')
+watch(
+  factoryId,
+  async (id) => {
+    factoryName.value = id
+    try {
+      const factory = await getFactoryName(id)
+      factoryName.value = `${factory.siteName} ${factory.name}` // 예: 울산공장 5공장
+    } catch {
+      // 조회 실패 시 ID 표시 유지
+    }
+  },
+  { immediate: true },
+)
 
 // 본사 관리자만 다른 사업장으로 돌아갈 수 있음
 const canChangeSite = computed(() => auth.role === ROLE.HQ_ADMIN)

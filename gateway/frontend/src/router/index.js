@@ -14,24 +14,15 @@ import { ROLE, WEB_ROLES } from '@/types/codes'
 
 import BlankLayout from '@/layouts/BlankLayout.vue'
 import MainLayout from '@/layouts/MainLayout.vue'
+import PlainLayout from '@/layouts/PlainLayout.vue'
+import { factoryIdsOf, homeRouteOf } from './home'
 import { FACTORY_MENUS } from './menus'
 
-/**
- * 로그인 사용자의 첫 화면
- * - 로그인 직후, 권한 없는 주소로 들어왔을 때 이동할 곳
- */
-export function homeRouteOf(user) {
-  if (user?.role === ROLE.HQ_ADMIN) {
-    return { name: 'site-select' }
-  }
-  if (user?.role === ROLE.PLANT_ADMIN && user.factoryId) {
-    return { name: 'dashboard', params: { factoryId: user.factoryId } }
-  }
-  return { name: 'login' }
-}
+// 다른 파일에서 '@/router' 로도 쓸 수 있게 다시 내보냄
+export { homeRouteOf }
 
 const routes = [
-  // 로그인 전 화면 + 사업장 선택: 상단 바 없는 빈 레이아웃
+  // 로그인: 상단 바 없는 빈 레이아웃
   {
     path: '/',
     component: BlankLayout,
@@ -42,11 +33,19 @@ const routes = [
         component: () => import('@/pages/auth/LoginPage.vue'),
         meta: { public: true }, // 로그인 없이 접근 가능
       },
+    ],
+  },
+
+  // 사업장 선택: 메뉴 없는 상단 바 (설계안 'hdr plain')
+  {
+    path: '/sites',
+    component: PlainLayout,
+    children: [
       {
-        path: 'sites',
+        path: '',
         name: 'site-select',
         component: () => import('@/pages/site/SiteSelectPage.vue'),
-        meta: { roles: [ROLE.HQ_ADMIN] }, // 본사 관리자만
+        meta: { roles: [ROLE.HQ_ADMIN], title: '사업장 선택' }, // 본사 관리자만
       },
     ],
   },
@@ -112,8 +111,12 @@ router.beforeEach((to) => {
     return homeRouteOf(auth.user)
   }
 
-  // 5) 공장 담당자는 자기 담당 공장만 볼 수 있음
-  if (auth.role === ROLE.PLANT_ADMIN && to.params.factoryId && to.params.factoryId !== auth.user.factoryId) {
+  // 5) 공장 담당자는 담당 공장(scope.factoryIds)만 볼 수 있음 (주소의 ID 는 문자열이라 숫자로 바꿔 비교)
+  if (
+    auth.role === ROLE.PLANT_ADMIN &&
+    to.params.factoryId &&
+    !factoryIdsOf(auth.user).includes(Number(to.params.factoryId))
+  ) {
     return homeRouteOf(auth.user)
   }
 

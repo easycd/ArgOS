@@ -12,13 +12,20 @@ export const LEVEL = Object.freeze({
   FIRE: 'FIRE', // 화재
 })
 
-/** 상태별 화면 표시 이름과 색 토큰 (tokens.css 의 변수명) */
+/**
+ * 상태별 화면 표시 정보
+ * - label: 이름, key: CSS 클래스용 이름(is-normal 등), icon: AppIcon 이름
+ * - color: 진한 색(점·선·도넛) — tokens.css 의 변수
+ */
 export const LEVEL_META = Object.freeze({
-  [LEVEL.NORMAL]: { label: '정상', color: 'var(--color-level-normal)' },
-  [LEVEL.WARN]: { label: '주의', color: 'var(--color-level-warn)' },
-  [LEVEL.ALARM]: { label: '경보', color: 'var(--color-level-alarm)' },
-  [LEVEL.FIRE]: { label: '화재', color: 'var(--color-level-fire)' },
+  [LEVEL.NORMAL]: { label: '정상', key: 'normal', icon: 'check', color: 'var(--color-level-normal)' },
+  [LEVEL.WARN]: { label: '주의', key: 'warn', icon: 'tri', color: 'var(--color-level-warn)' },
+  [LEVEL.ALARM]: { label: '경보', key: 'alarm', icon: 'alert', color: 'var(--color-level-alarm)' },
+  [LEVEL.FIRE]: { label: '화재', key: 'fire', icon: 'flame', color: 'var(--color-level-fire)' },
 })
+
+/** 센서 단계 3가지 (정상·주의·경보) 표시 순서 — 개수 표시·막대·도넛에서 공통 사용 */
+export const SENSOR_STAGES = Object.freeze([LEVEL.NORMAL, LEVEL.WARN, LEVEL.ALARM])
 
 /** 권한 3종 */
 export const ROLE = Object.freeze({

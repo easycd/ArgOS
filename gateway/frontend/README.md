@@ -21,6 +21,12 @@ npm run build          # 배포용 빌드 (dist/)
 
 비밀번호는 둘 다 `argos1234` 입니다. 예시 데이터는 **5공장 도장 공정 전류 센서 1개가 '주의'** 인 상황입니다(다른 상황은 `src/api/mock/data.js` 의 5공장 줄 주석 참고). 실제 백엔드에 붙일 때는 `.env` 에 `VITE_USE_MOCK=false` 를 넣으면 `/api` 요청이 `http://localhost:8080` 으로 갑니다.
 
+### 로그인 유지 시간
+
+로그인하면 **13시간** 유지되고, 상단 바의 남은 시간 옆 **'연장'** 을 누르면 1시간 늘어납니다. 만료 10분 전에 안내 문구가 뜨고, 시간이 다 되면 자동으로 로그아웃됩니다. 값은 `src/features/session/sessionConfig.js` 한 곳에 있습니다.
+
+개발할 때 빨리 확인하려면 `.env` 에 `VITE_DEV_SESSION_MINUTES=2` 를 넣고 `npm run dev` 를 다시 실행하세요(개발 모드에서만 2분).
+
 ## 폴더 구조
 
 ```text
@@ -34,6 +40,7 @@ src/
 │                     #   AppLogo, AppIcon, AppCheckbox, AppNotice, BaseCard, LevelBadge
 ├── features/         # 화면별 부품 (페이지는 이 부품들을 조립만 함)
 │   ├── auth/         #   로그인: LoginForm, LoginField, LoginAlert, LoginSubmit, LoginBackground, LoginSplash
+│   ├── session/      #   로그인 유지 13시간·연장 1시간: sessionConfig(설정 한 곳), SessionTimer(상단 바), useSessionTimer
 │   ├── dashboard/    #   사업장 현황: ZoneMapCard(UlsanMap, ZonePopover), FactoryStatusCard(Item),
 │   │                 #   SensorTypeCard, AlarmListCard(AlarmRow), HourlyAlarmCard(HourlyChart)
 │   └── site/         #   사업장 선택: SiteMapCard(KoreaMap), SiteSensorCard(SensorDonut),

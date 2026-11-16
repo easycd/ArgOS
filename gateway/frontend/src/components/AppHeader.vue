@@ -2,7 +2,7 @@
   상단 바 (화면설계안 js/shell.js buildHeader, css/base.css .hdr 기준)
   - 왼쪽: 로고(누르면 권한별 첫 화면), 제목(title 이 있을 때. 예: 사업장 선택)
   - 가운데: 기본 슬롯 (공장 화면의 메뉴 등을 넣을 자리)
-  - 오른쪽: 수신 상태·시계(AppHeaderStatus), 채팅·알림, 사용자 메뉴(AppHeaderUser)
+  - 오른쪽: 수신 상태·시계(AppHeaderStatus), 로그인 유지 시간·연장(SessionTimer), 채팅·알림, 사용자 메뉴(AppHeaderUser)
 -->
 <script setup>
 import { useRouter } from 'vue-router'
@@ -10,6 +10,7 @@ import AppHeaderStatus from './AppHeaderStatus.vue'
 import AppHeaderUser from './AppHeaderUser.vue'
 import AppIcon from './AppIcon.vue'
 import AppLogo from './AppLogo.vue'
+import SessionTimer from '@/features/session/SessionTimer.vue'
 import { homeRouteOf } from '@/router/home'
 import { useAuthStore } from '@/stores/auth'
 
@@ -41,6 +42,7 @@ function onBell() {}
 
     <div class="right">
       <AppHeaderStatus />
+      <SessionTimer />
       <button type="button" class="icon-btn" aria-label="채팅" @click="onChat">
         <AppIcon name="chat" />
       </button>

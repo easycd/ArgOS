@@ -100,6 +100,15 @@ router.beforeEach((to) => {
     auth.logout({ callServer: false })
   }
 
+  // 0-1) 로그인 유지 시간(13시간)이 지났으면 로그아웃 후 로그인 화면에 안내
+  //      (화면을 켜 둔 채 지난 경우는 상단 바 SessionTimer 가 처리, 여기서는 새로고침·주소 이동 때)
+  //      callServer: false → 로그인 정보를 바로(기다리지 않고) 지움.
+  //      서버 요청을 기다리면 그 사이 로그인 화면 가드가 '아직 로그인 상태'로 보고 다시 되돌려 보냄
+  if (auth.isExpired()) {
+    auth.logout({ callServer: false })
+    return { name: 'login', query: { reason: 'expired' } }
+  }
+
   // 1) 로그인 화면
   if (to.meta.public) {
     // 이미 로그인했으면 첫 화면으로

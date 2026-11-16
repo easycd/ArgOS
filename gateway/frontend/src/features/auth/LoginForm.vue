@@ -13,13 +13,16 @@ import { USE_MOCK } from '@/api/mock'
 import AppCheckbox from '@/components/AppCheckbox.vue'
 import AppIcon from '@/components/AppIcon.vue'
 import AppLogo from '@/components/AppLogo.vue'
+import { SESSION_HOURS } from '@/features/session/sessionConfig'
 import { homeRouteOf } from '@/router/home'
 import { useAuthStore } from '@/stores/auth'
 import { loadSavedLoginId, saveLoginId } from '@/utils/storage'
 
-defineProps({
+const props = defineProps({
   /** 성공 후 카드가 위로 사라지는 중 */
   leaving: { type: Boolean, default: false },
+  /** 로그인 유지 시간이 지나 자동 로그아웃되어 온 경우 (안내 상자를 처음부터 띄움) */
+  expired: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['success'])
@@ -36,7 +39,16 @@ const showPassword = ref(false)
 // 화면 상태
 const loading = ref(false)
 const fieldError = ref({ loginId: '', password: '' }) // 칸 아래 빨간 글씨
-const alertBox = ref(null) // 카드 위쪽 오류 상자: { icon, title, text }
+// 카드 위쪽 상자: { icon, title, text } — 자동 로그아웃으로 왔으면 처음부터 안내
+const alertBox = ref(
+  props.expired
+    ? {
+        icon: 'clock',
+        title: '로그인 유지 시간이 끝났습니다',
+        text: `${SESSION_HOURS}시간이 지나 자동으로 로그아웃되었습니다. 다시 로그인해 주세요.`,
+      }
+    : null,
+)
 const notice = ref('') // 비밀번호 재설정 안내
 const shaking = ref(false) // 실패 시 카드 흔들기
 

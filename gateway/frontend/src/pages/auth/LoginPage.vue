@@ -30,7 +30,7 @@ function onSplashDone() {
 <template>
   <div class="login-page">
     <LoginBackground />
-    <LoginForm :leaving="!!loggedInUser" @success="onLoginSuccess" />
+    <LoginForm :leaving="!!loggedInUser" :expired="route.query.reason === 'expired'" @success="onLoginSuccess" />
     <p class="footer" :class="{ hidden: loggedInUser }">ArgOS v1.0 · 계정 문의: 환경안전팀</p>
     <LoginSplash :user="loggedInUser" @done="onSplashDone" />
   </div>

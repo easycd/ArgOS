@@ -1,16 +1,33 @@
 <!--
   사업장 선택 화면 (본사 관리자 전용)
   - 설계: 한반도 지도에 울산·아산·전주 표시 → 사업장 선택 → 공장 진입
-  - 지금은 자리 표시용 목록만. 지도는 다음 단계에서 구현
-  - 이번 범위는 울산 5공장만 진입 가능
+  - 지금은 사업장 목록만 (지도는 설계 자료 받은 뒤 구현)
+  - 데이터: GET /sites (지금은 예시 데이터)
 -->
 <script setup>
+import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { getSites } from '@/api/sites'
+import BaseCard from '@/components/BaseCard.vue'
+import LevelBadge from '@/components/LevelBadge.vue'
 import { useAuthStore } from '@/stores/auth'
-import { SITES } from '@/features/site/sites'
 
 const router = useRouter()
 const auth = useAuthStore()
+
+const sites = ref([])
+const loading = ref(true)
+const errorMessage = ref('')
+
+onMounted(async () => {
+  try {
+    sites.value = await getSites()
+  } catch (error) {
+    errorMessage.value = error.message
+  } finally {
+    loading.value = false
+  }
+})
 
 function enterFactory(factoryId) {
   router.push({ name: 'dashboard', params: { factoryId } })
@@ -29,27 +46,33 @@ async function onLogout() {
       <button type="button" class="btn" @click="onLogout">로그아웃</button>
     </div>
 
-    <!-- TODO: 한반도 지도 (다음 단계) -->
-    <div class="map-placeholder">지도 영역</div>
+    <BaseCard title="사업장 목록">
+      <p v-if="loading" class="message">불러오는 중</p>
+      <p v-else-if="errorMessage" class="message error">{{ errorMessage }}</p>
 
-    <ul class="site-list">
-      <li v-for="site in SITES" :key="site.id" class="site">
-        <strong>{{ site.name }}</strong>
-        <div class="factories">
-          <button
-            v-for="factory in site.factories"
-            :key="factory.id"
-            type="button"
-            class="btn btn-primary"
-            :disabled="!factory.enabled"
-            @click="enterFactory(factory.id)"
-          >
-            {{ factory.name }}
-          </button>
-          <span v-if="site.factories.length === 0" class="empty">준비 중</span>
-        </div>
-      </li>
-    </ul>
+      <ul v-else class="site-list">
+        <li v-for="site in sites" :key="site.id" class="site">
+          <div class="site-info">
+            <strong>{{ site.name }}</strong>
+            <LevelBadge :level="site.level" />
+            <span class="alarm mono">알림 {{ site.alarmCount }}</span>
+          </div>
+          <div class="factories">
+            <button
+              v-for="factory in site.factories"
+              :key="factory.id"
+              type="button"
+              class="btn btn-primary"
+              :disabled="!factory.enabled"
+              @click="enterFactory(factory.id)"
+            >
+              {{ factory.name }}
+            </button>
+            <span v-if="site.factories.length === 0" class="message">준비 중</span>
+          </div>
+        </li>
+      </ul>
+    </BaseCard>
   </section>
 </template>
 
@@ -65,18 +88,6 @@ async function onLogout() {
   justify-content: space-between;
 }
 
-.map-placeholder {
-  height: 240px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 16px;
-  border: 1px dashed var(--color-border);
-  border-radius: var(--radius-md);
-  color: var(--color-text-sub);
-  background: var(--color-surface);
-}
-
 .site-list {
   margin: 0;
   padding: 0;
@@ -90,18 +101,29 @@ async function onLogout() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 16px;
-  background: var(--color-surface);
+  gap: 12px;
+  padding: 12px 14px;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
 }
 
+.site-info,
 .factories {
   display: flex;
+  align-items: center;
   gap: 8px;
 }
 
-.empty {
+.alarm,
+.message {
   color: var(--color-text-sub);
+}
+
+.message {
+  margin: 0;
+}
+
+.error {
+  color: var(--color-level-alarm);
 }
 </style>

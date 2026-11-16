@@ -6,7 +6,6 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import * as authApi from '@/api/auth'
-import { ROLE } from '@/types/codes'
 import { clearAuth, loadAuth, saveAuth } from '@/utils/storage'
 
 export const useAuthStore = defineStore('auth', () => {
@@ -39,28 +38,9 @@ export const useAuthStore = defineStore('auth', () => {
     setSession(result)
   }
 
-  /**
-   * [개발 전용] 백엔드 없이 권한별 화면을 확인하기 위한 가짜 로그인
-   * - 로그인 화면에서 개발 모드(npm run dev)일 때만 버튼이 보임
-   * - 백엔드 로그인 API 가 준비되면 삭제 예정
-   */
-  function devLogin(devRole) {
-    setSession({
-      accessToken: 'dev-token',
-      refreshToken: null,
-      user: {
-        id: 0,
-        name: devRole === ROLE.HQ_ADMIN ? '본사 관리자(개발)' : '공장 담당자(개발)',
-        role: devRole,
-        // 공장 담당자는 담당 공장이 정해져 있음 (우선 울산 5공장만)
-        factoryId: devRole === ROLE.PLANT_ADMIN ? 'ulsan-5' : null,
-      },
-    })
-  }
-
   /** 로그아웃: 서버 요청은 실패해도 화면 쪽 로그인 정보는 반드시 삭제 */
   async function logout({ callServer = true } = {}) {
-    if (callServer && accessToken.value && accessToken.value !== 'dev-token') {
+    if (callServer && accessToken.value) {
       try {
         await authApi.logout()
       } catch {
@@ -73,5 +53,5 @@ export const useAuthStore = defineStore('auth', () => {
     clearAuth()
   }
 
-  return { accessToken, refreshToken, user, isLoggedIn, role, login, devLogin, logout }
+  return { accessToken, refreshToken, user, isLoggedIn, role, login, logout }
 })

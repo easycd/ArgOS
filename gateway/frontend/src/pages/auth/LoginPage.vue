@@ -2,14 +2,14 @@
   로그인 화면 (가운데 카드)
   - 로그인 성공 → 권한별 첫 화면으로 이동 (router/index.js 의 homeRouteOf)
   - 공정 담당자(WORKER)는 모바일 앱을 쓰므로 웹 로그인 차단
-  - 개발 모드에서만 백엔드 없이 들어가는 버튼 표시
+  - 예시 데이터(mock) 모드에서는 예시 계정 안내 표시
 -->
 <script setup>
 import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { homeRouteOf } from '@/router'
 import { useAuthStore } from '@/stores/auth'
-import { ROLE } from '@/types/codes'
+import { USE_MOCK } from '@/api/mock'
 
 const route = useRoute()
 const router = useRouter()
@@ -20,8 +20,8 @@ const password = ref('')
 const loading = ref(false)
 const errorMessage = ref('')
 
-// npm run dev 로 실행했을 때만 true (빌드 결과물에서는 false)
-const isDev = import.meta.env.DEV
+// 예시 데이터 모드면 예시 계정 안내를 보여 줌
+const showMockHint = USE_MOCK
 
 /** 로그인 후 이동: 원래 가려던 주소(redirect)가 있으면 그쪽, 없으면 권한별 첫 화면 */
 async function goNext() {
@@ -55,12 +55,6 @@ async function onSubmit() {
     loading.value = false
   }
 }
-
-/** [개발 전용] 권한 골라서 바로 들어가기 */
-async function onDevLogin(role) {
-  auth.devLogin(role)
-  await goNext()
-}
 </script>
 
 <template>
@@ -85,12 +79,8 @@ async function onDevLogin(role) {
       </button>
     </form>
 
-    <!-- 개발 모드 전용: 백엔드 로그인 API 준비 전 화면 확인용 (준비되면 삭제) -->
-    <div v-if="isDev" class="dev-login">
-      <p>개발용 바로 들어가기</p>
-      <button type="button" class="btn" @click="onDevLogin(ROLE.HQ_ADMIN)">본사 관리자</button>
-      <button type="button" class="btn" @click="onDevLogin(ROLE.PLANT_ADMIN)">공장 담당자</button>
-    </div>
+    <!-- 예시 데이터 모드 전용 안내 (백엔드 연결 후 사라짐) -->
+    <p v-if="showMockHint" class="mock-hint">예시 계정: hq_admin, ulsan5_admin / argos1234</p>
   </div>
 </template>
 
@@ -140,19 +130,8 @@ async function onDevLogin(role) {
   color: var(--color-level-alarm);
 }
 
-.dev-login {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin-top: 24px;
-  padding-top: 16px;
-  border-top: 1px dashed var(--color-border);
-}
-
-.dev-login p {
-  width: 100%;
-  margin: 0;
+.mock-hint {
+  margin: 20px 0 0;
   color: var(--color-text-sub);
   font-size: 12px;
 }

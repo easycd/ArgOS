@@ -34,6 +34,6 @@ defineProps({
   color: #fff;
   font-size: 14px;
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.2);
-  animation: softin 0.2s both;
+  animation: pop-in var(--m-pop-in) both; /* 4px 위에서 내려오며 나타남 (motion.css) */
 }
 </style>

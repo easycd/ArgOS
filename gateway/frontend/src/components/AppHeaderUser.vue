@@ -79,6 +79,7 @@ async function onLogout() {
   border: 1px solid var(--color-border-card);
   border-radius: var(--radius-md);
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+  animation: pop-in var(--m-pop-in) both; /* motion.css */
 }
 
 .menu-head {

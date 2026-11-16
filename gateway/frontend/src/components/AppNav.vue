@@ -108,10 +108,18 @@ watch(() => route.fullPath, () => (adminOpen.value = false))
   height: 3px;
   border-radius: 3px 3px 0 0;
   background: var(--color-primary);
+  animation: tab-line var(--m-tab) both; /* 선택하면 밑줄이 가운데서 펼쳐짐 */
 }
 
 .chev {
   color: var(--color-text-weak);
+}
+
+@keyframes tab-line {
+  from {
+    transform: scaleX(0.3);
+    opacity: 0;
+  }
 }
 
 /* '관리' 펼침 */
@@ -130,6 +138,7 @@ watch(() => route.fullPath, () => (adminOpen.value = false))
   border: 1px solid var(--color-border-card);
   border-radius: var(--radius-md);
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+  animation: pop-in var(--m-pop-in) both; /* motion.css */
 }
 
 .menu-item {

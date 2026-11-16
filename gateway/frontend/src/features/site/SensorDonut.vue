@@ -83,4 +83,11 @@ const arcs = computed(() => {
   font-size: 11px;
   fill: var(--color-text-weak);
 }
+
+/* 개수가 바뀌면 조각 길이가 이어서 변함 (화면설계서 R2 --m-value) */
+circle {
+  transition:
+    stroke-dasharray var(--m-value),
+    stroke-dashoffset var(--m-value);
+}
 </style>

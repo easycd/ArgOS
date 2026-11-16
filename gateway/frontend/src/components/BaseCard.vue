@@ -1,6 +1,7 @@
 <!--
   카드 틀 (화면설계안 css/base.css 의 .card / .ch 모양)
   - 제목줄: 제목(title) + 회색 설명(sub) + 오른쪽 끝 영역(actions 슬롯)
+  - 화면에 나타날 때 아래에서 올라오며 차례로 나타남 (화면설계서 R2, motion.css 의 .rise)
   - 사용 예:
     <BaseCard title="사업장 목록" sub="3곳">
       <template #actions><button>...</button></template>
@@ -8,16 +9,32 @@
     </BaseCard>
 -->
 <script setup>
+import { onMounted, ref } from 'vue'
+
 defineProps({
   /** 카드 제목 (없으면 제목줄을 그리지 않음) */
   title: { type: String, default: '' },
   /** 제목 옆 회색 설명 */
   sub: { type: String, default: '' },
 })
+
+/**
+ * 차례 번호(--i): 같은 화면 안 카드들 중 몇 번째인지 (위→아래, 왼쪽→오른쪽)
+ * - 카드들이 같은 순간에 그려지므로, 그려진 직후 화면 안 카드 위치로 순서를 정함
+ */
+const el = ref(null)
+onMounted(() => {
+  const page = el.value.closest('.page') ?? document
+  const order = [...page.querySelectorAll('.base-card')]
+    .map((card) => ({ card, rect: card.getBoundingClientRect() }))
+    .sort((a, b) => a.rect.top - b.rect.top || a.rect.left - b.rect.left)
+    .map(({ card }) => card)
+  el.value.style.setProperty('--i', order.indexOf(el.value))
+})
 </script>
 
 <template>
-  <section class="base-card">
+  <section ref="el" class="base-card rise">
     <header v-if="title" class="card-head">
       <h3>{{ title }}</h3>
       <!-- 설명: 글자만이면 sub, 링크 등이 필요하면 sub 슬롯 -->

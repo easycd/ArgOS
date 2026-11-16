@@ -33,7 +33,7 @@ npm run build          # 배포용 빌드 (dist/)
 src/
 ├── api/              # 연계 서버 API (http.js = Axios 공통, mock/ = 예시 데이터)
 ├── assets/
-│   ├── images/       # 설계안에서 만든 정적 그림 (로그인 배경, 한반도 지도, 울산공장 지도, 5공장 공정 배치도)
+│   ├── images/       # 설계안에서 만든 정적 그림 (로그인 배경, 한반도 지도, 울산공장 지도, 5공장 공정 배치도, 도장 공정 3D 배치도)
 │   └── styles/       # tokens.css(색·글꼴 토큰), base.css(전역 기본)
 ├── components/       # 여러 화면이 같이 쓰는 부품
 │                     #   AppHeader(+Status, +Badges, +User), AppNav(상단 메뉴), SitePill(사업장 이름),
@@ -44,13 +44,15 @@ src/
 │   ├── dashboard/    #   사업장 현황: ZoneMapCard(UlsanMap, ZonePopover), FactoryStatusCard(Item),
 │   │                 #   SensorTypeCard, AlarmListCard(AlarmRow), HourlyAlarmCard(HourlyChart)
 │   ├── factory/      #   공장 대시보드: PlantMapCard(PlantMap, plantLayout.js), ProcessStatusCard(Item)
+│   ├── process/      #   공정 3D 설비 배치도: ProcessMapCard(PaintMap, paintLayout.js, FanPopover, EquipmentStrip, SensorRing),
+│   │                 #   InspectionTodayCard(InspectionRow)
 │   └── site/         #   사업장 선택: SiteMapCard(KoreaMap), SiteSensorCard(SensorDonut),
 │                     #   SiteListCard → SiteListItem → FactoryRow, StageCounts, StageBar, 집계·도우미 js
 ├── layouts/          # BlankLayout(로그인), PlainLayout(메뉴 없는 상단 바), MainLayout(사업장 안 화면)
 ├── pages/            # 화면 (데이터 불러오기·화면 이동만, 모양은 features 부품이 담당)
 ├── router/           # 주소·권한 가드(index.js), 첫 화면(home.js), 상단 메뉴(menus.js)
 │                     #   주소: /sites(사업장 선택) → /sites/:siteId(사업장 현황) → /sites/:siteId/factories/:factoryId
-│                     #         (공장 대시보드) → .../processes/:processId (3D 설비 배치도, 다음 작업)
+│                     #         (공장 대시보드) → .../processes/:processId (3D 설비 배치도) → .../equipment/:equipmentId (설비 상세, 다음 작업)
 ├── stores/           # Pinia (auth: 로그인 상태)
 ├── types/            # 공통 코드 (상태 단계 LEVEL, 권한 ROLE, 센서 종류, 알림 진행 상태)
 └── utils/            # echarts 등록, 차트 색(chartColors), 브라우저 저장, 날짜 형식, 안내 문구(useNotice)

@@ -1,0 +1,117 @@
+/**
+ * 공정 3D 배치도 예시 데이터 (5공장 도장 공정, processId 12)
+ * - 응답 모양: API 명세서 B3 (GET /processes/{id}/layout, /status, GET /inspections/today)
+ * - 값: 화면설계안 js/v-dash.js EQD(설비·센서), TODO(오늘 점검), '주의' 상황 값과 같게
+ * - 지금 상황: 상도 건조로 배기팬 전류 CT-17 이 22.4 A 로 '주의' (공장·사업장 화면 숫자와 같음)
+ * - 센서 19개 = 전류 9 + 온도 6 + CO 4 (CO-14 는 예비 센서라 그림에 위치 없음)
+ */
+import { LEVEL } from '@/types/codes'
+
+const { NORMAL, WARN } = LEVEL
+
+/** 설비 (seq: 공정 흐름 순서 번호, 그림과 아래 설비 줄에 표시. 명세서에 없는 값) */
+const EQUIPMENT = [
+  { id: 24, code: 'PNT-PRETREAT', name: '전처리', type: 'TANK', seq: 1, manager: '이재호' },
+  { id: 25, code: 'PNT-ED-TANK', name: '전착 탱크', type: 'TANK', seq: 2, manager: '이재호' },
+  { id: 26, code: 'PNT-ED-OVEN', name: '전착 건조로', type: 'OVEN', seq: 3, manager: '박성훈' },
+  { id: 27, code: 'PNT-SEALING', name: '실링', type: 'BOX', seq: 4, manager: '박성훈' },
+  { id: 28, code: 'PNT-PRIMER-BOOTH', name: '중도 부스', type: 'BOOTH', seq: 5, manager: '박성훈' },
+  { id: 29, code: 'PNT-PRIMER-OVEN', name: '중도 건조로', type: 'OVEN', seq: 6, manager: '박성훈' },
+  { id: 30, code: 'PNT-TOP-BOOTH', name: '상도 부스', type: 'BOOTH', seq: 7, manager: '김도현' },
+  { id: 31, code: 'PNT-TOP-OVEN', name: '상도 건조로', type: 'OVEN', seq: 8, manager: '김도현' },
+  { id: 32, code: 'PNT-AHU', name: '공조기 (AHU)', type: 'BOX', seq: null, manager: '이재호' },
+  { id: 33, code: 'PNT-PAINT-MIX', name: '도료 혼합실', type: 'BOX', seq: null, manager: '이재호' },
+  { id: 34, code: 'PNT-INCINERATOR', name: '소각설비', type: 'BOX', seq: null, manager: '이재호' },
+]
+
+/** 센서: [id, tag, 종류, 단위, 설비 id, 지금 값, 주의 기준, 경보 기준] — id 는 전류 1xx · 온도 2xx · CO 3xx */
+const SENSORS = [
+  [111, 'CT-11', 'CURRENT', 'A', 24, 9.8, 12, 15],
+  [211, 'TE-11', 'TEMP', '℃', 24, 52, 60, 70],
+  [112, 'CT-12', 'CURRENT', 'A', 25, 7.4, 10, 13],
+  [212, 'TE-12', 'TEMP', '℃', 25, 28, 32, 36],
+  [113, 'CT-13', 'CURRENT', 'A', 26, 16.2, 21.6, 27],
+  [213, 'TE-13', 'TEMP', '℃', 26, 151, 160, 180],
+  [311, 'CO-11', 'CO', 'ppm', 26, 7, 20, 30],
+  [114, 'CT-14', 'CURRENT', 'A', 28, 14.1, 18, 22],
+  [115, 'CT-15', 'CURRENT', 'A', 29, 17.3, 21.6, 27],
+  [214, 'TE-14', 'TEMP', '℃', 29, 148, 160, 180],
+  [312, 'CO-12', 'CO', 'ppm', 29, 12, 20, 30],
+  [116, 'CT-16', 'CURRENT', 'A', 30, 15.2, 18, 22],
+  [117, 'CT-17', 'CURRENT', 'A', 31, 22.4, 21.6, 27],
+  [215, 'TE-15', 'TEMP', '℃', 31, 146, 160, 180],
+  [313, 'CO-13', 'CO', 'ppm', 31, 9, 20, 30],
+  [121, 'CT-21', 'CURRENT', 'A', 32, 11.8, 15, 18],
+  [122, 'CT-22', 'CURRENT', 'A', 33, 4.6, 6, 8],
+  [221, 'TE-21', 'TEMP', '℃', 34, 742, 820, 880],
+  [314, 'CO-14', 'CO', 'ppm', null, 5, 20, 30], // 예비 센서 (설비에 아직 안 붙음)
+].map(([id, tag, type, unit, equipmentId, value, warn, alarm]) => ({
+  id, // 예시 번호: 전류 1xx · 온도 2xx · CO 3xx (태그 번호와 같게)
+  tag,
+  type,
+  unit,
+  equipmentId,
+  value,
+  warn,
+  alarm,
+  level: value >= alarm ? LEVEL.ALARM : value >= warn ? WARN : NORMAL,
+}))
+
+/** 배기팬이 있는 설비 → 팬 상태 (상도 건조로는 주의라 회전수를 올려 둔 상태) */
+const FANS = {
+  26: { power: 'ON', rpm: 1180, targetRpm: 1180 },
+  28: { power: 'ON', rpm: 1180, targetRpm: 1180 },
+  29: { power: 'ON', rpm: 1180, targetRpm: 1180 },
+  30: { power: 'ON', rpm: 1180, targetRpm: 1180 },
+  31: { power: 'ON', rpm: 1240, targetRpm: 1240 },
+}
+
+/** 설비 단계 = 붙은 센서 중 가장 높은 단계 */
+function equipmentLevel(equipmentId) {
+  const levels = SENSORS.filter((s) => s.equipmentId === equipmentId).map((s) => s.level)
+  if (levels.includes(LEVEL.ALARM)) return LEVEL.ALARM
+  if (levels.includes(WARN)) return WARN
+  return NORMAL
+}
+
+export const MOCK_PROCESS = {
+  12: {
+    // GET /processes/{processId}/layout
+    layout: {
+      processId: 12,
+      name: '도장 공정',
+      version: 14,
+      floorplan: null,
+      equipment: EQUIPMENT.map(({ manager, ...e }) => ({
+        ...e,
+        active: true,
+        managers: [{ id: 0, name: manager, primary: true }],
+      })),
+      sensors: SENSORS.map(({ id, tag, type, unit, equipmentId }) => ({ id, tag, type, unit, equipmentId, active: true })),
+    },
+    // GET /processes/{processId}/status
+    status: {
+      processId: 12,
+      level: WARN,
+      equipment: EQUIPMENT.map((e) => ({
+        id: e.id,
+        level: equipmentLevel(e.id),
+        runState: 'RUNNING',
+        fan: FANS[e.id] ?? null,
+      })),
+      sensors: SENSORS.map(({ id, tag, value, level, warn, alarm }) => ({ id, tag, value, level, warn, alarm })),
+    },
+    // GET /inspections/today?processId=12 (설계안 '오늘 설비 점검' 5건)
+    inspections: {
+      doneCount: 3,
+      totalCount: 5,
+      items: [
+        { scheduleId: 640, time: '08:30', equipmentName: '상도 건조로', title: '배기팬 벨트·베어링 점검', assignee: '김도현', status: 'DONE' },
+        { scheduleId: 641, time: '09:00', equipmentName: '전착 건조로', title: '버너실 CO 감지기 작동 확인', assignee: '박성훈', status: 'DONE' },
+        { scheduleId: 642, time: '10:30', equipmentName: '전처리', title: '순환펌프 누수·진동 점검', assignee: '이재호', status: 'DONE' },
+        { scheduleId: 643, time: '14:00', equipmentName: '소각설비', title: '연소실 온도 기록지 확인', assignee: '이재호', status: 'DELAYED' },
+        { scheduleId: 644, time: '17:00', equipmentName: '중도 건조로', title: '배기 덕트 댐퍼 개도 확인', assignee: '박성훈', status: 'PLANNED' },
+      ],
+    },
+  },
+}

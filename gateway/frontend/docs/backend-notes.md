@@ -192,3 +192,43 @@
 | 1 | 배치도 그림: 프론트는 설계안 고정 그림(5공장 공정 건물 4개)을 쓰고, 카메라 위치도 그림에 고정. 명세서 `cameras[].x, y` 는 아직 안 씀 |
 | 2 | 사업장 이름(경로의 '울산공장'): 공장 overview 응답에 `siteId`·`siteName` 이 있으면 따로 안 불러도 됨 → 넣을지 합의 |
 | 3 | 상단 바 상태 띠("주의 1건 · 상도 건조로 · 눌러서 확인")와 체크리스트 진행 칸은 경보 창·체크리스트 화면이 생길 때 같이 만듦. 지금은 채팅·알림 빨간 숫자만 |
+
+---
+
+## 7. 공정 3D 설비 배치도 (명세서 B3 '도장 공정 3D 배치도')
+
+| API | 프론트 사용 | 명세서와 다른 점 |
+| --- | --- | --- |
+| `GET /processes/{processId}/layout` | 설비 목록(이름·순서), 센서가 어느 설비에 붙었는지 | 아래 표 참고 |
+| `GET /processes/{processId}/status` | 설비 상태 테두리 색, 센서 이름표 색, 배기팬 상태, 상도 건조로 센서 게이지 | 없음 |
+| `POST /equipment/{equipmentId}/fan` | 배기팬 창 '적용' → `{ power: "ON"/"OFF" }` 또는 `{ rpm: 600~1800 }` | 없음. 프론트는 접수(202) 되면 화면 값을 바로 바꿈 (**TODO: SSE `command.result` 로 확정·5초 안에 안 오면 되돌리기**) |
+| `GET /alarms?processId=&date=today` | 이 공정의 실시간 알림 | **processId 범위 지원 필요** (명세서는 siteId·factoryId 예시만) |
+| `GET /inspections/today?processId=` | 오늘 설비 점검 카드 | 없음 |
+
+### 프론트가 쓰는 `layout` 필드
+
+| 필드 | 쓰는 곳 |
+| --- | --- |
+| `name` | 경로·카드 제목 ('도장 공정') |
+| `equipment[].id`, `name` | 설비 줄, 말풍선, 설비 상세로 이동 |
+| `equipment[].code` | **그림 속 설비와 짝 맞춤** (`PNT-TOP-OVEN` → 그림의 상도 건조로). 모든 설비에 code 필요, 값 합의 필요 (프론트 가정: `PNT-PRETREAT`, `PNT-ED-TANK`, `PNT-ED-OVEN`, `PNT-SEALING`, `PNT-PRIMER-BOOTH`, `PNT-PRIMER-OVEN`, `PNT-TOP-BOOTH`, `PNT-TOP-OVEN`, `PNT-AHU`, `PNT-PAINT-MIX`, `PNT-INCINERATOR`) |
+| **`equipment[].seq`** | 공정 흐름 순서 번호(1~8) — 그림과 아래 설비 줄의 파란 번호. **명세서에 없음 → 추가 필요** (공장 관리 화면에서 정하는 값으로 보임) |
+| `sensors[].id`, `tag`, `type`, `unit`, `equipmentId` | 설비별 센서 묶기 (`equipmentId` 가 null 이면 예비 센서: 개수에는 넣고 그림에는 안 나옴) |
+
+- `equipment[].pos`·`size`·`shape`, `sensors[].pos`, `floorplan` 은 아직 안 씀: 그림은 설계안 고정 그림(축측 SVG)이고 위치도 그림에 고정. 공장 관리(설비 재배치) 화면을 만들 때 이 값으로 그리는 방식을 다시 정함
+
+### 프론트가 쓰는 `status` 필드
+
+| 필드 | 쓰는 곳 |
+| --- | --- |
+| `equipment[].level` | 설비 둘레 상태 테두리 (주의·경보만 빛번짐) |
+| `equipment[].fan.power`, `rpm` | 배기팬 창 (켜기/끄기, 회전수) |
+| `sensors[].value`, `level`, `alarm` | 센서 이름표 색, 말풍선 값, 게이지(눈금 끝 = 경보 기준 × 1.2) |
+
+### 정해야 할 것
+
+| 번호 | 내용 |
+| --- | --- |
+| 1 | 버너실 테두리: 프론트는 설비의 **CO 센서 단계**로 칠함 (전류만 주의면 건물만 주황, 버너실은 초록). 서버가 버너를 별도 설비로 줄지, 설비 안 부품 단계로 줄지 |
+| 2 | 배기팬 끄기: 명세서는 '2초 길게 누르기'인데 지금은 ON/OFF 버튼 + '적용' 두 번 누르기로 대신함 (실수 방지 방식 합의) |
+| 3 | 공정 센서 수: 도장 공정 19개 = 전류 9 + 온도 6 + CO 4. 설계안 그림에는 CO 센서가 3개(CO-11~13)라, 예시 데이터에서는 4번째를 예비 센서 CO-14(설비 미연결)로 둠 |

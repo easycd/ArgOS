@@ -56,28 +56,32 @@ export function getSiteOverview(siteId) {
 
 /**
  * 범위(사업장 또는 공장)에 맞는 예시 알림 고르기
- * - 명세서: 범위는 siteId · factoryId 중 하나만 보냄
+ * - 명세서: 범위는 siteId · factoryId · processId 중 하나만 보냄
  */
-function mockAlarmsOf({ siteId, factoryId }) {
+function mockAlarmsOf({ siteId, factoryId, processId }) {
+  if (processId) return MOCK_ALARMS.filter((a) => a.processId === Number(processId))
   if (factoryId) return MOCK_ALARMS.filter((a) => a.factoryId === Number(factoryId))
   return MOCK_ALARMS.filter((a) => a.siteId === Number(siteId))
 }
 
-/** 범위 파라미터: factoryId 가 있으면 공장, 없으면 사업장 */
-const scopeParams = ({ siteId, factoryId }) => (factoryId ? { factoryId } : { siteId })
+/** 범위 파라미터: 공정 > 공장 > 사업장 순서로 하나만 */
+const scopeParams = ({ siteId, factoryId, processId }) =>
+  processId ? { processId } : factoryId ? { factoryId } : { siteId }
 
 /**
  * 오늘 알림 목록 (최근 순)
- * @param {{ siteId?: number, factoryId?: number, size?: number }} params
+ * @param {{ siteId?: number, factoryId?: number, processId?: number, size?: number }} params
  * @returns {Promise<{ items: Array, page: number, size: number, total: number }>}
  */
-export function getAlarms({ siteId, factoryId, size = 20 }) {
+export function getAlarms({ siteId, factoryId, processId, size = 20 }) {
   if (USE_MOCK) {
-    // 예시 데이터에만 있는 범위 값(siteId·factoryId)은 빼고 응답 모양만 남김
-    const all = mockAlarmsOf({ siteId, factoryId }).map(({ siteId: _s, factoryId: _f, ...item }) => item)
+    // 예시 데이터에만 있는 범위 값(siteId·factoryId·processId)은 빼고 응답 모양만 남김
+    const all = mockAlarmsOf({ siteId, factoryId, processId }).map(
+      ({ siteId: _s, factoryId: _f, processId: _p, ...item }) => item,
+    )
     return mockOk({ items: all.slice(0, size), page: 0, size, total: all.length })
   }
-  return http.get('/alarms', { params: { ...scopeParams({ siteId, factoryId }), date: 'today', size } })
+  return http.get('/alarms', { params: { ...scopeParams({ siteId, factoryId, processId }), date: 'today', size } })
 }
 
 /**

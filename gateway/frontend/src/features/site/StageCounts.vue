@@ -81,11 +81,12 @@ b {
   font-size: 13px;
 }
 
-.is-warn b {
+/* .item 까지 붙여야 함: 부모 카드에 is-warn 이 붙어 있으면 모든 숫자가 주황이 되는 문제 방지 */
+.item.is-warn b {
   color: var(--color-level-warn-text);
 }
 
-.is-alarm b {
+.item.is-alarm b {
   color: var(--color-level-alarm-text);
 }
 </style>

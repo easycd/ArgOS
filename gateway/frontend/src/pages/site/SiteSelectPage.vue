@@ -40,10 +40,8 @@ onMounted(async () => {
 const { message: noticeMessage, show: showNotice } = useNotice()
 
 /**
- * 사업장으로 이동 (지도 핀, 도넛 카드, '이동' 버튼)
- * - 설계안: 울산공장 → 울산공장(사업장) 현황 화면
- * - TODO: 사업장 현황 화면(GET /sites/{siteId}/overview)이 생기면 그쪽으로.
- *         지금은 진입 가능한 5공장 대시보드로 이동
+ * 사업장으로 이동 (지도 핀, 도넛 카드, '이동' 버튼) → 사업장 현황 화면
+ * - 지금은 울산공장만 들어갈 수 있음
  */
 function enterSite(siteId) {
   if (siteId !== AVAILABLE_SITE_ID) {
@@ -51,12 +49,12 @@ function enterSite(siteId) {
     showNotice(`${site?.name ?? '이 사업장'} 화면은 준비 중입니다. 지금은 울산공장만 볼 수 있습니다.`)
     return
   }
-  router.push({ name: 'dashboard', params: { factoryId: AVAILABLE_FACTORY_ID } })
+  router.push({ name: 'site-dashboard', params: { siteId } })
 }
 
-/** 공장 줄을 눌렀을 때 (FactoryRow 가 진입 가능한 공장만 이벤트를 보냄) */
+/** 공장 줄을 눌렀을 때 → 공장 대시보드 (FactoryRow 가 진입 가능한 공장만 이벤트를 보냄) */
 function enterFactory(factory) {
-  router.push({ name: 'dashboard', params: { factoryId: factory.id } })
+  router.push({ name: 'dashboard', params: { siteId: AVAILABLE_SITE_ID, factoryId: factory.id } })
 }
 </script>
 

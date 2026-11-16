@@ -219,7 +219,8 @@ function todayAt(time) {
 
 /** 알림 한 건 만들기 (siteId·factoryId 는 범위로 거르기 위한 값, 응답에는 안 나감) */
 const alarm = (id, factoryId, status, title, location, sensorTag, sensorType, value, unit, threshold, time) => ({
-  siteId: 1, factoryId, id, level: LEVEL.WARN, status, title, location,
+  // 5공장 알림은 모두 도장 공정(processId 12)
+  siteId: 1, factoryId, processId: factoryId === 5 ? 12 : null, id, level: LEVEL.WARN, status, title, location,
   equipmentId: id - 1000, sensorId: id - 900, sensorTag, sensorType, value, unit, threshold, raisedAt: todayAt(time),
 })
 
@@ -230,11 +231,11 @@ const alarm = (id, factoryId, status, title, location, sensorTag, sensorType, va
  */
 export const MOCK_ALARMS = [
   alarm(1042, 5, 'ACTING', '전류 주의 기준 초과', '5공장 · 도장 공정 · 상도 건조로 배기팬', 'CT-17', 'CURRENT', 22.4, 'A', 21.6, '16:38:20'),
-  alarm(1040, 5, 'CLOSED', '온도 주의 해제', '5공장 · 도장 공정 · 전착 건조로', 'TE-13', 'TEMP', 151, '℃', 150, '14:05:41'),
+  alarm(1040, 5, 'CLOSED', '온도 주의 해제', '5공장 · 도장 공정 · 전착 건조로', 'TE-13', 'TEMP', 162, '℃', 160, '14:05:41'),
   alarm(1038, 2, 'CLOSED', '온도 주의 해제', '2공장 · 차체 공정 · 용접 라인', 'TE-204', 'TEMP', 38, '℃', 35, '13:12:05'),
-  alarm(1035, 5, 'CLOSED', 'CO 주의 해제', '5공장 · 도장 공정 · 중도 건조로 버너실', 'CO-12', 'CO', 12, 'ppm', 10, '11:32:10'),
+  alarm(1035, 5, 'CLOSED', 'CO 주의 해제', '5공장 · 도장 공정 · 중도 건조로 버너실', 'CO-12', 'CO', 21, 'ppm', 20, '11:32:10'),
   alarm(1031, 1, 'CLOSED', 'CO 주의 해제', '1공장 · 도장 공정 · 버너실', 'CO-112', 'CO', 12, 'ppm', 10, '10:47:31'),
   alarm(1029, 6, 'CLOSED', '전류 주의 해제', '엔진·변속기 공장 · 가공 라인', 'CT-631', 'CURRENT', 9.8, 'A', 9.5, '09:20:14'),
-  alarm(1027, 5, 'CLOSED', '전류 주의 해제', '5공장 · 도장 공정 · 전처리 순환펌프', 'CT-11', 'CURRENT', 9.8, 'A', 9.5, '08:47:55'),
+  alarm(1027, 5, 'CLOSED', '전류 주의 해제', '5공장 · 도장 공정 · 전처리 순환펌프', 'CT-11', 'CURRENT', 12.4, 'A', 12, '08:47:55'),
   alarm(1019, 2, 'CLOSED', '온도 주의 해제', '2공장 · 프레스 공정 · 유압 펌프', 'TE-118', 'TEMP', 61, '℃', 60, '02:13:40'),
 ]

@@ -75,6 +75,12 @@ const routes = [
         component: () => import('@/pages/dashboard/ProcessPage.vue'),
         meta: { nav: 'dashboard', title: '3D 설비 배치도' },
       },
+      {
+        path: 'factories/:factoryId/processes/:processId/equipment/:equipmentId',
+        name: 'equipment',
+        component: () => import('@/pages/dashboard/EquipmentPage.vue'),
+        meta: { nav: 'dashboard', title: '설비 상세' },
+      },
       ...MENU_ROUTES.map((menu) => ({
         path: menu.path,
         name: menu.name,

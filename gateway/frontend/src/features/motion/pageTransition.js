@@ -37,8 +37,15 @@ export function decideTransition(to, from) {
   } else {
     transitionState.name = 'page'
   }
-  // 누른 곳이 있으면 그곳, 없으면(주소 직접 이동 등) 화면 가운데
-  transitionState.originX = lastPointer?.x ?? window.innerWidth / 2
-  transitionState.originY = lastPointer?.y ?? window.innerHeight / 2
+  /*
+   * 확대·축소 중심
+   * - 줌 인: 누른 곳 (그쪽으로 빨려 들어가듯). 누른 곳이 없으면 화면 가운데
+   * - 줌 아웃: 항상 화면 가운데
+   *   (예전에는 누른 곳 = 왼쪽 위 경로 글자를 중심으로 축소해서, 화면 오른쪽 끝만 크게 움직여
+   *    좌우로 쏠리며 흔들려 보였음 → 가운데를 중심으로 바꿔 양쪽이 똑같이 움직이게 함)
+   */
+  const useClick = transitionState.name === 'zoom-in' && lastPointer
+  transitionState.originX = useClick ? lastPointer.x : window.innerWidth / 2
+  transitionState.originY = useClick ? lastPointer.y : window.innerHeight / 2
   lastPointer = null
 }

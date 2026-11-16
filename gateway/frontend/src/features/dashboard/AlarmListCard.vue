@@ -38,6 +38,13 @@ b.open {
   color: var(--color-level-alarm-text);
 }
 
+/* 4줄(84px × 4)이 넘으면 카드 안에서 스크롤 (설계안 카드 높이와 같게) */
+.list {
+  max-height: 336px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
 .empty {
   padding: 40px 20px;
   text-align: center;

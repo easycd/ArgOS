@@ -66,8 +66,14 @@ const routes = [
       {
         path: 'factories/:factoryId',
         name: 'dashboard',
-        component: () => import('@/pages/dashboard/DashboardPage.vue'),
+        component: () => import('@/pages/dashboard/FactoryDashboardPage.vue'),
         meta: { nav: 'dashboard', title: '공장 대시보드' },
+      },
+      {
+        path: 'factories/:factoryId/processes/:processId',
+        name: 'process',
+        component: () => import('@/pages/dashboard/ProcessPage.vue'),
+        meta: { nav: 'dashboard', title: '3D 설비 배치도' },
       },
       ...MENU_ROUTES.map((menu) => ({
         path: menu.path,

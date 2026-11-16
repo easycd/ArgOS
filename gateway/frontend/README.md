@@ -25,20 +25,25 @@ npm run build          # 배포용 빌드 (dist/)
 
 ```text
 src/
-├── api/          # 연계 서버 API (http.js = Axios 공통, mock/ = 예시 데이터)
+├── api/              # 연계 서버 API (http.js = Axios 공통, mock/ = 예시 데이터)
 ├── assets/
-│   ├── images/   # 설계안에서 만든 정적 그림 (로그인 배경, 한반도 지도)
-│   └── styles/   # tokens.css(색·글꼴 토큰), base.css(전역 기본)
-├── components/   # 공통 컴포넌트 (AppIcon, AppHeader, LevelBadge, BaseCard)
-├── features/     # 도메인별 기능 (site: 한반도 지도, 도넛, 단계 막대, 집계)
-├── layouts/      # BlankLayout(로그인), PlainLayout(메뉴 없는 상단 바), MainLayout(공장 화면)
-├── pages/        # 화면 (auth, site, dashboard, history, inspection, threshold, user, factory)
-├── router/       # 주소·권한 가드(index.js), 첫 화면(home.js), 상단 메뉴(menus.js)
-├── stores/       # Pinia (auth: 로그인 상태)
-├── types/        # 공통 코드 (상태 단계 LEVEL, 권한 ROLE)
-└── utils/        # echarts 등록, 브라우저 저장, 날짜 형식
+│   ├── images/       # 설계안에서 만든 정적 그림 (로그인 배경, 한반도 지도)
+│   └── styles/       # tokens.css(색·글꼴 토큰), base.css(전역 기본)
+├── components/       # 여러 화면이 같이 쓰는 부품
+│                     #   AppHeader(+Status, +User), AppLogo, AppIcon, AppCheckbox,
+│                     #   AppNotice, BaseCard, LevelBadge
+├── features/         # 화면별 부품 (페이지는 이 부품들을 조립만 함)
+│   ├── auth/         #   로그인: LoginForm, LoginField, LoginAlert, LoginSubmit, LoginBackground, LoginSplash
+│   └── site/         #   사업장 선택: SiteMapCard(KoreaMap), SiteSensorCard(SensorDonut),
+│                     #   SiteListCard → SiteListItem → FactoryRow, StageCounts, StageBar, 집계·도우미 js
+├── layouts/          # BlankLayout(로그인), PlainLayout(메뉴 없는 상단 바), MainLayout(공장 화면)
+├── pages/            # 화면 (데이터 불러오기·화면 이동만, 모양은 features 부품이 담당)
+├── router/           # 주소·권한 가드(index.js), 첫 화면(home.js), 상단 메뉴(menus.js)
+├── stores/           # Pinia (auth: 로그인 상태)
+├── types/            # 공통 코드 (상태 단계 LEVEL, 권한 ROLE)
+└── utils/            # echarts 등록, 브라우저 저장, 날짜 형식, 안내 문구(useNotice)
 docs/
-└── backend-notes.md   # 백엔드에 전달할 API 사항 (화면 만들 때마다 추가)
+└── backend-notes.md  # 백엔드에 전달할 API 사항 (화면 만들 때마다 추가)
 ```
 
 ## 규칙
@@ -48,3 +53,4 @@ docs/
 - 상태·권한 문자열은 `src/types/codes.js` 상수만 사용
 - API 호출은 `src/api/` 모듈을 통해서만 (응답 형식·인증 방식 변경 시 `http.js` 만 수정)
 - 새 API 를 쓰면 `docs/backend-notes.md` 에 함께 적기
+- 한 파일에 화면 전체를 넣지 않음: 페이지는 조립만, 덩어리(카드·줄·입력칸)는 features/ 에 파일로 나눔

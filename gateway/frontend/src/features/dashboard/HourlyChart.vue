@@ -26,6 +26,9 @@ const slots = computed(() =>
 
 // ECharts 설정 (설계안 v-rev.js hourBar() 와 같은 모양)
 const option = computed(() => ({
+  // 처음 그리기 500ms, 값 바뀜 400ms (화면설계서 R2 --m-chart-in, --m-value)
+  animationDuration: 500,
+  animationDurationUpdate: 400,
   grid: { left: 26, right: 10, top: 14, bottom: 24 },
   tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
   xAxis: {

@@ -49,5 +49,6 @@ const parts = computed(() =>
   display: block;
   height: 100%;
   border-radius: 2px;
+  transition: flex-grow var(--m-value); /* 개수가 바뀌면 길이가 이어서 변함 */
 }
 </style>

@@ -13,6 +13,8 @@ import '@fontsource/fira-code/600.css'
 // 디자인 토큰 → 전역 기본 스타일 순서 (base.css 가 토큰을 사용)
 import '@/assets/styles/tokens.css'
 import '@/assets/styles/base.css'
+// 화면 전환·카드 등장·말풍선 등 움직임 (tokens.css 의 --m-* 값 사용)
+import '@/assets/styles/motion.css'
 
 import App from './App.vue'
 import router from './router'

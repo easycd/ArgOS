@@ -34,12 +34,13 @@ src/
 ├── api/              # 연계 서버 API (http.js = Axios 공통, mock/ = 예시 데이터)
 ├── assets/
 │   ├── images/       # 설계안에서 만든 정적 그림 (로그인 배경, 한반도 지도, 울산공장 지도, 5공장 공정 배치도, 도장 공정 3D 배치도)
-│   └── styles/       # tokens.css(색·글꼴 토큰), base.css(전역 기본)
+│   └── styles/       # tokens.css(색·글꼴·움직임 토큰), base.css(전역 기본), motion.css(화면 전환·등장·말풍선 움직임)
 ├── components/       # 여러 화면이 같이 쓰는 부품
 │                     #   AppHeader(+Status, +Badges, +User), AppNav(상단 메뉴), SitePill(사업장 이름),
 │                     #   AppLogo, AppIcon, AppCheckbox, AppNotice, BaseCard, LevelBadge
 ├── features/         # 화면별 부품 (페이지는 이 부품들을 조립만 함)
 │   ├── auth/         #   로그인: LoginForm, LoginField, LoginAlert, LoginSubmit, LoginBackground, LoginSplash
+│   ├── motion/       #   화면 전환: PageTransition(레이아웃이 씀), pageTransition.js(깊이로 줌 인·아웃 방향 결정)
 │   ├── session/      #   로그인 유지 13시간·연장 1시간: sessionConfig(설정 한 곳), SessionTimer(상단 바), useSessionTimer
 │   ├── dashboard/    #   사업장 현황: ZoneMapCard(UlsanMap, ZonePopover), FactoryStatusCard(Item),
 │   │                 #   SensorTypeCard, AlarmListCard(AlarmRow), HourlyAlarmCard(HourlyChart)
@@ -48,7 +49,7 @@ src/
 │   │                 #   InspectionTodayCard(InspectionRow)
 │   └── site/         #   사업장 선택: SiteMapCard(KoreaMap), SiteSensorCard(SensorDonut),
 │                     #   SiteListCard → SiteListItem → FactoryRow, StageCounts, StageBar, 집계·도우미 js
-├── layouts/          # BlankLayout(로그인), PlainLayout(메뉴 없는 상단 바), MainLayout(사업장 안 화면)
+├── layouts/          # BlankLayout(로그인), MainLayout(상단 바 + 본문 전환, 사업장 선택은 meta.plain 으로 메뉴 없이)
 ├── pages/            # 화면 (데이터 불러오기·화면 이동만, 모양은 features 부품이 담당)
 ├── router/           # 주소·권한 가드(index.js), 첫 화면(home.js), 상단 메뉴(menus.js)
 │                     #   주소: /sites(사업장 선택) → /sites/:siteId(사업장 현황) → /sites/:siteId/factories/:factoryId
@@ -68,3 +69,4 @@ docs/
 - API 호출은 `src/api/` 모듈을 통해서만 (응답 형식·인증 방식 변경 시 `http.js` 만 수정)
 - 새 API 를 쓰면 `docs/backend-notes.md` 에 함께 적기
 - 한 파일에 화면 전체를 넣지 않음: 페이지는 조립만, 덩어리(카드·줄·입력칸)는 features/ 에 파일로 나눔
+- 움직임: 시간·곡선은 `tokens.css` 의 `--m-*` 만 사용. 화면 전환은 라우터 `meta.depth`(대시보드 단계)로 자동 결정되고, 카드는 `BaseCard` 를 쓰면 자동으로 차례 등장. 말풍선·드롭다운은 `animation: pop-in var(--m-pop-in)`. '움직임 줄이기' 설정은 `motion.css` 에서 처리

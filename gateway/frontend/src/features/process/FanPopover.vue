@@ -127,7 +127,7 @@ const style = computed(() => ({
   box-shadow:
     0 14px 40px rgba(15, 23, 42, 0.18),
     0 2px 8px rgba(15, 23, 42, 0.08);
-  animation: softin 0.15s both;
+  animation: pop-in var(--m-pop-in) both; /* 4px 위에서 내려오며 나타남 (motion.css) */
 }
 
 .head {

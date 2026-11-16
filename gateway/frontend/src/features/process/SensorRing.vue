@@ -33,6 +33,16 @@ const color = computed(() => LEVEL_META[props.sensor.level]?.color ?? 'var(--col
       stroke-linecap="round"
       :stroke-dasharray="`${(circumference * ratio).toFixed(1)} ${circumference.toFixed(1)}`"
       :transform="`rotate(-90 ${size / 2} ${size / 2})`"
+      class="arc"
     />
   </svg>
 </template>
+
+<style scoped>
+/* 값이 바뀌면 호 길이·색이 이어서 변함 (화면설계서 R2 --m-value) */
+.arc {
+  transition:
+    stroke-dasharray var(--m-value),
+    stroke var(--m-value);
+}
+</style>

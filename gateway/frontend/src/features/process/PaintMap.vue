@@ -93,6 +93,7 @@ function applyLevels() {
     halo.style.stroke = COLOR[level]
     halo.style.color = COLOR[level] // 빛번짐(drop-shadow)이 이 색을 씀
     halo.classList.toggle('glow', !calm) // 빛번짐은 주의·경보 테두리에만
+    halo.classList.toggle('fast', level === LEVEL.ALARM || level === LEVEL.FIRE) // 경보·화재는 더 빠르게 깜빡임
   })
   for (const eq of props.equipment) {
     for (const s of eq.sensors) {
@@ -185,7 +186,12 @@ function onClick(event) {
 /* 주의·경보 테두리만 빛번짐 + 천천히 깜빡임 */
 .svg :deep(.halo.glow) {
   filter: drop-shadow(0 0 6px currentColor) drop-shadow(0 0 12px currentColor);
-  animation: halo-pulse 1.5s ease-in-out infinite;
+  animation: halo-pulse var(--m-pulse-warn) ease-in-out infinite;
+}
+
+/* 경보·화재: 0.8초 (화면설계서 R2 --m-pulse-alarm) */
+.svg :deep(.halo.glow.fast) {
+  animation-duration: var(--m-pulse-alarm);
 }
 
 @keyframes halo-pulse {
@@ -212,6 +218,7 @@ function onClick(event) {
   white-space: nowrap;
   box-shadow: 0 6px 18px rgba(15, 23, 42, 0.28);
   pointer-events: none;
+  animation: pop-in var(--m-pop-in) both; /* motion.css */
 }
 
 .tip b {

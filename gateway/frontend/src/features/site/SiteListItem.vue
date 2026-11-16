@@ -181,7 +181,7 @@ const emit = defineEmits(['toggle', 'enter', 'enter-factory'])
 .body {
   display: grid;
   grid-template-rows: 0fr;
-  transition: grid-template-rows 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition: grid-template-rows var(--m-panel); /* tokens.css */
 }
 
 .open .body {

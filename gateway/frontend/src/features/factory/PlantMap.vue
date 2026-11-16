@@ -205,7 +205,7 @@ watch(() => props.processes, () => nextTick(applyLevels), { deep: true })
   color: var(--color-text-sub);
   white-space: nowrap;
   cursor: pointer;
-  animation: softin 0.2s both;
+  animation: pop-in var(--m-pop-in) both; /* 4px 위에서 내려오며 나타남 (motion.css) */
 }
 
 .summary b {

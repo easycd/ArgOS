@@ -15,7 +15,7 @@ import { ROLE, WEB_ROLES } from '@/types/codes'
 
 import BlankLayout from '@/layouts/BlankLayout.vue'
 import MainLayout from '@/layouts/MainLayout.vue'
-import PlainLayout from '@/layouts/PlainLayout.vue'
+import { decideTransition } from '@/features/motion/pageTransition'
 import { homeRouteOf, scopeOf } from './home'
 import { MENU_ROUTES } from './menus'
 
@@ -37,55 +37,53 @@ const routes = [
     ],
   },
 
-  // 사업장 선택: 메뉴 없는 상단 바 (설계안 'hdr plain')
+  /*
+   * 상단 바 + 본문 (사업장 선택부터 설비 상세까지 한 레이아웃)
+   * - 한 레이아웃이라 화면이 바뀌어도 상단 바는 그대로 있고 본문만 전환 효과를 냄
+   * - meta.plain: 메뉴 없는 상단 바 (설계안 'hdr plain', 사업장 선택)
+   * - meta.depth: 대시보드 단계 깊이 (사업장 선택 0 → 사업장 1 → 공장 2 → 공정 3 → 설비 4)
+   *   깊어지면 확대(줌 인), 얕아지면 축소(줌 아웃) — features/motion/pageTransition.js
+   */
   {
     path: '/sites',
-    component: PlainLayout,
+    component: MainLayout,
     children: [
       {
         path: '',
         name: 'site-select',
         component: () => import('@/pages/site/SiteSelectPage.vue'),
-        meta: { roles: [ROLE.HQ_ADMIN], title: '사업장 선택' }, // 본사 관리자만
+        meta: { roles: [ROLE.HQ_ADMIN], title: '사업장 선택', plain: true, depth: 0 }, // 본사 관리자만
       },
-    ],
-  },
-
-  // 사업장 안: 상단 바(사업장 이름 + 메뉴) + 본문
-  {
-    path: '/sites/:siteId',
-    component: MainLayout,
-    meta: { roles: WEB_ROLES },
-    children: [
       {
-        path: '',
+        path: ':siteId',
         name: 'site-dashboard',
         component: () => import('@/pages/dashboard/SiteDashboardPage.vue'),
-        meta: { nav: 'dashboard', title: '사업장 현황' },
+        meta: { roles: WEB_ROLES, nav: 'dashboard', title: '사업장 현황', depth: 1 },
       },
       {
-        path: 'factories/:factoryId',
+        path: ':siteId/factories/:factoryId',
         name: 'dashboard',
         component: () => import('@/pages/dashboard/FactoryDashboardPage.vue'),
-        meta: { nav: 'dashboard', title: '공장 대시보드' },
+        meta: { roles: WEB_ROLES, nav: 'dashboard', title: '공장 대시보드', depth: 2 },
       },
       {
-        path: 'factories/:factoryId/processes/:processId',
+        path: ':siteId/factories/:factoryId/processes/:processId',
         name: 'process',
         component: () => import('@/pages/dashboard/ProcessPage.vue'),
-        meta: { nav: 'dashboard', title: '3D 설비 배치도' },
+        meta: { roles: WEB_ROLES, nav: 'dashboard', title: '3D 설비 배치도', depth: 3 },
       },
       {
-        path: 'factories/:factoryId/processes/:processId/equipment/:equipmentId',
+        path: ':siteId/factories/:factoryId/processes/:processId/equipment/:equipmentId',
         name: 'equipment',
         component: () => import('@/pages/dashboard/EquipmentPage.vue'),
-        meta: { nav: 'dashboard', title: '설비 상세' },
+        meta: { roles: WEB_ROLES, nav: 'dashboard', title: '설비 상세', depth: 4 },
       },
+      // 메뉴 화면 (깊이 없음 → 탭 이동처럼 부드럽게 바뀜)
       ...MENU_ROUTES.map((menu) => ({
-        path: menu.path,
+        path: `:siteId/${menu.path}`,
         name: menu.name,
         component: menu.component,
-        meta: { nav: menu.nav, title: menu.title },
+        meta: { roles: WEB_ROLES, nav: menu.nav, title: menu.title },
       })),
     ],
   },
@@ -156,6 +154,11 @@ router.beforeEach((to) => {
   }
 
   return true
+})
+
+// 화면 전환 방향(줌 인 / 줌 아웃 / 탭 이동)은 여기 한 곳에서 정함
+router.beforeResolve((to, from) => {
+  decideTransition(to, from)
 })
 
 export default router

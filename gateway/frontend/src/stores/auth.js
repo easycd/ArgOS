@@ -2,7 +2,7 @@
  * 로그인 상태 스토어 (Pinia)
  * - 액세스 토큰, 로그인 사용자 정보, 로그인 유지 만료 시각을 보관
  * - 새로고침해도 유지되도록 utils/storage.js 로 저장·복원
- * - 리프레시 토큰은 서버가 HttpOnly 쿠키로 관리하므로 여기서 다루지 않음 (API 명세서 A1)
+ * - 리프레시 토큰은 쓰지 않음 (토큰 자체 13시간 유효, A안 확정 2026-11-16)
  * - 로그인 유지 시간(13시간)·연장(1시간)은 features/session/sessionConfig.js
  */
 import { defineStore } from 'pinia'

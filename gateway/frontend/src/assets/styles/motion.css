@@ -13,6 +13,9 @@
   transition:
     transform var(--m-zoom-leave),
     opacity var(--m-zoom-leave);
+  /* 움직이는 동안 글자·선이 픽셀 단위로 떨리지 않게 따로 그리기 */
+  will-change: transform, opacity;
+  backface-visibility: hidden;
 }
 
 .zoom-in-enter-active,
@@ -21,6 +24,8 @@
   transition:
     transform var(--m-zoom),
     opacity var(--m-zoom);
+  will-change: transform, opacity;
+  backface-visibility: hidden;
 }
 
 .zoom-in-leave-to {
@@ -33,15 +38,16 @@
   transform: scale(0.82);
 }
 
-/* ───────── 화면 전환: 단계 사이 축소(줌 아웃) — 돌아갈 때 반대로 ───────── */
+/* ───────── 화면 전환: 단계 사이 축소(줌 아웃) — 돌아갈 때 반대로 ─────────
+ * 중심은 항상 화면 가운데 (pageTransition.js). 배율은 줌 인보다 작게 해서 덜 출렁이게 */
 .zoom-out-leave-to {
   opacity: 0;
-  transform: scale(0.82);
+  transform: scale(0.88);
 }
 
 .zoom-out-enter-from {
   opacity: 0;
-  transform: scale(1.15);
+  transform: scale(1.08);
 }
 
 /* ───────── 화면 전환: 메뉴 탭 이동·같은 단계 (살짝 사라졌다 나타남) ───────── */

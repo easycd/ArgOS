@@ -56,7 +56,7 @@ watch(
 <style scoped>
 .content {
   padding: 16px 20px 24px;
-  /* 확대·축소 효과가 옆으로 넘쳐 가로 스크롤이 생기지 않게 */
-  overflow-x: clip;
+  /* 확대·축소 중 커진 화면이 넘쳐도 스크롤 길이·스크롤바가 바뀌지 않게 (가로·세로 모두 잘라냄) */
+  overflow: clip;
 }
 </style>

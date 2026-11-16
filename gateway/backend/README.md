@@ -29,4 +29,26 @@
 상태 확인: `GET /actuator/health`  
 서비스 확인: `GET /api/v1/system/info`
 
-현재는 두 확인 경로만 공개되어 있으며, 나머지 요청은 기본 차단됩니다. 인증 방식과 API 계약을 확정한 뒤 `auth`, `dashboard`, `alarm`, `inspection`, `document`, `admin`, `integration` 패키지를 추가합니다.
+## 로그인 API
+
+모든 경로는 `/api/v1`부터 시작합니다. 액세스 토큰은 30분이며, 최초 세션은 로그인 후 13시간에 만료됩니다. `POST /auth/extend`를 누를 때마다 기존 만료 시각에 1시간을 더합니다. 연장은 자동으로 일어나지 않습니다.
+
+| 경로 | 용도 |
+| --- | --- |
+| `POST /auth/login` | `loginId`, `password`, `client`(`WEB`/`APP`)로 로그인 |
+| `POST /auth/refresh` | 액세스 토큰 자동 갱신. 세션 만료 시각은 그대로 유지 |
+| `POST /auth/extend` | 토큰으로 세션 만료 시각을 1시간 연장 |
+| `POST /auth/logout` | 세션 즉시 폐기 |
+| `GET /me` | 내 정보와 담당 범위 조회 |
+| `PUT /me/password` | 본인 비밀번호 변경 |
+
+웹의 갱신 토큰은 HttpOnly 쿠키, React Native 앱의 갱신 토큰은 응답 본문으로 전달합니다. 앱은 OS 보안 저장소에 보관해야 합니다. 서버 DB에는 갱신 토큰 원문 대신 SHA-256 해시를 저장합니다. 보호된 요청은 `Authorization: Bearer <accessToken>`을 사용합니다.
+
+환경변수 `GATEWAY_JWT_SECRET_BASE64`에 32바이트 이상 무작위 값의 Base64 인코딩을 넣어야 합니다. HTTPS 환경에서는 `GATEWAY_COOKIE_SECURE=true`로 설정합니다. 비어 있는 개발 DB에서만 최초 본사 관리자를 만들려면 `GATEWAY_BOOTSTRAP_ADMIN_LOGIN`과 `GATEWAY_BOOTSTRAP_ADMIN_PASSWORD`를 함께 설정합니다. 첫 로그인 후 비밀번호 변경이 필요합니다.
+
+`src/main/resources/db/migration/V1__gateway_auth.sql`은 연계 DB의 인증 테이블을 만드는 초기 마이그레이션입니다. 다른 팀의 통합 DB 마이그레이션과 합칠 때 테이블 소유권과 적용 순서를 조정해야 합니다.
+
+## 대시보드 · 알림 · 체크리스트 · SSE
+
+로그인 외에 구현한 API 목록과 명세서와 다른 점은 [docs/API_IMPLEMENTED.md](docs/API_IMPLEMENTED.md) 에 있습니다.
+중앙 서버(`factory/central-server`)가 켜져 있어야 화면 데이터가 나옵니다.

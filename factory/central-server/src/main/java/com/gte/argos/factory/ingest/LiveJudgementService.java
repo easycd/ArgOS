@@ -102,7 +102,8 @@ public class LiveJudgementService {
         jdbc.update("DELETE FROM alarm WHERE raised_at >= ?", cutoff);
         jdbc.update("DELETE FROM sensor_event WHERE started_at >= ? OR ended_at IS NULL", cutoff);
         jdbc.update("DELETE FROM sensor_trend WHERE ts >= ?", cutoff);
-        jdbc.update("UPDATE equipment SET run_state = 'RUN'");
+        jdbc.update("UPDATE equipment SET run_state = 'RUN', "
+                + "fan_rpm = CASE WHEN equipment_type = 'FAN' THEN 1200 ELSE fan_rpm END");
         engine = null;
         listener = null;
         state.clear();

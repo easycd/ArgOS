@@ -99,14 +99,25 @@ com.gte.argos.factory
 | `POST /internal/alarms/{id}/close` `{ "userId": 7 }` | 종료 (→ CLOSED). 진행 중 이벤트가 있으면 409 `VALUE_STILL_OVER` + `details.sensors` |
 | `GET /internal/feed?after=0&limit=500` | 실시간 변화. 연계 서버가 1초마다 `after=next` 로 가져가 SSE 로 전달 |
 
+설비 명령 (연계 서버 → 중앙)
+
+| API | 설명 |
+| --- | --- |
+| `POST /internal/equipment/{id}/commands` `{ "command": "SHUTDOWN", "alarmId": 1051, "userId": 7 }` | 202 `{ commandId, status: "SENT" }`. 명령: `FAN_ON`·`FAN_OFF`·`FAN_RPM`(value 600~1800)·`SHUTDOWN`·`RESTART` |
+| `GET /internal/commands/{id}` | 명령 한 건 |
+
+실제 설비가 없어 응답은 시뮬레이션입니다 (팬 1초, 셧다운·재가동 3초 뒤 완료). 셧다운은 `RUN → STOPPING → STOPPED`,
+배기팬은 `fan_rpm` 이 바뀝니다. 진행은 피드 `COMMAND_RESULT`(SENT → DONE · FAILED). 센서값은 바꾸지 않습니다 (값 회복은 봇에 직접 명령).
+오류: `COMMAND_NOT_ALLOWED`, `NOT_A_FAN`, `RPM_OUT_OF_RANGE`, `EQUIPMENT_STOPPED`, `ALREADY_STOPPED`, `ALREADY_RUNNING`.
+
 피드 항목 `type`: `SENSOR_VALUES`(`values: [[sensorId, ts, value], ...]`), `EVENT_OPENED`, `EVENT_ESCALATED`,
-`EVENT_CLOSED`, `ALARM_OPENED`, `ALARM_UPDATED`, `ALARM_CLEARED`(이벤트가 모두 끝남), `ALARM_STATUS`(확인·조치·종료), `RESET`.
+`EVENT_CLOSED`, `ALARM_OPENED`, `ALARM_UPDATED`, `ALARM_CLEARED`(이벤트가 모두 끝남), `ALARM_STATUS`(확인·조치·종료), `COMMAND_RESULT`, `RESET`.
 `bootId` 가 바뀌면 중앙 서버가 다시 켜진 것이므로 `after=0` 부터, `gap=true` 면 `status`·`alarms` 를 다시 조회합니다.
 
 ## 아직 안 한 것
 
 - Redis 입력 어댑터 (봇 → 중앙). `LiveJudgementService.ingest()` 를 부르면 됨
 - 시연 시계 기준값을 Redis 로 공유 (봇·연계 서버와 시각 맞추기)
-- 연계 서버의 설비 명령(셧다운·팬) 받기
+- 설비 명령을 봇(미니 PC)에 실제로 전달 (Redis 설계 후)
 - 화재 판정 (화재 시나리오 데이터가 오면)
 - 서버 재시작 때 진행 중이던 실시간 이벤트 이어 받기 (지금은 리셋으로 정리)

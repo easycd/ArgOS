@@ -9,6 +9,8 @@ spring:
     hibernate:
       ddl-auto: none
     open-in-view: false
+  flyway:
+    enabled: true
 
 server:
   port: ${GATEWAY_SERVER_PORT:8080}
@@ -22,3 +24,16 @@ management:
     health:
       show-details: never
 
+argos:
+  auth:
+    jwt-secret-base64: ${GATEWAY_JWT_SECRET_BASE64}
+    access-seconds: 1800
+    session-seconds: 46800
+    cookie-secure: ${GATEWAY_COOKIE_SECURE:true}
+    cookie-same-site: Strict
+
+  # 중앙 서버 연계 (연계 → 중앙은 HTTP)
+  central:
+    base-url: ${CENTRAL_SERVER_BASE_URL:http://localhost:8081}
+    api-key: ${CENTRAL_API_KEY:}
+    feed-enabled: ${CENTRAL_FEED_ENABLED:true}

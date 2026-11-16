@@ -5,7 +5,7 @@
   - 메뉴 목록은 router/menus.js 한 곳에서 관리
 -->
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import AppIcon from './AppIcon.vue'
 import { NAV_ADMIN, NAV_TABS } from '@/router/menus'
@@ -16,8 +16,9 @@ const route = useRoute()
 const siteId = computed(() => route.params.siteId)
 const currentNav = computed(() => route.meta.nav)
 
-// '관리' 펼침 열림 여부
+// '관리' 펼침 열림 여부 (다른 화면으로 가면 닫음)
 const adminOpen = ref(false)
+watch(() => route.fullPath, () => (adminOpen.value = false))
 </script>
 
 <template>

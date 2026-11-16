@@ -70,8 +70,15 @@ h3 {
 }
 
 .sub {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis; /* 좁은 화면에서 오른쪽 영역과 겹치지 않게 설명이 먼저 '…'로 줄어듦 */
   font-size: 13px;
   color: var(--color-text-weak);
+}
+
+.actions {
+  flex: none;
 }
 
 .actions {

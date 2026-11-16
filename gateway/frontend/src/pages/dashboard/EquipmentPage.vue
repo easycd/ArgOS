@@ -162,12 +162,14 @@ function onSelectEquipment(eq) {
 
 <style scoped>
 /*
- * 배치 (설계안 1920 화면 기준): 위 줄 560 | 나머지 | 468, 아래 줄 추이가 앞 두 칸을 차지
+ * 배치 (설계안 1920 화면 기준): 위 줄 560 | 820 | 468, 아래 줄 추이가 앞 두 칸을 차지
+ * - 고정 px 대신 같은 비율(fr)로: 1920 에서는 설계안과 같고, 1536 처럼 좁으면 세 칸이 같이 줄어듦
+ *   (가운데만 줄이면 게이지 숫자가 고리와 겹침)
  * - 좁은 화면(1400px 이하)에서는 다른 화면처럼 한 줄에 하나씩
  */
 .grid {
   display: grid;
-  grid-template-columns: 560px minmax(0, 1fr) 468px;
+  grid-template-columns: minmax(0, 560fr) minmax(0, 820fr) minmax(0, 468fr);
   gap: 16px; /* 같은 줄 카드는 높이를 맞춤 (설계안: 위 줄 428, 아래 줄 488) */
 }
 

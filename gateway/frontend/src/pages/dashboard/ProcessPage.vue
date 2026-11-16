@@ -18,7 +18,7 @@ import AlarmListCard from '@/features/dashboard/AlarmListCard.vue'
 import SensorTypeCard from '@/features/dashboard/SensorTypeCard.vue'
 import InspectionTodayCard from '@/features/process/InspectionTodayCard.vue'
 import ProcessMapCard from '@/features/process/ProcessMapCard.vue'
-import { svgKeyOf } from '@/features/process/paintLayout'
+import { buildProcessEquipment } from '@/features/process/processEquipment'
 import { LEVEL, SENSOR_TYPES } from '@/types/codes'
 import { useNotice } from '@/utils/useNotice'
 
@@ -60,29 +60,8 @@ async function load() {
 
 watch(() => route.params.processId, load, { immediate: true })
 
-/**
- * 화면용 설비 목록: 배치도(layout) + 지금 값(status) 을 합침
- * - key: 그림 안 설비 이름 (code 'PNT-TOP-OVEN' → 'top-oven')
- * - sensors: 이 설비에 붙은 센서 + 지금 값·단계
- */
-const equipment = computed(() => {
-  if (!layout.value || !status.value) return []
-  const sensorNow = (id) => status.value.sensors.find((s) => s.id === id) ?? {}
-  return layout.value.equipment.map((e) => {
-    const now = status.value.equipment.find((x) => x.id === e.id) ?? {}
-    return {
-      id: e.id,
-      key: svgKeyOf(e.code),
-      name: e.name,
-      seq: e.seq,
-      level: now.level ?? LEVEL.NORMAL,
-      fan: now.fan ?? null,
-      sensors: layout.value.sensors
-        .filter((s) => s.equipmentId === e.id)
-        .map((s) => ({ ...s, ...sensorNow(s.id) })),
-    }
-  })
-})
+// 화면용 설비 목록: 배치도(layout) + 지금 값(status) 을 합침 (features/process/processEquipment.js)
+const equipment = computed(() => buildProcessEquipment(layout.value, status.value))
 
 /** 이 공정 센서 종류별 단계 개수 (설비에 안 붙은 예비 센서도 포함, 열화상 제외) */
 const levelsByType = computed(() => {

@@ -1,41 +1,195 @@
 <!--
-  설비 상세 화면 (예: 상도 건조로 — 설계안 'equip')
-  - 지금은 제목만 있는 자리 표시, 다음 작업에서 만듦
+  설비 상세 화면 (예: 상도 건조로 — 화면설계안 js/v-dash.js vEquip(), 화면설계서 B4)
+  - 제목 줄: 경로 + 상태 + 체크리스트 진행 + 추이 범위 + 설비 배치도로 (EquipmentTopBar)
+  - 위 줄: 설비 위치 | 센서 현재값(게이지 3개) | 열화상 카메라
+  - 아래 줄: 센서 추이(전날 겹쳐 보기) | 이벤트 이력
+  - 이 파일은 데이터 불러오기와 화면 이동만 담당, 그리는 일은 features/equipment/ 의 카드들이 함
+  - 데이터 (지금은 예시 데이터): GET /equipment/{id}, /equipment/{id}/events, /thermal/{cameraId}/latest,
+    /sensors/series, 설비 위치 그림용 GET /processes/{id}/layout, /status
 -->
 <script setup>
-import { useRoute } from 'vue-router'
-import AppIcon from '@/components/AppIcon.vue'
+import { computed, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { getEquipment, getEquipmentEvents, getSensorSeries, getThermalLatest } from '@/api/equipment'
+import { getProcessLayout, getProcessStatus } from '@/api/process'
+import EquipmentLocationCard from '@/features/equipment/EquipmentLocationCard.vue'
+import EquipmentTopBar from '@/features/equipment/EquipmentTopBar.vue'
+import EventLogCard from '@/features/equipment/EventLogCard.vue'
+import SensorGaugeCard from '@/features/equipment/SensorGaugeCard.vue'
+import ThermalCard from '@/features/equipment/ThermalCard.vue'
+import TrendCard from '@/features/equipment/TrendCard.vue'
+import { useLiveValues } from '@/features/equipment/useLiveValues'
+import { svgKeyOf } from '@/features/process/paintLayout'
+import { buildProcessEquipment } from '@/features/process/processEquipment'
 
 const route = useRoute()
-const { siteId, factoryId, processId } = route.params
+const router = useRouter()
+
+const equipment = ref(null)
+const events = ref([])
+const thermal = ref(null)
+const processEquipment = ref([])
+const loading = ref(true)
+const errorMessage = ref('')
+
+/** 설비 정보·이벤트·열화상·설비 위치 그림 불러오기 */
+async function load() {
+  const { processId, equipmentId } = route.params
+  loading.value = true
+  errorMessage.value = ''
+  try {
+    const [eq, ev, layout, status] = await Promise.all([
+      getEquipment(equipmentId),
+      getEquipmentEvents(equipmentId),
+      getProcessLayout(processId),
+      getProcessStatus(processId),
+    ])
+    // 주소의 공정과 설비의 공정이 다르면 (주소를 직접 고친 경우) 열지 않음
+    if (eq.processId !== Number(processId)) throw new Error('이 공정의 설비가 아닙니다.')
+    equipment.value = eq
+    events.value = ev
+    processEquipment.value = buildProcessEquipment(layout, status)
+    thermal.value = eq.cameraId ? await getThermalLatest(eq.cameraId, eq.id) : null
+    await loadSeries()
+  } catch (error) {
+    errorMessage.value = error.message
+  } finally {
+    loading.value = false
+  }
+}
+
+watch(() => route.params.equipmentId, load, { immediate: true })
+
+/* ───────── 센서 추이: 범위(1시간 / 6시간 / 오늘)를 바꾸면 다시 불러옴 ───────── */
+const range = ref('1h') // 설계안 기본값 (화면설계서는 '오늘'이 기본 → 보고서 '확인할 점')
+const series = ref(null)
+const seriesRange = ref('1h') // 지금 그려진 값의 범위 (새 값이 올 때까지 이전 그림 유지)
+const seriesLoading = ref(false)
+
+async function loadSeries() {
+  if (!equipment.value?.sensors.length) {
+    series.value = { series: [] }
+    return
+  }
+  const want = range.value
+  seriesLoading.value = true
+  try {
+    const data = await getSensorSeries({ equipment: equipment.value, range: want })
+    if (want !== range.value) return // 그사이 범위를 또 바꿈
+    series.value = data
+    seriesRange.value = want
+  } catch (error) {
+    errorMessage.value = error.message
+  } finally {
+    seriesLoading.value = false
+  }
+}
+
+watch(range, loadSeries)
+
+/* ───────── 실시간 값 (예시: 2초마다 조금씩) ───────── */
+const { values: liveValues, elapsedSec } = useLiveValues(() => equipment.value?.sensors)
+
+/* ───────── 경로·링크 ───────── */
+const crumbs = computed(() => {
+  const { siteId, factoryId, processId } = route.params
+  const [site, factory, process] = equipment.value?.path ?? []
+  return [
+    { label: site, to: { name: 'site-dashboard', params: { siteId } } },
+    { label: factory, to: { name: 'dashboard', params: { siteId, factoryId } } },
+    { label: process, to: { name: 'process', params: { siteId, factoryId, processId } } },
+    { label: equipment.value?.name ?? '' },
+  ]
+})
+
+const backTo = computed(() => {
+  const { siteId, factoryId, processId } = route.params
+  return { name: 'process', params: { siteId, factoryId, processId } }
+})
+
+// 기준값 관리·통계 화면에 이 설비를 골라 둔 채로 이동 (그 화면들은 아직 자리만 있음)
+const thresholdTo = computed(() => ({ name: 'threshold', params: { siteId: route.params.siteId }, query: { equipmentId: equipment.value?.id } }))
+const historyTo = computed(() => ({ name: 'history', params: { siteId: route.params.siteId }, query: { equipmentId: equipment.value?.id } }))
+
+const locationSub = computed(() => {
+  const seq = equipment.value?.seq
+  return `${equipment.value?.path?.[2] ?? ''}${seq ? ` · ${seq}번 설비` : ''}`
+})
+
+/** 설비 위치 그림에서 옆 설비를 누르면 그 설비 상세로 */
+function onSelectEquipment(eq) {
+  if (eq.id === equipment.value?.id) return
+  router.push({ name: 'equipment', params: { ...route.params, equipmentId: eq.id } })
+}
 </script>
 
 <template>
-  <section>
-    <RouterLink :to="{ name: 'process', params: { siteId, factoryId, processId } }" class="back">
-      <AppIcon name="cr" :size="14" class="flip" />설비 배치도로
-    </RouterLink>
-    <h1 class="page-title">설비 상세</h1>
-    <p class="placeholder">준비 중입니다. (다음 작업) · 설비 번호 {{ route.params.equipmentId }}</p>
-  </section>
+  <p v-if="loading" class="state">불러오는 중</p>
+  <p v-else-if="errorMessage" class="state error">{{ errorMessage }}</p>
+
+  <div v-else class="equipment-page">
+    <EquipmentTopBar
+      v-model:range="range"
+      :crumbs="crumbs"
+      :level="equipment.level"
+      :checklist="equipment.activeChecklist"
+      :back-to="backTo"
+    />
+
+    <div class="grid">
+      <EquipmentLocationCard
+        class="location"
+        :equipment="processEquipment"
+        :focus-key="svgKeyOf(equipment.code)"
+        :sub="locationSub"
+        @select="onSelectEquipment"
+      />
+      <SensorGaugeCard class="gauges" :sensors="equipment.sensors" :live-values="liveValues" />
+      <ThermalCard v-if="thermal" class="thermal" :thermal="thermal" :level="equipment.level" :elapsed-sec="elapsedSec" />
+
+      <TrendCard
+        class="trend"
+        :sensors="equipment.sensors"
+        :data="series"
+        :range="seriesRange"
+        :loading="seriesLoading"
+        :live-values="liveValues"
+      />
+      <EventLogCard class="events" :events="events" :threshold-to="thresholdTo" :history-to="historyTo" />
+    </div>
+  </div>
 </template>
 
 <style scoped>
-.back {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  margin-bottom: 12px;
-  color: var(--color-primary);
-  font-size: 13px;
-  text-decoration: none;
+/*
+ * 배치 (설계안 1920 화면 기준): 위 줄 560 | 나머지 | 468, 아래 줄 추이가 앞 두 칸을 차지
+ * - 좁은 화면(1400px 이하)에서는 다른 화면처럼 한 줄에 하나씩
+ */
+.grid {
+  display: grid;
+  grid-template-columns: 560px minmax(0, 1fr) 468px;
+  gap: 16px; /* 같은 줄 카드는 높이를 맞춤 (설계안: 위 줄 428, 아래 줄 488) */
 }
 
-.flip {
-  transform: rotate(180deg);
+.trend {
+  grid-column: 1 / 3;
 }
 
-.placeholder {
+@media (max-width: 1400px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .trend {
+    grid-column: auto;
+  }
+}
+
+.state {
   color: var(--color-text-sub);
+}
+
+.state.error {
+  color: var(--color-level-alarm-text);
 }
 </style>

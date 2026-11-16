@@ -69,7 +69,7 @@ http.interceptors.response.use(
       const { status, data } = error.response
 
       // 401: 토큰 만료 등 → 로그아웃 후 로그인 화면으로
-      // TODO: 리프레시 토큰 재발급 방식이 확정되면 여기서 재발급 후 원래 요청 재시도
+      // (리프레시 토큰은 쓰지 않음: 토큰 13시간 유효 A안 확정 — 만료되면 다시 로그인)
       // (로그인 전 401 = 아이디·비밀번호 오류이므로 이동하지 않고 에러 문구만 표시)
       if (status === 401 && handlers.getToken()) {
         handlers.onUnauthorized()

@@ -1,7 +1,7 @@
 /**
  * 인증 API (설계 자료 API 명세서 A1 기준 + 로그인 유지 13시간 변경)
  * - mock 모드에서는 예시 계정(api/mock/data.js)으로 로그인
- * - 리프레시 토큰: 웹은 서버가 HttpOnly 쿠키(argos_rt)로 줌 → 프론트는 저장하지 않음
+ * - 리프레시 토큰은 쓰지 않음: 토큰 자체를 13시간 유효로 하는 A안 확정(2026-11-16 재원님)
  * - 로그인 유지: 로그인 응답의 sessionExpiresAt(만료 시각)까지, '연장'하면 POST /auth/extend
  *   (명세서에는 없는 값·API → 백엔드와 합의 전 가정, docs/backend-notes.md 참고)
  */
@@ -49,7 +49,7 @@ export function extendSession(currentExpiresAt) {
   return http.post('/auth/extend')
 }
 
-/** 로그아웃 (서버에서 리프레시 토큰 삭제) */
+/** 로그아웃 (서버에서 토큰을 무효로 처리) */
 export function logout() {
   if (USE_MOCK) return mockOk(null)
   return http.post('/auth/logout')

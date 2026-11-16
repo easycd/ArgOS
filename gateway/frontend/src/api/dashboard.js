@@ -6,7 +6,7 @@
  */
 import http from './http'
 import { USE_MOCK, mockFail, mockOk } from './mock'
-import { MOCK_ALARMS, MOCK_HOURLY, MOCK_SITES, MOCK_SITE_TREES } from './mock/data'
+import { MOCK_ALARMS, MOCK_SITES, MOCK_SITE_TREES } from './mock/data'
 import { factoryLevels, sumLevels } from '@/features/site/siteStats'
 
 const SENSOR_TYPES = ['CURRENT', 'TEMP', 'CO']
@@ -55,29 +55,60 @@ export function getSiteOverview(siteId) {
 }
 
 /**
+ * 범위(사업장 또는 공장)에 맞는 예시 알림 고르기
+ * - 명세서: 범위는 siteId · factoryId 중 하나만 보냄
+ */
+function mockAlarmsOf({ siteId, factoryId }) {
+  if (factoryId) return MOCK_ALARMS.filter((a) => a.factoryId === Number(factoryId))
+  return MOCK_ALARMS.filter((a) => a.siteId === Number(siteId))
+}
+
+/** 범위 파라미터: factoryId 가 있으면 공장, 없으면 사업장 */
+const scopeParams = ({ siteId, factoryId }) => (factoryId ? { factoryId } : { siteId })
+
+/**
  * 오늘 알림 목록 (최근 순)
- * @param {{ siteId: number, size?: number }} params
+ * @param {{ siteId?: number, factoryId?: number, size?: number }} params
  * @returns {Promise<{ items: Array, page: number, size: number, total: number }>}
  */
-export function getAlarms({ siteId, size = 20 }) {
+export function getAlarms({ siteId, factoryId, size = 20 }) {
   if (USE_MOCK) {
-    const items = (MOCK_ALARMS[Number(siteId)] ?? []).slice(0, size)
-    return mockOk({ items, page: 0, size, total: items.length })
+    // 예시 데이터에만 있는 범위 값(siteId·factoryId)은 빼고 응답 모양만 남김
+    const all = mockAlarmsOf({ siteId, factoryId }).map(({ siteId: _s, factoryId: _f, ...item }) => item)
+    return mockOk({ items: all.slice(0, size), page: 0, size, total: all.length })
   }
-  return http.get('/alarms', { params: { siteId, date: 'today', size } })
+  return http.get('/alarms', { params: { ...scopeParams({ siteId, factoryId }), date: 'today', size } })
+}
+
+/**
+ * 예시 알림 목록으로 시간대별 알림 만들기 (주간 07~18시, 야간 19~06시)
+ * - 주의 → warn, 경보·화재 → alarm, 조치 완료(CLOSED) → action
+ */
+function mockHourlyOf(alarms) {
+  const shift = () => ({ alarmCount: 0, actionCount: 0, hours: [] })
+  const result = { day: shift(), night: shift() }
+  for (const a of alarms) {
+    const hour = Number(a.raisedAt.slice(11, 13))
+    const s = hour >= 7 && hour < 19 ? result.day : result.night
+    let row = s.hours.find((h) => h.hour === hour)
+    if (!row) s.hours.push((row = { hour, warn: 0, alarm: 0, action: 0 }))
+    if (a.level === 'WARN') row.warn += 1
+    else row.alarm += 1
+    s.alarmCount += 1
+    if (a.status === 'CLOSED') {
+      row.action += 1
+      s.actionCount += 1
+    }
+  }
+  return result
 }
 
 /**
  * 시간대별 알림 (주간 07~19시, 야간 19~07시)
+ * @param {{ siteId?: number, factoryId?: number }} params
  * @returns {Promise<{ day: { alarmCount, actionCount, hours }, night: { ... } }>}
  */
-export function getHourlyAlarms({ siteId }) {
-  if (USE_MOCK) {
-    const hourly = MOCK_HOURLY[Number(siteId)] ?? {
-      day: { alarmCount: 0, actionCount: 0, hours: [] },
-      night: { alarmCount: 0, actionCount: 0, hours: [] },
-    }
-    return mockOk(hourly)
-  }
-  return http.get('/alarms/hourly', { params: { siteId, date: 'today' } })
+export function getHourlyAlarms({ siteId, factoryId }) {
+  if (USE_MOCK) return mockOk(mockHourlyOf(mockAlarmsOf({ siteId, factoryId })))
+  return http.get('/alarms/hourly', { params: { ...scopeParams({ siteId, factoryId }), date: 'today' } })
 }

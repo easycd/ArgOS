@@ -20,7 +20,8 @@ defineProps({
   <section class="base-card">
     <header v-if="title" class="card-head">
       <h3>{{ title }}</h3>
-      <span v-if="sub" class="sub">{{ sub }}</span>
+      <!-- 설명: 글자만이면 sub, 링크 등이 필요하면 sub 슬롯 -->
+      <span v-if="sub || $slots.sub" class="sub"><slot name="sub">{{ sub }}</slot></span>
       <div v-if="$slots.actions" class="actions"><slot name="actions" /></div>
     </header>
     <slot />

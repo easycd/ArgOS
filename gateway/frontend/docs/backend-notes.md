@@ -575,3 +575,40 @@
 | 1 | 위치 단위: 그림 격자 칸(`grid`)으로 갈지, 명세서 미터(`pos`)로 갈지 |
 | 2 | `kind` · `active` 필드를 layout 응답 · 저장 본문에 넣을지 |
 | 3 | 판 번호가 다를 때(다른 사람이 먼저 저장) 409 와 응답 모양 — 지금은 문구만 띄우고 바꾼 값은 그대로 둠, '조회'로 다시 불러옴 |
+
+---
+
+## 16. 이용 로그 (명세서 G2, 화면설계서 G2)
+
+백엔드(develop)는 `common/ActivityLogger` 로 `activity_log` 에 **쓰기만 하고 읽는 API(`/logs`)는 아직 없어** 명세서 G2 모양으로 예시 데이터를 만들었습니다(`api/logs.js`, `api/mock/logData.js`).
+
+| API | 프론트 사용 | 백엔드 | 명세서와 다른 점 / 추가 필요 |
+| --- | --- | --- | --- |
+| `GET /logs?from=&to=&factoryId=&processId=&type=&q=&page=&size=` | 표(한 쪽 16행, 설계안) + 유형별 건수 + 시간대별 이용 | **없음** | `type` 은 화면 한 칸이 코드 여러 개라 **쉼표로 이어 보냄**(`LOGIN,LOGOUT`) — 명세서는 하나라 가정. `topUsers` 추가 필요 (아래) |
+| `GET /logs/export` (같은 조건) | CSV로 내보내기 | **없음** | 파일 이름은 프론트가 정함(`ArgOS_이용로그_5공장_도장공정_20261111-20261117.csv`, 화면설계서). 내려받은 것도 로그에 남김(명세서) |
+
+### 유형 코드 ↔ 화면 칸 (설계안 8칸)
+
+| 화면 칸 | type 코드 | 백엔드에서 쓰는 곳 |
+| --- | --- | --- |
+| 로그인 | `LOGIN` · `LOGOUT` | 로그인 쪽 (명세서) |
+| 조치 | `CHECKLIST` · `FAN` | `ChecklistService`(담당자 변경 등) · `EquipmentActionService`(팬) |
+| 셧다운 | `SHUTDOWN` · `FIRE_CLEAR` | `EquipmentActionService` · (화재 해제는 백엔드 없음) |
+| 기준값 변경 | `THRESHOLD` | `ThresholdAdminService` |
+| 설비 수정 | `LAYOUT` | `ThresholdAdminService` (공장 관리 저장 API 생기면 거기도) |
+| 사용자 | `USER` | (사용자 API 없음) |
+| 서류 등록 | `INSPECTION` | (명세서) |
+| 내려받기 | `EXPORT` | `StatsService` (+ `/logs/export`) |
+
+- 명세서 type 목록에 없는 `CHECKLIST` 를 백엔드가 쓰고 있어 화면은 '조치' 칸으로 묶음
+
+### 응답에 있으면 좋은 것 (명세서에 없음)
+
+| 필드 | 쓰는 곳 |
+| --- | --- |
+| `topUsers: [{ loginId, name, count }]` (4명) | 시간대별 이용 카드 아래 '많이 쓴 사용자' (설계안). 없으면 빈 칸 |
+| `countsByType` 를 **유형 조건 없이** 셈 | 유형 칸을 눌러 거른 뒤에도 다른 칸 건수가 보이게 (예시 데이터는 이렇게 함) |
+
+### 보이는 범위 (화면설계서 G2)
+
+- 본사 관리자: 전체 / 공장 담당자: 소속 공장 기록만, **본사 관리자의 기록은 안 보임** → 서버가 걸러 줘야 함 (프론트는 공장 선택만 잠금)

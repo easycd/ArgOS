@@ -139,6 +139,18 @@ const rowOf = (u) => ({
 })
 
 /** GET /users?role=&factoryId=&active=&q=&page=&size= */
+/** 이용 로그 예시 데이터용 사용자 (api/mock/logData.js) — 아이디 · 이름 · 권한 · 담당 공장·공정 · 담당 문구 */
+export const logUsers = () =>
+  USERS.map((u) => ({
+    id: u.id,
+    name: u.name,
+    loginId: u.loginId,
+    role: u.role,
+    factoryId: u.scope.factoryIds[0] ?? null,
+    processId: u.scope.processIds[0] ?? null,
+    scopeText: scopeText(u),
+  }))
+
 export function list(actor, { role, factoryId, active, q, page = 0, size = 15 } = {}) {
   const seen = USERS.filter((u) => canSee(actor, u))
   const rows = seen.filter(

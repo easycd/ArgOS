@@ -118,7 +118,7 @@ const tab = computed({
   get: () => 'users',
   set: (v) => {
     if (v === 'factory') guard(() => router.push({ name: 'factory', params: { siteId: route.params.siteId } }))
-    else if (v === 'logs') toast('이용 로그 화면은 준비 중입니다.', { type: 'info' })
+    else if (v === 'logs') guard(() => router.push({ name: 'logs', params: { siteId: route.params.siteId } }))
   },
 })
 

@@ -7,10 +7,12 @@
 <script setup>
 import { onBeforeUnmount, ref } from 'vue'
 import { USE_MOCK } from '@/api/mock'
+import { serverNow } from '@/api/clock'
 import { formatClock } from '@/utils/format'
 
-const now = ref(formatClock(new Date()))
-const timer = setInterval(() => (now.value = formatClock(new Date())), 1000)
+// 시연 시계 기준 (서버 데이터의 시각과 맞춤)
+const now = ref(formatClock(serverNow()))
+const timer = setInterval(() => (now.value = formatClock(serverNow())), 1000)
 onBeforeUnmount(() => clearInterval(timer))
 </script>
 

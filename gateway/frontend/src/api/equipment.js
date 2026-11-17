@@ -7,6 +7,7 @@
  */
 import http from './http'
 import { USE_MOCK, mockFail, mockOk } from './mock'
+import { serverNow } from './clock'
 import { TOP_OVEN_ID, mockEquipment, mockEquipmentEvents, thermalOf } from './mock/equipmentData'
 import { buildSeries } from './mock/equipmentSeries'
 import { scenario } from './mock/scenario'
@@ -40,7 +41,7 @@ export function getThermalLatest(cameraId, equipmentId) {
 
 /** 범위 → 요청 기간·간격 ('1h' = 최근 1시간 1분 간격, '6h' = 최근 6시간, 'today' = 오늘 0시부터) */
 function periodOf(range) {
-  const to = new Date()
+  const to = serverNow() // 시연 시계 기준 (PC 시계면 서버 데이터와 날짜가 어긋남)
   const from = new Date(to)
   if (range === '1h') from.setHours(to.getHours() - 1)
   else if (range === '6h') from.setHours(to.getHours() - 6)

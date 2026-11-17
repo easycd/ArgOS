@@ -7,6 +7,8 @@ import http from './http'
 import { USE_MOCK, mockOk } from './mock'
 import { hasActiveChecklist, mockAlarms } from './mock/data'
 import { scenario } from './mock/scenario'
+import { unreadTotal } from './mock/chatData'
+import { useAuthStore } from '@/stores/auth'
 
 /**
  * @returns {Promise<{ unackedAlarmCount: number, activeChecklistCount: number, unreadChatCount: number, activeFire: object|null }>}
@@ -17,7 +19,7 @@ export function getNotificationSummary() {
       // 예시 알림 중 아직 조치가 끝나지 않은 것 (지금 예시 상황: 5공장 CT-17 주의가 진행 중이면 1건)
       unackedAlarmCount: mockAlarms().filter((a) => a.status !== 'CLOSED').length,
       activeChecklistCount: hasActiveChecklist() ? 1 : 0,
-      unreadChatCount: 2,
+      unreadChatCount: unreadTotal(useAuthStore().user), // 채팅 예시 데이터의 안 읽은 글 (api/mock/chatData.js)
       // 진행 중 화재 (명세서: { id, location } 정도. 예시 상황에서 화재면 채움)
       activeFire: scenario.fire?.status === 'ACTIVE' ? { id: scenario.fire.id, location: '울산공장 · 5공장 · 도장 공정 · 상도 건조로 버너실' } : null,
     })

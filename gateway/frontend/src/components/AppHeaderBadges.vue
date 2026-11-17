@@ -1,16 +1,19 @@
 <!--
   상단 바 채팅·알림 아이콘 + 빨간 숫자 (설계안 .bell em)
-  - 숫자: GET /notifications/summary (안 읽은 채팅, 아직 조치 안 끝난 알림)
-  - 알림이 있으면 종 아이콘이 흔들림
-  - TODO: 채팅 패널, 알림 목록 펼치기는 해당 화면 작업 때 연결
+  - 알림 숫자: GET /notifications/summary (아직 조치 안 끝난 알림). 알림이 있으면 종 아이콘이 흔들림
+  - 채팅: 누르면 오른쪽 채팅 패널 열기·닫기 (features/chat/ChatPanel.vue), 숫자는 안 읽은 채팅 (stores/chat.js 대화방 합계)
+    채팅을 쓰지 않는 사람(공정 담당자)에게는 채팅 아이콘이 없음
+  - TODO: 알림 목록 펼치기는 해당 화면 작업 때 연결
 -->
 <script setup>
 import { onMounted, ref } from 'vue'
 import AppIcon from './AppIcon.vue'
 import { getNotificationSummary } from '@/api/notifications'
+import { useChatStore } from '@/stores/chat'
 import { useLiveReload } from '@/utils/useLiveReload'
 
 const summary = ref({ unackedAlarmCount: 0, unreadChatCount: 0 })
+const chat = useChatStore()
 
 async function load() {
   try {
@@ -23,14 +26,22 @@ async function load() {
 onMounted(load)
 useLiveReload(load) // 알림이 생기거나 끝나면 숫자도 다시
 
-function onChat() {}
 function onBell() {}
 </script>
 
 <template>
-  <button type="button" class="icon-btn" aria-label="채팅" @click="onChat">
+  <button
+    v-if="chat.enabled"
+    type="button"
+    class="icon-btn"
+    :class="{ on: chat.open }"
+    aria-label="채팅"
+    :aria-expanded="chat.open"
+    @click="chat.toggle()"
+  >
     <AppIcon name="chat" />
-    <em v-if="summary.unreadChatCount">{{ summary.unreadChatCount }}</em>
+    <!-- 새 글이 오면 숫자가 톡 커졌다 돌아옴 (화면설계서 I1 '120% 300ms') -->
+    <em v-if="chat.unread" :key="chat.unread" class="pop">{{ chat.unread }}</em>
   </button>
   <button
     type="button"
@@ -56,6 +67,11 @@ function onBell() {}
   cursor: pointer;
 }
 
+/* 채팅 패널이 열려 있으면 아이콘 파랗게 */
+.icon-btn.on {
+  color: var(--color-primary);
+}
+
 /* 빨간 숫자 */
 em {
   position: absolute;
@@ -72,6 +88,16 @@ em {
   font-size: 10px;
   font-style: normal;
   font-weight: 700;
+}
+
+em.pop {
+  animation: badge-pop 300ms ease-out;
+}
+
+@keyframes badge-pop {
+  40% {
+    transform: scale(1.2);
+  }
 }
 
 /* 알림이 있으면 종이 흔들림 */

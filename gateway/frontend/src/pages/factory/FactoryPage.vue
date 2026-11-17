@@ -206,7 +206,7 @@ const tab = computed({
   get: () => 'factory',
   set: (v) => {
     if (v === 'users') router.push({ name: 'user', params: { siteId: route.params.siteId } })
-    else if (v === 'logs') toast('이용 로그 화면은 준비 중입니다.', { type: 'info' })
+    else if (v === 'logs') router.push({ name: 'logs', params: { siteId: route.params.siteId } }) // 저장 안 한 변경은 onBeforeRouteLeave 가 확인
   },
 })
 

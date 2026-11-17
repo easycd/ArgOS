@@ -22,8 +22,10 @@ const badge = computed(() => {
 </script>
 
 <template>
+  <!-- compact: 좁은 화면에서 글자를 줄이는 상단 바용 모양 (ChecklistBadge.vue) -->
   <ChecklistBadge
     v-if="badge"
+    class="compact"
     :checklist="badge"
     sub="도장 공정"
     @click="alert.open('checklist', { alarmId: first.alarmId, checklistId: first.id })"

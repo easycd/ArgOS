@@ -25,7 +25,7 @@ async function onLogout() {
   <div class="user-wrap">
     <button type="button" class="user" :aria-expanded="open" @click="open = !open">
       <span class="avatar"><AppIcon name="user" /></span>
-      <span>{{ ROLE_LABEL[auth.role] }}</span>
+      <span class="role">{{ ROLE_LABEL[auth.role] }}</span>
       <AppIcon name="cd" :size="14" class="chev" />
     </button>
 
@@ -67,6 +67,13 @@ async function onLogout() {
 
 .chev {
   color: var(--color-text-weak);
+}
+
+/* 좁은 화면: 역할 글자 숨김 (누르면 메뉴에 이름·아이디가 나옴) */
+@media (max-width: 1600px) {
+  .role {
+    display: none;
+  }
 }
 
 .menu {

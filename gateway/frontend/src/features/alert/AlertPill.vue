@@ -77,6 +77,9 @@ function onClick() {
   white-space: nowrap;
   cursor: pointer;
   transition: transform 150ms;
+  /* 상단 바가 1920 보다 좁아질 때 '어디 · 눌러서 확인' 글자부터 줄여서(…) 화면 밖으로 밀리지 않게 */
+  min-width: 0;
+  overflow: hidden;
 }
 
 .pill:hover {
@@ -84,6 +87,9 @@ function onClick() {
 }
 
 .pill small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-size: 12.5px;
   font-weight: 500;
   opacity: 0.95;
@@ -157,6 +163,17 @@ function onClick() {
   }
   100% {
     opacity: 0.35;
+  }
+}
+
+/* 좁은 화면: 설명 글자는 숨기고 '주의 1건' 은 끝까지 보이게 (줄어들지 않음) */
+@media (max-width: 1600px) {
+  .pill {
+    flex-shrink: 0;
+  }
+
+  .pill small {
+    display: none;
   }
 }
 

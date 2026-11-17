@@ -86,6 +86,12 @@ function initial() {
     shutdown: null,
     /** 상도 건조로가 멈춘 상태 (셧다운·화재 뒤, 현장 점검 전) */
     shut: false,
+    /** 기준값 관리에서 저장한 기준 { 센서 id: { 계절: { warn, alarm } } } (thresholdRules.js) */
+    thresholds: {},
+    /** 기준값 관리에서 저장한 변경 이력 (thresholdData.js 가 기본 이력 위에 붙임) */
+    thresholdHistory: [],
+    /** 설비별 기준값 판 번호 (동시에 고치면 409) */
+    thresholdVersion: {},
     /** 예시 시계: base 시각에서 실제로 흐른 초를 더함 */
     clock: { base: '16:42:10', at: Date.now() },
   }

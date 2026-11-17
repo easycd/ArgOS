@@ -91,4 +91,18 @@ function goHome() {
   color: var(--color-text-sub);
   white-space: nowrap;
 }
+
+/* 1920 보다 좁은 화면: 간격을 줄여서 오른쪽이 화면 밖으로 밀리지 않게 */
+@media (max-width: 1800px) {
+  .right {
+    gap: 12px;
+  }
+}
+
+@media (max-width: 1600px) {
+  .app-header {
+    gap: 10px;
+    padding: 0 16px;
+  }
+}
 </style>

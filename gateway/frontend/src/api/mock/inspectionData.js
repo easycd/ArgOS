@@ -21,9 +21,9 @@ const copy = (v) => JSON.parse(JSON.stringify(v))
 
 /* ───────── 서류 양식 (GET /doc-forms) ───────── */
 /**
- * fields: 명세서 { key, label, type, unit, limit } + group(구역, 추가 필드)
+ * fields: 명세서 { key, label, type, unit, limit } + group(구역) · options(고르는 칸) · row(표의 몇째 줄) (추가 필드)
  * - F01 은 설계안 인식 결과 순서 그대로 (작업 개요 → 가스 농도 측정 → 사전 안전조치 → 작업 종료 확인)
- * - F02 ~ F05 는 예시 원본이 없어 칸 이름만 가정 (확인 필요)
+ * - F02 ~ F05 는 ArgOS 시연용 가상 양식의 칸 그대로 (예시 원본 그림은 F01 만 있음)
  */
 const PRE_ITEMS = [
   ['작업 전 환기 실시', '배기팬 CF-03 가동'],
@@ -34,6 +34,145 @@ const PRE_ITEMS = [
   ['구조용 장비 비치 (사다리 · 섬유로프 등)', ''],
   ['작업자 밀폐공간 특별안전교육 실시', ''],
   ['작업장 전원 · 밸브 잠금 및 표지 부착', ''],
+]
+
+/* ───────── F02 ~ F05 양식 칸 (ArgOS 시연용 가상 양식 — 예시 원본 그림은 없음) ───────── */
+const RESULT = ['양호', '불량', '해당 없음']
+const f = (key, label, type, group, extra = {}) => ({ key, label, type, group, ...extra })
+
+/** 점검 항목 n개: 판정(양호/불량/해당 없음) + 측정값(단위가 있는 항목만) + 비고 */
+function checkItems(items) {
+  return items.flatMap(([label, unit], i) => {
+    const no = String(i + 1).padStart(2, '0')
+    return [
+      f(`item${no}`, `${i + 1}. ${label}`, 'choice', 'items', { options: RESULT, row: i + 1 }),
+      ...(unit ? [f(`item${no}Value`, `${label} 측정값`, 'number', 'items', { unit, row: i + 1 })] : []),
+      f(`item${no}Note`, `${label} 비고`, 'text', 'items', { row: i + 1 }),
+    ]
+  })
+}
+
+/** 이상 사항 및 조치 n줄: 항목 No · 이상 내용 · 조치 내용 · 조치 기한 · 조치 완료일 */
+function issueRows(n) {
+  return Array.from({ length: n }, (_, i) => i + 1).flatMap((r) => [
+    f(`issue${r}No`, `${r}줄 항목 No`, 'number', 'issues', { row: r }),
+    f(`issue${r}Problem`, `${r}줄 이상 내용`, 'text', 'issues', { row: r }),
+    f(`issue${r}Action`, `${r}줄 조치 내용`, 'text', 'issues', { row: r }),
+    f(`issue${r}Due`, `${r}줄 조치 기한`, 'date', 'issues', { row: r }),
+    f(`issue${r}DoneAt`, `${r}줄 조치 완료일`, 'date', 'issues', { row: r }),
+  ])
+}
+
+const F02_FIELDS = [
+  f('inspectedAt', '점검 일자·시각', 'datetime', 'info'),
+  f('inspType', '점검 구분', 'choice', 'info', { options: ['일상', '주간', '월간'] }),
+  f('factory', '공장', 'text', 'info'),
+  f('equipmentNo', '설비번호', 'text', 'info', { prefix: 'EF-' }),
+  f('zone', '구역', 'text', 'info'),
+  f('inspector', '점검자', 'text', 'info'),
+  f('checker', '확인자', 'text', 'info'),
+  ...checkItems([
+    ['배기팬 가동 상태'],
+    ['모터 운전 전류', 'A'],
+    ['베어링 온도', '℃'],
+    ['팬 벨트'],
+    ['덕트·후드'],
+    ['댐퍼'],
+    ['필터 차압', 'Pa'],
+    ['배기 풍량', 'm³/min'],
+    ['제어반'],
+    ['CO 감지기', 'ppm'],
+    ['비상 정지 장치'],
+    ['예비 팬 전환'],
+  ]),
+  ...issueRows(3),
+  f('verdict', '종합 판정', 'choice', 'verdict', { options: ['정상 운전', '조건부 운전', '운전 중지'] }),
+  f('opinion', '종합 의견', 'text', 'verdict'),
+]
+
+const F03_FIELDS = [
+  f('inspectedAt', '점검 일자·시각', 'datetime', 'info'),
+  f('inspType', '점검 구분', 'choice', 'info', { options: ['일상', '월간', '분기'] }),
+  f('factory', '공장', 'text', 'info'),
+  f('roomName', '전기실명', 'text', 'info'),
+  f('equipmentNo', '설비번호', 'text', 'info', { prefix: 'TR-' }),
+  f('voltage', '수전 전압', 'choice', 'info', { options: ['22.9kV', '154kV', '기타'] }),
+  f('inspector', '점검자', 'text', 'info'),
+  f('checker', '확인자', 'text', 'info'),
+  ...['R', 'S', 'T'].map((p) => f(`volt${p}`, `${p}상 전압`, 'number', 'measure', { unit: 'V' })),
+  ...['R', 'S', 'T'].map((p) => f(`amp${p}`, `${p}상 전류`, 'number', 'measure', { unit: 'A' })),
+  f('peakKw', '최대 수요전력', 'number', 'measure', { unit: 'kW' }),
+  f('loadRate', '부하율', 'number', 'measure', { unit: '%' }),
+  f('powerFactor', '역률', 'number', 'measure', { unit: '%' }),
+  f('trTemp', '변압기 온도', 'number', 'measure', { unit: '℃' }),
+  f('kwh', '적산 전력량', 'number', 'measure', { unit: 'kWh' }),
+  ...checkItems([
+    ['변압기 외관'],
+    ['차단기(VCB·ACB)'],
+    ['표시등·계기'],
+    ['보호계전기'],
+    ['케이블 접속부(열화상 최고 온도)', '℃'],
+    ['절연 상태'],
+    ['접지'],
+    ['전기실 환경', '℃'],
+    ['소화설비·감지기'],
+    ['출입 통제'],
+  ]),
+  ...issueRows(2),
+  f('verdict', '종합 판정', 'choice', 'verdict', { options: ['정상', '주의', '운전 정지 필요'] }),
+]
+
+const F04_FIELDS = [
+  f('eduDate', '교육 일자', 'date', 'edu'),
+  f('eduStart', '교육 시작', 'time', 'edu'),
+  f('eduEnd', '교육 끝', 'time', 'edu'),
+  f('eduHours', '총 시간', 'number', 'edu', { unit: '시간' }),
+  f('factory', '공장', 'text', 'edu'),
+  f('place', '교육 장소', 'text', 'edu'),
+  f('zone', '대상 구역', 'text', 'edu'),
+  f('eduType', '교육 구분', 'choice', 'edu', { options: ['정기교육', '채용 시', '작업내용 변경 시', '특별교육', '관리감독자'] }),
+  f('specialWork', '특별교육 작업', 'choice', 'edu', { options: ['밀폐공간 작업', '화기 작업', '전기 작업', '유해화학물질 취급', '해당 없음'] }),
+  f('method', '교육 방법', 'choice', 'edu', { options: ['집체', '현장', '시청각'] }),
+  f('instructorName', '강사 성명', 'text', 'edu'),
+  f('instructorOrg', '강사 소속', 'text', 'edu'),
+  ...[1, 2, 3].flatMap((r) => [
+    f(`subject${r}`, `${r}. 교육 과목`, 'text', 'content', { row: r }),
+    f(`detail${r}`, `${r}. 세부 내용`, 'text', 'content', { row: r }),
+    f(`minutes${r}`, `${r}. 시간`, 'number', 'content', { unit: '분', row: r }),
+  ]),
+  f('targetCount', '교육 대상', 'number', 'people', { unit: '명' }),
+  f('attendCount', '참석', 'number', 'people', { unit: '명' }),
+  f('absentCount', '불참', 'number', 'people', { unit: '명' }),
+  ...Array.from({ length: 20 }, (_, i) => i + 1).flatMap((r) => [
+    f(`trainee${r}Name`, `${r}. 성명`, 'text', 'roster', { row: r }),
+    f(`trainee${r}No`, `${r}. 사번`, 'text', 'roster', { row: r }),
+    f(`trainee${r}Sign`, `${r}. 서명`, 'sign', 'roster', { row: r }),
+  ]),
+  f('absentees', '불참자', 'text', 'people'),
+  f('makeupDate', '보충 교육일', 'date', 'people'),
+]
+
+// 위험성 평가 및 감소 대책 8줄 (위험성 = 가능성 × 중대성). 양식의 예시 행은 인식하지 않음
+const F05_FIELDS = [
+  f('evalDate', '평가 일자', 'date', 'info'),
+  f('evalType', '평가 구분', 'choice', 'info', { options: ['최초', '정기', '수시', '상시'] }),
+  f('factory', '공장', 'text', 'info'),
+  f('processWork', '공정·작업', 'text', 'info'),
+  f('zone', '구역', 'text', 'info'),
+  f('evaluator', '평가자', 'text', 'info'),
+  f('participants', '참여 근로자', 'text', 'info'),
+  ...Array.from({ length: 8 }, (_, i) => i + 1).flatMap((r) => [
+    f(`risk${r}Task`, `${r}. 세부 작업`, 'text', 'risk', { row: r }),
+    f(`risk${r}Hazard`, `${r}. 유해·위험요인`, 'text', 'risk', { row: r }),
+    f(`risk${r}Accident`, `${r}. 재해 형태`, 'text', 'risk', { row: r }),
+    f(`risk${r}Current`, `${r}. 현재 안전조치`, 'text', 'risk', { row: r }),
+    f(`risk${r}Likelihood`, `${r}. 가능성`, 'number', 'risk', { min: 1, max: 3, row: r }),
+    f(`risk${r}Severity`, `${r}. 중대성`, 'number', 'risk', { min: 1, max: 3, row: r }),
+    f(`risk${r}Level`, `${r}. 위험성`, 'number', 'risk', { formula: '가능성 × 중대성', row: r }),
+    f(`risk${r}Measure`, `${r}. 감소 대책`, 'text', 'risk', { row: r }),
+    f(`risk${r}After`, `${r}. 개선 후 위험성`, 'number', 'risk', { row: r }),
+    f(`risk${r}Owner`, `${r}. 담당/완료일`, 'text', 'risk', { row: r }),
+  ]),
 ]
 
 const FORMS = [
@@ -58,14 +197,11 @@ const FORMS = [
       { key: 'signer', label: '확인자 서명', type: 'text', group: 'end' },
     ],
   },
-  { formType: 'F02', name: '환기·배기설비 점검일지', fields: simpleFields(['점검일', '설비', '풍량', '벨트 상태', '점검자']) },
-  { formType: 'F03', name: '수변전설비 점검일지', fields: simpleFields(['점검일', '변압기 온도', '전압', '절연 상태', '점검자']) },
-  { formType: 'F04', name: '안전보건교육 일지', fields: simpleFields(['교육일', '교육 내용', '교육 시간', '참석 인원', '강사']) },
-  { formType: 'F05', name: '위험성평가표', fields: simpleFields(['평가일', '작업명', '위험 요인', '위험성 수준', '평가자']) },
+  { formType: 'F02', name: '환기·배기설비 점검일지', fields: F02_FIELDS },
+  { formType: 'F03', name: '수변전설비 점검일지', fields: F03_FIELDS },
+  { formType: 'F04', name: '안전보건교육 일지', fields: F04_FIELDS },
+  { formType: 'F05', name: '위험성평가표', note: '양식의 예시 행은 인식하지 않음', fields: F05_FIELDS },
 ]
-function simpleFields(labels) {
-  return labels.map((label, i) => ({ key: `f${i + 1}`, label, type: i === 0 ? 'date' : 'text', group: 'overview' }))
-}
 export const FORM_NAME = Object.fromEntries(FORMS.map((f) => [f.formType, f.name]))
 
 export const docForms = () => copy(FORMS)

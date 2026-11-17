@@ -193,6 +193,7 @@ function shake() {
           <section>
             <div class="m-sect"><AppIcon name="cam" :size="15" />열화상 카메라</div>
             <ThermalImage
+              v-if="response.thermal?.imageUrl"
               :image-url="response.thermal.imageUrl"
               :max="response.thermal.max"
               :max-point="response.thermal.maxPoint"
@@ -201,6 +202,8 @@ function shake() {
               :zone-name="zoneOf(response.thermal)"
               class="gap ir"
             />
+            <!-- 응답에 열화상이 없을 때 (창은 그대로 열림) -->
+            <div v-else class="gap ir no-ir"><AppIcon name="cam" :size="22" />열화상 이미지를 받지 못했습니다</div>
             <div class="m-sect top"><AppIcon name="info" :size="15" />경보 사유</div>
             <div class="m-box reason gap">
               <b>{{ response.reason }}</b>
@@ -328,5 +331,18 @@ function shake() {
   font-size: 12.5px;
   line-height: 19px;
   color: #7f1d1d;
+}
+.no-ir {
+  aspect-ratio: 4 / 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-sub);
+  font-size: 13px;
+  color: var(--color-text-weak);
 }
 </style>

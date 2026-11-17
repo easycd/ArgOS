@@ -12,17 +12,25 @@
 import http from './http'
 import { USE_MOCK, mockFail, mockOk } from './mock'
 import { alarmResponse, fireView } from './mock/alertData'
+import { THERMAL_BY_STATE } from './mock/equipmentData'
 import { MOCK_PASSWORD } from './mock/data'
 import { scenario } from './mock/scenario'
 import { approveUnlock as mockApprove, clearFire as mockClear, closeIncident, startShutdown, valueStillOver } from './mock/scenarioEmergency'
+import { LEVEL } from '@/types/codes'
 
 /** 경보 대응 창 내용 */
-export function getAlarmResponse(alarmId) {
+export async function getAlarmResponse(alarmId) {
   if (USE_MOCK) {
     const data = alarmResponse(alarmId)
     return data ? mockOk(data) : mockFail({ code: 'ALARM_NOT_FOUND', message: '없는 알림입니다.', status: 404 })
   }
-  return http.get(`/alarms/${alarmId}/response`)
+  const data = await http.get(`/alarms/${alarmId}/response`)
+  // 실제 열화상 그림(VMS)이 아직 없어서 서버는 imageUrl 없이 level 만 줌 → 단계에 맞는 예시 그림 사용 (api/alarms.js 와 같은 방식)
+  // 서버가 imageUrl 을 채워 주면 그 값을 그대로 씀. thermal 자체가 없으면 창이 '열화상 없음'으로 보여 줌
+  if (data.thermal && !data.thermal.imageUrl) {
+    data.thermal.imageUrl = (THERMAL_BY_STATE[data.thermal.level ?? data.level] ?? THERMAL_BY_STATE[LEVEL.NORMAL]).image
+  }
+  return data
 }
 
 const already = () => mockFail({ code: 'COMMAND_RUNNING', message: '셧다운이 이미 진행 중입니다.', status: 409 })

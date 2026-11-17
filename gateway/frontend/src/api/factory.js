@@ -5,7 +5,7 @@
  */
 import http from './http'
 import { USE_MOCK, mockFail, mockOk } from './mock'
-import { MOCK_FACTORY_DETAILS, MOCK_SITE_TREES } from './mock/data'
+import { mockFactoryDetail, mockSiteTrees } from './mock/data'
 
 /**
  * 공장 현황
@@ -16,8 +16,8 @@ import { MOCK_FACTORY_DETAILS, MOCK_SITE_TREES } from './mock/data'
 export function getFactoryOverview(factoryId) {
   const id = Number(factoryId)
   if (USE_MOCK) {
-    const detail = MOCK_FACTORY_DETAILS[id]
-    const factory = Object.values(MOCK_SITE_TREES)
+    const detail = mockFactoryDetail(id) // 지금 예시 상황으로 만듦
+    const factory = Object.values(mockSiteTrees())
       .flatMap((tree) => tree.factories)
       .find((f) => f.id === id)
     if (!detail || !factory) {

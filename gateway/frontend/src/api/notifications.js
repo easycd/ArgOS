@@ -5,7 +5,7 @@
  */
 import http from './http'
 import { USE_MOCK, mockOk } from './mock'
-import { MOCK_ALARMS } from './mock/data'
+import { hasActiveChecklist, mockAlarms } from './mock/data'
 
 /**
  * @returns {Promise<{ unackedAlarmCount: number, activeChecklistCount: number, unreadChatCount: number, activeFire: object|null }>}
@@ -13,9 +13,9 @@ import { MOCK_ALARMS } from './mock/data'
 export function getNotificationSummary() {
   if (USE_MOCK) {
     return mockOk({
-      // 예시 알림 중 아직 조치가 끝나지 않은 것 (5공장 CT-17 주의 1건)
-      unackedAlarmCount: MOCK_ALARMS.filter((a) => a.status !== 'CLOSED').length,
-      activeChecklistCount: 1,
+      // 예시 알림 중 아직 조치가 끝나지 않은 것 (지금 예시 상황: 5공장 CT-17 주의가 진행 중이면 1건)
+      unackedAlarmCount: mockAlarms().filter((a) => a.status !== 'CLOSED').length,
+      activeChecklistCount: hasActiveChecklist() ? 1 : 0,
       unreadChatCount: 2,
       activeFire: null,
     })

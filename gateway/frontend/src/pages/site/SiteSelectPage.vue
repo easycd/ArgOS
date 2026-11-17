@@ -13,6 +13,7 @@ import AppNotice from '@/components/AppNotice.vue'
 import SiteListCard from '@/features/site/SiteListCard.vue'
 import SiteMapCard from '@/features/site/SiteMapCard.vue'
 import SiteSensorCard from '@/features/site/SiteSensorCard.vue'
+import { useLiveReload } from '@/utils/useLiveReload'
 import { useNotice } from '@/utils/useNotice'
 
 const router = useRouter()
@@ -26,15 +27,21 @@ const sites = ref([])
 const loading = ref(true)
 const errorMessage = ref('')
 
-onMounted(async () => {
+/** 사업장 목록 불러오기 (silent: 상황이 바뀌어 다시 부를 때는 '불러오는 중'을 띄우지 않음) */
+async function load({ silent = false } = {}) {
+  if (!silent) loading.value = true
   try {
     sites.value = await getSites()
+    errorMessage.value = ''
   } catch (error) {
     errorMessage.value = error.message
   } finally {
     loading.value = false
   }
-})
+}
+
+onMounted(load)
+useLiveReload(load) // 상황(정상·주의 등)이 바뀌면 숫자·색만 다시
 
 // 짧은 안내 문구
 const { message: noticeMessage, show: showNotice } = useNotice()

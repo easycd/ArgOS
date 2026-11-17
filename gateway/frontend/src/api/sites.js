@@ -4,18 +4,18 @@
  */
 import http from './http'
 import { USE_MOCK, mockFail, mockOk } from './mock'
-import { MOCK_SITES, MOCK_SITE_TREES } from './mock/data'
+import { mockSiteTrees, mockSites } from './mock/data'
 
 /** 사업장 목록: 지도·도넛·목록 머리줄 (GET /sites) */
 export function getSites() {
-  if (USE_MOCK) return mockOk(MOCK_SITES)
+  if (USE_MOCK) return mockOk(mockSites()) // 지금 예시 상황으로 만듦
   return http.get('/sites')
 }
 
 /** 사업장 펼치기: 공장 → 공정 → 이상 센서 (GET /sites/{siteId}/tree) */
 export function getSiteTree(siteId) {
   if (USE_MOCK) {
-    const tree = MOCK_SITE_TREES[siteId]
+    const tree = mockSiteTrees()[siteId]
     return tree ? mockOk(tree) : mockFail({ code: 'NOT_FOUND', message: '사업장을 찾을 수 없습니다.', status: 404 })
   }
   return http.get(`/sites/${siteId}/tree`)
@@ -31,7 +31,7 @@ export function getSiteTree(siteId) {
 export async function getSiteName(siteId) {
   const id = Number(siteId)
   if (USE_MOCK) {
-    const site = MOCK_SITES.find((s) => s.id === id)
+    const site = mockSites().find((s) => s.id === id)
     return site ? mockOk(site.name) : mockFail({ code: 'NOT_FOUND', message: '사업장을 찾을 수 없습니다.', status: 404 })
   }
   const overview = await http.get(`/sites/${id}/overview`)

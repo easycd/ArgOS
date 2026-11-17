@@ -20,6 +20,7 @@ import PlantMapCard from '@/features/factory/PlantMapCard.vue'
 import ProcessStatusCard from '@/features/factory/ProcessStatusCard.vue'
 import { sumLevels } from '@/features/site/siteStats'
 import { SENSOR_TYPES } from '@/types/codes'
+import { useLiveReload } from '@/utils/useLiveReload'
 import { useNotice } from '@/utils/useNotice'
 
 const route = useRoute()
@@ -32,10 +33,13 @@ const siteName = ref('')
 const loading = ref(true)
 const errorMessage = ref('')
 
-/** 네 가지를 한꺼번에 불러옴 (하나라도 실패하면 오류 문구) */
-async function load() {
+/**
+ * 네 가지를 한꺼번에 불러옴 (하나라도 실패하면 오류 문구)
+ * - silent: 상황이 바뀌어 다시 부를 때는 '불러오는 중'을 띄우지 않음
+ */
+async function load({ silent = false } = {}) {
   const { siteId, factoryId } = route.params
-  loading.value = true
+  if (!silent) loading.value = true
   errorMessage.value = ''
   try {
     const [o, a, h, name] = await Promise.all([
@@ -55,7 +59,8 @@ async function load() {
   }
 }
 
-watch(() => route.params.factoryId, load, { immediate: true })
+watch(() => route.params.factoryId, () => load(), { immediate: true })
+useLiveReload(load)
 
 // 공장 전체 센서 종류별 개수 = 공정들의 합 (센서별 단계 현황 카드)
 const factoryLevelsByType = computed(() =>

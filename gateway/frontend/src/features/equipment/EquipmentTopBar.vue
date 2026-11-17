@@ -4,6 +4,7 @@
   - 오른쪽: 추이 범위(1시간 / 6시간 / 오늘) + '설비 배치도' 돌아가기 버튼
 -->
 <script setup>
+import { computed } from 'vue'
 import ChecklistBadge from './ChecklistBadge.vue'
 import AppIcon from '@/components/AppIcon.vue'
 import LevelBadge from '@/components/LevelBadge.vue'
@@ -11,6 +12,8 @@ import SegButtons from '@/components/SegButtons.vue'
 import { useAlertStore } from '@/stores/alert'
 
 const alert = useAlertStore()
+// 경보·화재 중에는 체크리스트 배지를 숨김 (상단 바와 같은 규칙)
+const emergency = computed(() => ['ALARM', 'FIRE'].includes(alert.primary?.level))
 
 defineProps({
   /** 경로: [{ label, to }] — to 가 있으면 링크 */
@@ -44,7 +47,7 @@ const RANGES = [
     <LevelBadge :level="level" class="big" />
 
     <div class="right">
-      <ChecklistBadge v-if="checklist" :checklist="checklist" @click="alert.open('checklist', { checklistId: checklist.id })" />
+      <ChecklistBadge v-if="checklist && !emergency" :checklist="checklist" @click="alert.open('checklist', { checklistId: checklist.id })" />
       <SegButtons v-model="range" :options="RANGES" />
       <RouterLink :to="backTo" class="btn back"><AppIcon name="cl" :size="16" />설비 배치도</RouterLink>
     </div>

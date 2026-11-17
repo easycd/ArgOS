@@ -74,13 +74,14 @@ function paintProcess() {
   const sensors = sensorsNow()
   const count = (type, level) => sensors.filter((s) => s.type === type && s.level === level).length
   const typeLevels = (type) => levels(count(type, NORMAL), count(type, LEVEL.WARN), count(type, LEVEL.ALARM))
-  // 설비 14대 중 상도 건조로만 상황에 따라 바뀜
-  const top = maxLevel(sensors.filter((s) => s.equipmentId === 31).map((s) => s.level))
+  // 설비 14대 중 상도 건조로만 상황에 따라 바뀜 (화재 중이면 공정·설비 단계가 '화재', 개수는 경보 칸에 셈)
+  const fire = scenario.state === LEVEL.FIRE
+  const top = fire ? LEVEL.ALARM : maxLevel(sensors.filter((s) => s.equipmentId === 31).map((s) => s.level))
   return {
     id: 12,
     code: 'PNT',
     name: '도장 공정',
-    level: maxLevel(sensors.map((s) => s.level)),
+    level: fire ? LEVEL.FIRE : maxLevel(sensors.map((s) => s.level)),
     equipmentCount: 14,
     equipmentLevels: levels(top === NORMAL ? 14 : 13, top === LEVEL.WARN ? 1 : 0, top === LEVEL.ALARM ? 1 : 0),
     sensorCount: sensors.length,
@@ -267,10 +268,44 @@ function topOvenAlarm() {
   }
 }
 
+/**
+ * 경보·화재 알림 (예시 상황, scenarioEmergency.js)
+ * - 경보: 16:47:36 전류 경보(CT-17 27.5 A) · 16:50:12 온도 주의(TE-15 164 ℃) · 16:52:08 CO 경보(CO-13 34 ppm)
+ * - 화재: 16:58:04 화재 감지(열화상 최고 486 ℃) — 레벨 FIRE
+ * - 경보 종료·화재 해제 뒤에는 모두 '조치 완료'(CLOSED), 제목은 '… 해제'
+ */
+function emergencyAlarms() {
+  const inc = scenario.incident
+  if (!inc) return []
+  const closed = inc.status === 'CLOSED'
+  const status = closed ? 'CLOSED' : 'OPEN'
+  const loc = '5공장 · 도장 공정 · 상도 건조로'
+  const row = (id, level, title, place, tag, type, value, unit, threshold, time) => ({
+    ...alarm(id, 5, status, closed ? title.replace('기준 초과', '해제').replace('감지', '해제') : title, place, tag, type, value, unit, threshold, time),
+    level,
+    closedAt: closed ? todayAt(inc.closedAt) : null,
+  })
+  const list = [
+    row(1051, LEVEL.ALARM, 'CO 경보 기준 초과', `${loc} 버너실`, 'CO-13', 'CO', 34, 'ppm', 30, '16:52:08'),
+    row(1049, LEVEL.WARN, '온도 주의 기준 초과', loc, 'TE-15', 'TEMP', 164, '℃', 160, '16:50:12'),
+    row(1050, LEVEL.ALARM, '전류 경보 기준 초과', `${loc} 배기팬`, 'CT-17', 'CURRENT', 27.5, 'A', 27, '16:47:36'),
+  ]
+  const f = scenario.fire
+  if (f) {
+    const fireClosed = f.status === 'CLEARED'
+    list.unshift({
+      ...alarm(1052, 5, fireClosed ? 'CLOSED' : 'OPEN', fireClosed ? '화재 경보 해제' : '화재 감지', `${loc} 버너실`, 'IR-01', 'TEMP', 486, '℃', 150, f.detectedAt),
+      level: LEVEL.FIRE,
+      closedAt: fireClosed ? todayAt(f.clearedAt) : null,
+    })
+  }
+  return list
+}
+
 /** 오늘 알림 (최근 순, 지금 상황) */
 export function mockAlarms() {
   const top = topOvenAlarm()
-  return top ? [top, ...PAST_ALARMS] : [...PAST_ALARMS]
+  return [...emergencyAlarms(), ...(top ? [top] : []), ...PAST_ALARMS]
 }
 
 /** 진행 중인 체크리스트가 있는지 (상단 바 숫자) */

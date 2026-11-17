@@ -7,6 +7,8 @@
  */
 import { alarmTrendPoints } from './equipmentSeries'
 import { mockAlarms, todayAt } from './data'
+import { THERMAL_BY_STATE, mockEquipmentEvents } from './equipmentData'
+import { EQUIPMENT, equipmentLevel, runStateOf, sensorsNow } from './processData'
 import { TOP_OVEN_VALUES, scenario, scenarioNow, workerName } from './scenario'
 import { LEVEL } from '@/types/codes'
 import irWarn from '@/assets/images/thermal/ir_warn.jpg'
@@ -51,6 +53,33 @@ function pastTimeline(raisedTime) {
   ]
 }
 
+/**
+ * 경보·화재 알림의 조치 내역 (설계안 actSteps() 'dng' · 'flame')
+ * - 경보: 발생 → 공정 담당자 알림(PUSH) → 설비 셧다운(SHUTDOWN) → 경보 종료(CLOSE)
+ * - 화재: 감지 → 경고 방송(BROADCAST) → 자동 셧다운(SHUTDOWN) → 본사 통보(HQ_NOTIFY) → 경보 해제(CLEAR)
+ */
+function emergencyTimeline(row) {
+  const t = row.raisedAt.slice(11, 19)
+  if (row.level === LEVEL.FIRE) {
+    const f = scenario.fire
+    return [
+      step('RAISED', t, null, '화재 감지'),
+      step('BROADCAST', addSec(t, 1), null, '경고 방송'),
+      step('SHUTDOWN', addSec(t, 2), null, '자동 셧다운'),
+      step('HQ_NOTIFY', addSec(t, 2), null, '본사 통보'),
+      ...(f?.clearedAt ? [step('CLEAR', f.clearedAt, f.clearedBy, '경보 해제')] : []),
+    ]
+  }
+  const sd = scenario.shutdown
+  const inc = scenario.incident
+  return [
+    step('RAISED', t, null, '발생'),
+    step('PUSH', addSec(t, 1), null, '공정 담당자 알림'),
+    ...(sd?.steps[2] ? [step('SHUTDOWN', sd.steps[2], null, '설비 셧다운')] : []),
+    ...(inc?.closedAt ? [step('CLOSE', inc.closedAt, null, '경보 종료')] : []),
+  ]
+}
+
 export function alarmTimeline(alarmId) {
   const row = mockAlarms().find((a) => a.id === Number(alarmId))
   if (!row) return null
@@ -64,7 +93,12 @@ export function alarmTimeline(alarmId) {
     value: row.value,
     unit: row.unit,
     threshold: row.threshold,
-    timeline: row.id === 1042 ? topOvenTimeline() : pastTimeline(row.raisedAt.slice(11, 19)),
+    timeline:
+      row.id === 1042
+        ? topOvenTimeline()
+        : row.id >= 1049
+          ? emergencyTimeline(row)
+          : pastTimeline(row.raisedAt.slice(11, 19)),
     checklist: row.checklist,
   }
 }
@@ -140,6 +174,115 @@ export function checklistView(checklistId) {
     reportedAt: c.reportedAt && todayAt(c.reportedAt),
     confirmedAt: c.confirmedAt && todayAt(c.confirmedAt),
     // 서버 지금 시각 (명세서에 없음): '경과 시간'을 서버 시계 기준으로 세려고. 예시 데이터는 예시 시계
+    serverTime: todayAt(scenarioNow()),
+  }
+}
+
+/* ───────── 경보·화재 (명세서 C4 · C4F · C5, 백엔드 AlarmService.response 필드) ───────── */
+
+const STEP_LABELS = ['버너 연료 차단', '컨베이어 정지', '배기팬 추가 가동 후 정지']
+
+/** 셧다운 진행 (응답에 붙여 줌, 명세서에 없음 — 실제는 SSE command.result 로 옴) */
+function shutdownView() {
+  const sd = scenario.shutdown
+  if (!sd) return null
+  return {
+    equipmentIds: [...sd.equipmentIds], // 반응형 배열을 그대로 넘기면 structuredClone 이 못 복사함
+    auto: !!sd.auto,
+    startedAt: todayAt(sd.startedAt),
+    steps: STEP_LABELS.map((label, i) => ({ label, at: sd.steps[i] ? todayAt(sd.steps[i]) : null })),
+    done: sd.steps.every(Boolean),
+  }
+}
+
+/**
+ * 경보 대응 창 내용: GET /alarms/{id}/response
+ * - 경보(1051) 와 화재(1052) 모두 같은 응답 모양, 화재면 fireId 가 있음
+ */
+export function alarmResponse(alarmId) {
+  const id = Number(alarmId)
+  const inc = scenario.incident
+  if (!inc || (id !== 1051 && id !== 1052)) return null
+  const fire = id === 1052 && scenario.fire
+  const sensors = sensorsNow()
+  const top = sensors.filter((s) => s.equipmentId === 31)
+  const t = THERMAL_BY_STATE[scenario.state] ?? THERMAL_BY_STATE[LEVEL.ALARM]
+  const logs = mockEquipmentEvents(31)
+    .filter((e) => e.type !== 'RECORD' && e.type !== 'THRESHOLD')
+    .slice(0, 8)
+    .map((e) => ({ at: e.at, text: `${e.text}`, detail: e.detail, level: e.level ?? null, type: e.type }))
+  return {
+    id,
+    level: fire ? LEVEL.FIRE : LEVEL.ALARM,
+    status: fire ? (scenario.fire.status === 'CLEARED' ? 'CLOSED' : 'OPEN') : inc.status,
+    fireId: fire ? scenario.fire.id : null,
+    title: fire ? '상도 건조로 버너실에서 화재가 감지되었습니다' : '상도 건조로에서 경보가 발생했습니다',
+    location: '울산공장 · 5공장 · 도장 공정 · 상도 건조로' + (fire ? ' 버너실' : ''),
+    raisedAt: todayAt(fire ? scenario.fire.detectedAt : inc.raisedAt),
+    reason: fire
+      ? '열화상 최고 온도가 화재 기준(150 ℃)을 3초 이상 넘었습니다. 온도 212 ℃ · CO 120 ppm 동시 상승'
+      : '배기팬 과부하로 배기량이 줄어 버너실 CO가 경보 기준을 넘었습니다.',
+    reasonDetail: fire ? '' : '전류 27.5 A (평소의 153%) · CO 34 ppm · 온도 164 ℃ 상승 중', // 명세서에 없음 (사유 아래 한 줄)
+    cameraId: 301,
+    thermal: { imageUrl: t.image, max: t.max, min: t.min, avg: t.avg, maxPoint: t.point, scale: t.scale, zoneName: fire ? '버너실 앞' : '배기팬 모터부' },
+    // 상도 건조로 센서 3종 (명세서는 공정 센서 전부 — 설계안은 3종만)
+    sensors: top.map((s) => ({
+      id: s.id, tag: s.tag, type: s.type, equipmentName: '상도 건조로', value: s.value, unit: s.unit, warn: s.warn, alarm: s.alarm, level: s.level,
+    })),
+    equipment: EQUIPMENT.filter((e) => e.seq).map((e) => ({
+      id: e.id,
+      name: e.name,
+      tags: sensors.filter((s) => s.equipmentId === e.id).map((s) => s.tag).join(' · '),
+      level: equipmentLevel(e.id, sensors),
+      runState: runStateOf(e.id),
+    })),
+    logs,
+    shutdown: shutdownView(),
+    valueStillOver: sensors.some((s) => s.level === LEVEL.ALARM),
+  }
+}
+
+/* ───────── 화재: GET /fires, GET /fires/{id} ───────── */
+export function fireView() {
+  const f = scenario.fire
+  if (!f) return null
+  const t = THERMAL_BY_STATE[LEVEL.FIRE]
+  const done = (time) => ({ at: todayAt(time), done: true })
+  return {
+    id: f.id,
+    alarmId: 1052,
+    status: f.status,
+    location: '울산공장 · 5공장 · 도장 공정 · 상도 건조로 버너실',
+    siteId: 1,
+    siteName: '울산공장',
+    factoryId: 5,
+    processId: 12,
+    equipmentId: 31,
+    lat: 35.5438,
+    lng: 129.3697,
+    detectedAt: todayAt(f.detectedAt),
+    basis: '열화상 최고 온도가 화재 기준(150 ℃)을 3초 이상 넘었습니다. 온도 212 ℃ · CO 120 ppm 동시 상승',
+    values: { thermalMax: t.max, temp: 212, co: 120 }, // 명세서에 없음 (감지 근거 숫자 칸)
+    thermal: { cameraId: 301, imageUrl: t.image, max: t.max, min: t.min, avg: t.avg, maxPoint: t.point, scale: t.scale },
+    broadcast: {
+      on: f.status === 'ACTIVE',
+      startedAt: todayAt('16:58:05'),
+      message: '5공장 도장 공정에서 화재가 발생했습니다. 작업자는 즉시 지정 대피로로 대피하십시오.',
+    },
+    hqNotifiedAt: todayAt('16:58:06'),
+    unlock: { failCount: f.failCount, maxFail: 5, locked: f.locked },
+    actions: [
+      { step: 'DETECTED', ...done(f.detectedAt), text: '화재 감지' },
+      { step: 'BROADCAST', ...done('16:58:05'), text: '공장 내 경고 방송 송출', running: f.status === 'ACTIVE' },
+      { step: 'SHUTDOWN', ...done('16:58:06'), text: '상도 건조로 자동 셧다운 (버너 연료 차단)' },
+      { step: 'HQ_NOTIFY', ...done('16:58:06'), text: '본사 관제 통보' },
+      { step: 'WORKER_PUSH', ...done('16:58:06'), text: '도장 공정 담당자 앱 알림' },
+      f.status === 'CLEARED'
+        ? { step: 'CLEARED', at: todayAt(f.clearedAt), done: true, text: `경보 해제 · ${f.clearedBy}` }
+        : { step: 'CLEARED', at: null, done: false, text: '공장 담당자 경보 해제 (비밀번호 확인 필요)' },
+    ],
+    clearedAt: f.clearedAt && todayAt(f.clearedAt),
+    clearedBy: f.clearedBy,
     serverTime: todayAt(scenarioNow()),
   }
 }

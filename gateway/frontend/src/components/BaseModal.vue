@@ -6,7 +6,8 @@
   - 나타남: 배경 투명도 .22s, 상자 아래 14px · 96% 에서 .3s
     사라짐: 부모가 <Transition name="modal" :duration="{ enter: 300, leave: 200 }"> 로 감싸면 .18s (화면설계서 R2 --m-modal)
   - lock: 바깥 누르기·Esc 로 안 닫힘 → 대신 상자가 좌우로 흔들림 (주의 알림처럼 꼭 처리해야 하는 창)
-  - tone: 'warn' 이면 상자 둘레 주황 빛 (설계안 .modal.warnm)
+  - tone: 'warn' 이면 상자 둘레 주황 빛 (설계안 .modal.warnm), 'alarm' 이면 빨간 빛 (설계안 .modal.alarm)
+  - redDim: 어두운 배경을 붉게 (화재, 설계안 .dim.red)
   - 사용 예: <BaseModal :width="520" lock tone="warn" @close="..."> 내용 </BaseModal>
     (열고 닫기는 부모가 v-if 로, 사라지는 움직임은 부모의 <Transition name="modal"> 이 담당)
 -->
@@ -19,6 +20,7 @@ const props = defineProps({
   tone: { type: String, default: '' },
   /** 화면 읽기 프로그램용 제목 */
   label: { type: String, default: '' },
+  redDim: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['close'])
@@ -46,7 +48,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 
 <template>
   <div class="modal-root">
-    <div class="dim" @click="requestClose" />
+    <div class="dim" :class="{ red: redDim }" @click="requestClose" />
     <div
       ref="box"
       class="box"
@@ -90,6 +92,16 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
     0 30px 80px rgba(15, 23, 42, 0.35),
     0 4px 14px rgba(15, 23, 42, 0.16);
   animation: modal-in 300ms cubic-bezier(0.2, 0.9, 0.3, 1.05) both;
+}
+
+.dim.red {
+  background: rgba(127, 29, 29, 0.5);
+}
+
+.box.tone-alarm {
+  box-shadow:
+    0 0 0 4px rgba(220, 38, 38, 0.55),
+    0 30px 80px rgba(127, 29, 29, 0.45);
 }
 
 .box.tone-warn {

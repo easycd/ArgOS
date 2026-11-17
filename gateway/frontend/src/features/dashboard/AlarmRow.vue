@@ -47,7 +47,9 @@ const chip = computed(() => {
 
 /** 누가 무엇을 하는 중인지 (설계안 actSteps().txt) */
 const actor = computed(() => {
-  const { status, assignee } = props.alarm
+  const { status, assignee, level } = props.alarm
+  if (level === 'FIRE') return status === 'OPEN' ? '경고 방송 송출 · 자동 셧다운 · 해제 대기' : '관리자 비밀번호 확인 후 해제'
+  if (level === 'ALARM') return status === 'OPEN' ? '공장 담당자 조치 대기 · 셧다운 전' : '설비 셧다운 후 경보 종료'
   if (status === 'OPEN') return '공장 담당자 확인 전'
   if (status === 'ACKED') return '확인함 · 체크리스트 전송 전'
   if (status === 'ACTING' && c.value) {
@@ -104,7 +106,15 @@ watch(
         <div class="ax-body">
           <AlarmSteps v-if="timeline" :alarm="alarm" :timeline="timeline" />
           <button v-if="active" type="button" class="btn btn-primary small" @click="emit('act', alarm)">
-            {{ alarm.status === 'ACTING' ? '체크리스트 진행 보기' : '주의 상세 열기' }}
+            {{
+              alarm.level === 'FIRE'
+                ? '화재 창 열기'
+                : alarm.level === 'ALARM'
+                  ? '경보 창 열기'
+                  : alarm.status === 'ACTING'
+                    ? '체크리스트 진행 보기'
+                    : '주의 상세 열기'
+            }}
           </button>
           <button v-else type="button" class="btn small" @click="emit('history', alarm)">이력에서 보기</button>
         </div>

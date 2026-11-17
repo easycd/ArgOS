@@ -34,7 +34,9 @@ const typeLabel = (type) => SENSOR_TYPES.find((t) => t.type === type)?.label ?? 
 
 // 진행 중 체크리스트 칩 (상단 바 체크리스트와 같은 건)
 const alert = useAlertStore()
-const checklist = computed(() => (last.value ? alert.checklistOfEquipment(last.value.id) : null))
+// 경보·화재 중에는 숨김 (상단 바 체크리스트 버튼과 같은 규칙)
+const emergency = computed(() => ['ALARM', 'FIRE'].includes(alert.primary?.level))
+const checklist = computed(() => (last.value && !emergency.value ? alert.checklistOfEquipment(last.value.id) : null))
 const checklistText = computed(() => {
   const c = checklist.value
   if (!c) return ''

@@ -25,6 +25,9 @@ export const TOP_OVEN_VALUES = {
   [LEVEL.FIRE]: { 117: 0.0, 215: 212, 313: 120 },
 }
 
+/** 셧다운으로 상도 건조로를 멈춘 뒤 값 (설계안 curVal() S.shut: 전류 0, 온도 96 ℃, CO 8 ppm) */
+export const SHUT_VALUES = { 117: 0.0, 215: 96, 313: 8 }
+
 /** 조치 체크리스트 기본 5개 항목 (설계안 js/core.js CKLIST, 명세서 GET /checklist-templates 예시) */
 export const DEFAULT_ITEMS = [
   '배기팬 이상 소음·진동 확인',
@@ -75,15 +78,27 @@ function initial() {
       confirmedAt: null,
       result: null,
     },
+    /** 경보 (3단계) 한 건: { id, status: OPEN | CLOSED, raisedAt, closedAt, result } — 없으면 null (scenarioEmergency.js) */
+    incident: null,
+    /** 화재: { id, status: ACTIVE | CLEARED, detectedAt, failCount, locked, clearedAt, clearedBy } — 없으면 null */
+    fire: null,
+    /** 셧다운 진행: { equipmentIds, startedAt, steps: [시각|null ×3] } — 없으면 null */
+    shutdown: null,
+    /** 상도 건조로가 멈춘 상태 (셧다운·화재 뒤, 현장 점검 전) */
+    shut: false,
     /** 예시 시계: base 시각에서 실제로 흐른 초를 더함 */
     clock: { base: '16:42:10', at: Date.now() },
   }
 }
 
+/** 경보·화재가 없는 상태 (상황을 통째로 바꿀 때 같이 비움) */
+export const NO_EMERGENCY = () => ({ incident: null, fire: null, shutdown: null, shut: false })
+
 function load() {
   try {
     const saved = JSON.parse(sessionStorage.getItem(STORAGE_KEY))
-    if (saved?.state) return saved
+    // 예전에 저장된 값에 새 칸이 없을 수 있어 처음 값 위에 덮음
+    if (saved?.state) return { ...initial(), ...saved }
   } catch {
     // 저장된 값을 못 읽으면 처음 상황
   }
@@ -115,14 +130,22 @@ export function scenarioNow() {
 /** 'HH:mm:ss' 두 시각 사이 초 */
 export const secondsBetween = (from, to) => toSec(to) - toSec(from)
 
-/** 상도 건조로 센서 값을 고를 때 쓰는 단계 (조치 확인 뒤에는 정상 값) */
-export function valueState() {
-  return scenario.state
-}
-
-/** 상도 건조로 센서 지금 값 (117·215·313 이 아니면 undefined) */
+/**
+ * 상도 건조로 센서 지금 값 (117·215·313 이 아니면 undefined)
+ * - 정상: 셧다운으로 멈췄으면 0 A · 96 ℃ · 8 ppm, 아니면 평소 값
+ * - 경보 중 셧다운: 단계마다 값이 내려감 (설계안 shutdownSeq: 연료 차단 → CO 26, 컨베이어 정지 → 온도 151, 배기팬 정지 → 전류 0)
+ */
 export function topOvenValue(sensorId) {
-  return TOP_OVEN_VALUES[valueState()]?.[sensorId]
+  if (!(sensorId in SHUT_VALUES)) return undefined
+  if (scenario.state === LEVEL.NORMAL && scenario.shut) return SHUT_VALUES[sensorId]
+  const v = { ...TOP_OVEN_VALUES[scenario.state] }
+  if (scenario.state === LEVEL.ALARM && scenario.shutdown) {
+    const done = scenario.shutdown.steps.filter(Boolean).length
+    if (done >= 1) v[313] = 26
+    if (done >= 2) v[215] = 151
+    if (done >= 3) v[117] = 0.0
+  }
+  return v[sensorId]
 }
 
 /** 진행 중인 체크리스트 (확인 끝났으면 null) */
@@ -139,8 +162,8 @@ function stopTick() {
   tickTimer = null
 }
 
-/** 상황을 통째로 바꾸고 화면에 알림 */
-function replace(next, event) {
+/** 상황을 통째로 바꾸고 화면에 알림 (경보·화재 상황도 이 함수로) */
+export function replace(next, event) {
   stopTick()
   Object.assign(scenario, next)
   emitLive(event)
@@ -148,7 +171,10 @@ function replace(next, event) {
 
 /** 정상 (알림 없음, 오늘 16:30:05) */
 export function setNormal() {
-  replace({ state: LEVEL.NORMAL, alarm: null, checklist: null, clock: { base: '16:30:05', at: Date.now() } }, 'level.changed')
+  replace(
+    { state: LEVEL.NORMAL, alarm: null, checklist: null, ...NO_EMERGENCY(), clock: { base: '16:30:05', at: Date.now() } },
+    'level.changed',
+  )
 }
 
 /** 주의 발생 (16:38:20 CT-17 22.4 A, 아직 아무도 확인 안 함) */
@@ -158,6 +184,7 @@ export function raiseWarn() {
       state: LEVEL.WARN,
       alarm: { id: 1042, status: 'OPEN', raisedAt: '16:38:20', ackedAt: null, ackedBy: null, closedAt: null },
       checklist: null,
+      ...NO_EMERGENCY(),
       clock: { base: '16:38:20', at: Date.now() },
     },
     'alarm.created',

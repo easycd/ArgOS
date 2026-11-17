@@ -6,6 +6,7 @@
 import http from './http'
 import { USE_MOCK, mockOk } from './mock'
 import { hasActiveChecklist, mockAlarms } from './mock/data'
+import { scenario } from './mock/scenario'
 
 /**
  * @returns {Promise<{ unackedAlarmCount: number, activeChecklistCount: number, unreadChatCount: number, activeFire: object|null }>}
@@ -17,7 +18,8 @@ export function getNotificationSummary() {
       unackedAlarmCount: mockAlarms().filter((a) => a.status !== 'CLOSED').length,
       activeChecklistCount: hasActiveChecklist() ? 1 : 0,
       unreadChatCount: 2,
-      activeFire: null,
+      // 진행 중 화재 (명세서: { id, location } 정도. 예시 상황에서 화재면 채움)
+      activeFire: scenario.fire?.status === 'ACTIVE' ? { id: scenario.fire.id, location: '울산공장 · 5공장 · 도장 공정 · 상도 건조로 버너실' } : null,
     })
   }
   return http.get('/notifications/summary')

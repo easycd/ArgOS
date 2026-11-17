@@ -1,12 +1,15 @@
 <!--
   알림 한 건의 조치 내역 (설계안 v-rev.js actSteps() · css/rev.css .axs) — 실시간 알림 줄을 펼치면 보임
-  - 5단계: 발생 → 확인 → 체크리스트 전송 → 조치 중(담당자, 진행) → 조치 확인
+  - 주의 5단계: 발생 → 확인 → 체크리스트 전송 → 조치 중(담당자, 진행) → 조치 확인
+  - 경보 4단계: 발생 → 공정 담당자 알림 → 설비 셧다운 → 경보 종료
+  - 화재 5단계: 감지 → 경고 방송 → 자동 셧다운 → 본사 통보 → 경보 해제 (설계안 actSteps 'dng' · 'flame')
   - 끝난 단계: 파란 동그라미에 체크 + 시각 / 지금 단계: 파란 테두리가 퍼지며 깜빡(1.4초) / 남은 단계: 회색 번호 + '대기'
   - 데이터: GET /alarms/{id} 의 timeline (step: RAISED · ACK · CHECKLIST · REPORT · CONFIRM)
 -->
 <script setup>
 import { computed } from 'vue'
 import AppIcon from '@/components/AppIcon.vue'
+import { LEVEL } from '@/types/codes'
 
 const props = defineProps({
   /** GET /alarms 의 items 하나 (status, checklist, assignee) */
@@ -18,7 +21,22 @@ const props = defineProps({
 const hm = (iso) => iso?.slice(11, 19) ?? ''
 const at = (name) => props.timeline.find((s) => s.step === name)?.at ?? null
 
+/** 경보·화재: 정해진 단계 순서에서 끝난 것은 시각, 다음 하나는 진행 중, 나머지는 대기 */
+const EMERGENCY = {
+  [LEVEL.ALARM]: [['RAISED', '발생'], ['PUSH', '공정 담당자 알림'], ['SHUTDOWN', '설비 셧다운'], ['CLOSE', '경보 종료']],
+  [LEVEL.FIRE]: [['RAISED', '감지'], ['BROADCAST', '경고 방송'], ['SHUTDOWN', '자동 셧다운'], ['HQ_NOTIFY', '본사 통보'], ['CLEAR', '경보 해제']],
+}
+function emergencySteps(order) {
+  const next = order.findIndex(([name]) => !at(name))
+  return order.map(([name, label], i) => {
+    const time = at(name)
+    return { label, text: time ? hm(time) : '대기', state: time ? 'done' : i === next ? 'run' : 'wait' }
+  })
+}
+
 const steps = computed(() => {
+  const order = EMERGENCY[props.alarm.level]
+  if (order) return emergencySteps(order)
   const ack = at('ACK')
   const sent = at('CHECKLIST')
   const report = at('REPORT')

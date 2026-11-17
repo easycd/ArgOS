@@ -42,10 +42,13 @@ const isEmergency = (a) => a.level === LEVEL.ALARM || a.level === LEVEL.FIRE
 const where = (a) => `울산공장 ${a.location.split(' · ').slice(0, 2).join(' ')}`
 const goProcess = (a) => router.push({ name: 'process', params: { siteId: a.siteId, factoryId: a.factoryId, processId: a.processId } })
 
+/** 화재 알림 띠 닫기 함수 (화재가 해제되면 같이 닫음) */
+let closeFireToast = null
+
 /** 본사 관리자 알림 띠 (설계안 onState() hq: 주의 · 경보 · 화재) */
 function notifyHq(a) {
   if (a.level === LEVEL.FIRE) {
-    toast(`${where(a).split(' ').slice(0, 2).join(' ')}에서 화재가 감지되었습니다.`, {
+    closeFireToast = toast(`${where(a).split(' ').slice(0, 2).join(' ')}에서 화재가 감지되었습니다.`, {
       type: 'err',
       ms: 0, // 화재는 직접 닫을 때까지
       action: '화재 현황 보기',
@@ -64,6 +67,11 @@ watch(
     const first = !known
     const before = known ?? {}
     known = Object.fromEntries(list.map((a) => [a.id, a.status]))
+    // 화재가 끝났으면 '닫을 때까지' 띄워 둔 화재 알림 띠도 닫음
+    if (closeFireToast && !list.some((a) => a.level === LEVEL.FIRE)) {
+      closeFireToast()
+      closeFireToast = null
+    }
     // 새로 '발생 중(OPEN)'이 된 알림 (처음이면 지금 OPEN 인 것 전부)
     const fresh = list.filter((a) => a.status === 'OPEN' && before[a.id] !== 'OPEN')
     if (!fresh.length) return

@@ -340,3 +340,44 @@
 | 2 | 주의 '나중에(5분 뒤 다시)'·주의음: 설계안에 없어 프론트는 안 만듦. 필요하면 서버가 다시 알림을 보낼지 프론트 타이머로 할지 |
 | 3 | 체크리스트 '응답 없음': 프론트가 마지막 항목 완료(없으면 전송) 후 10분이 지나면 표시. 서버가 상태로 줄지 |
 | 4 | 예상 원인 단추: 지금은 보기만. 누르면 그 원인에 맞는 항목으로 바꾸려면 `GET /checklist-templates` 에 원인별 묶음이 필요 |
+
+---
+
+## 10. 알림 대응 — 경보 · 화재 (명세서 C4 · C4F · C5, 화면설계서 C4 · C5)
+
+| API | 프론트 사용 | 백엔드 코드 | 명세서·코드와 다른 점 / 추가 필요 |
+| --- | --- | --- | --- |
+| `GET /alarms/{id}/response` | 경보·화재 창 전체 | 있음 | 아래 '추가 필요 필드' |
+| `POST /equipment/{id}/shutdown` | 설비 하나 셧다운 (2초 길게) | 있음 | 없음 |
+| `POST /processes/{id}/shutdown` | '도장 공정 전체' 셧다운 (2초 + 확인) | 있음 | 없음 (`equipmentIds` 비움) |
+| `POST /processes/{id}/call-workers` | 공정 담당자 호출 | 있음 | 없음 |
+| `POST /alarms/{id}/close` | 경보 종료 (셧다운 뒤, 결과 한 줄) | 있음 | 없음. 409 `VALUE_STILL_OVER` 면 알림 띠 |
+| `GET /fires?status=ACTIVE` | 본사 사업장 선택 화면 화재 띠·화재 상세 | **없음** | 명세서 C5 기준으로 프론트 구현 |
+| `GET /fires/{id}` | 화재 창, 본사 화재 상세 | **없음** | 명세서 C4F + 추가 필드 |
+| `POST /fires/{id}/clear` | 비밀번호 다시 입력 해제 | **없음** | **틀릴 때 401 이면 프론트가 로그아웃시킴** (아래) |
+| `POST /fires/{id}/approve-unlock` | 본사 관리자 '잠금 풀기 승인' | **없음** | 명세서 기준 |
+| `GET /notifications/summary` | 상단 바 | 있음 | `activeFire` 를 `{ id, location }` 로 가정 |
+
+### 추가 필요 필드
+
+| 어디 | 필드 | 쓰는 곳 |
+| --- | --- | --- |
+| `/alarms/{id}/response` | `location` (사업장부터) | 창 머리 위치 |
+| `/alarms/{id}/response` | `thermal { imageUrl, max, min, avg, maxPoint, scale, zoneName }` | 창 안 열화상 (지금 응답에는 `cameraId` 만 → 따로 부르지 않게 같이 주면 좋음) |
+| `/alarms/{id}/response` | `reasonDetail` | 사유 아래 한 줄 '전류 27.5 A (평소의 153%) · CO 34 ppm …' |
+| `/alarms/{id}/response` | `shutdown { equipmentIds, steps: [{ label, at }], done, auto }` | 셧다운 단계 표시 (버너 연료 차단 → 컨베이어 정지 → 배기팬 정지). SSE `command.result` 에 단계가 오면 그걸로 대신해도 됨 |
+| `/alarms/{id}/response` | `valueStillOver` | '경보 종료' 단추 켜기 (경보 기준 위 센서가 없을 때) |
+| `/alarms/{id}/response` | `equipment[].runState` | 셧다운 고르기에서 이미 정지된 설비 막기 (코드에 있음) |
+| `/fires/{id}` | `values { thermalMax, temp, co }` | 감지 근거 숫자 3칸 |
+| `/fires/{id}` | `actions[].text` · `running` | 자동 조치 줄 문구, '송출 중' 칩 |
+| `/fires/{id}` | `serverTime` | 경과 시간을 서버 시계로 |
+
+### 정해야 할 것
+
+| 번호 | 내용 |
+| --- | --- |
+| 1 | **화재 해제 비밀번호가 틀릴 때 401**: 프론트 공통 처리(`src/api/http.js`)가 로그인 상태의 401 을 '토큰 만료'로 보고 로그아웃시킴 → `400 FIRE_PASSWORD_MISMATCH` 로 바꾸거나, 프론트가 이 주소만 예외로 둘지 |
+| 2 | 본사 관리자: 경보·화재 창은 **열람만** (셧다운·해제 단추 없음), 해제 잠금 풀기 승인만 함 — 명세서 가정. 서버도 403 `ACTION_NOT_ALLOWED` 로 막는지 |
+| 3 | 경보 창 '공정 내 센서 데이터': 명세서는 공정 센서 전부, 설계안은 상도 건조로 3종 → 프론트는 응답의 `sensors` 를 그대로 그림(지금 예시는 3개) |
+| 4 | 화재 중 추가 셧다운(다른 설비): 화면설계서에 있지만 설계안 화재 창에는 없어 아직 안 만듦 |
+| 5 | 화재가 해제된 뒤 본사 화재 상세를 '해제됨 17:21 · 한지우'로 10초 보여 주는 것(C5): 아직 안 만듦 (해제되면 바로 사업장 목록으로) |

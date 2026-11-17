@@ -135,7 +135,28 @@ API 명세서 기준으로 구현한 것과, 명세서와 다르게 한 점입�
 주의 창에는 종료 단추가 없으므로, 연계 서버가 실시간 피드에서 그 알림의 값이 기준 아래로 돌아온 것(`valueStillOver: false`)을 보면
 체크리스트를 확인한 사람 이름으로 알림을 닫습니다 (조치 이력 `CLOSE` "값이 기준 아래로 돌아와 자동 종료"). 경보(3단계)는 대상이 아닙니다 (셧다운 뒤 '경보 종료').
 
+### 사용자 관리 (G1) · 내 정보 수정 (A1)
+
+| 화면 | API | 권한 | 비고 |
+| --- | --- | --- | --- |
+| G1 | `GET /users?role=&factoryId=&active=&q=&page=&size=` | 본사·공장 | `{ counts, inactiveCount, items, page, size, total }`. `counts`·`inactiveCount` 는 내가 볼 수 있는 사람 전체 기준(검색 조건과 상관없음). 줄마다 `scopeText`, `factoryId` 추가. 한 쪽 15행이 기본 |
+| G1 | `GET /users/{id}` | 본사·공장 | `scope`, `scopeText`, `createdAt`, `lastLoginAt`, `pushReady`(앱 푸시 토큰 등록됨), `history[{ at, by, text }]` (최근 50건) |
+| G1 | `GET /users/check-login-id?loginId=` | 본사·공장 | `{ available }`. 규칙(영문 소문자·숫자·밑줄 4~20자)에 안 맞거나 삭제한 사용자 아이디도 false |
+| G1 | `POST /users` `{ name, loginId, phone, role, scope: { factoryIds, processIds } }` | 본사·공장 | `{ id, tempPassword }`. 임시 비밀번호는 이때 한 번만. 첫 로그인 때 비밀번호 변경(`pwResetRequired`) |
+| G1 | `PUT /users/{id}` `{ name, phone, role, scope }` | 본사·공장 | `{ id, role, scopeText }` |
+| G1 | `PATCH /users/{id}/status` `{ active }` | 본사·공장 | `{ id, active }`. 정지하면 바로 로그인·API 사용 불가 (403 `USER_INACTIVE`) |
+| G1 | `DELETE /users/{id}` | 본사·공장 | 행은 남김(`deleted_at`, V3). 목록·로그인에서 빠지고 아이디는 다시 못 씀 |
+| G1 | `POST /users/{id}/reset-password` | 본사·공장 | `{ tempPassword }`, 다음 로그인 때 비밀번호 변경 |
+| A1 | `PUT /me` `{ name, phone }` | 로그인 | `{ id, name, phone }` (공정 담당자 앱도 사용) |
+
+- 담당 범위: 본사 관리자는 범위 없음 / 공장 담당자는 `factoryIds` 1개 이상 / 공정 담당자는 `processIds` 1개 이상 (공장은 공정에서 정함, `factoryIds` 는 무시). 한 사업장 안에서만
+- 권한 범위 (화면설계서 G1): 본사 관리자는 전부. 공장 담당자는 담당 공장의 공장 담당자·공정 담당자만 보고 고침 (본사 관리자는 안 보임, 본사 관리자 권한은 못 줌). 공정 담당자는 403
+- 오류: 400 `VALIDATION_FAILED`·`SCOPE_REQUIRED`, 403 `ROLE_NOT_ALLOWED`(줄 수 없는 권한, 내 권한 변경)·`OUT_OF_SCOPE`, 404 `NOT_FOUND`,
+  409 `LOGIN_ID_TAKEN`·`CANNOT_DISABLE_SELF`·`CANNOT_DELETE_SELF`·`LAST_PLANT_ADMIN`(그 공장의 마지막 공장 담당자를 정지·삭제·권한 변경)·`HAS_ACTIVE_CHECKLIST`(끝나지 않은 체크리스트가 있는 사람을 정지·삭제하거나 공정을 뺌)
+- 변경은 이용 로그(`activity_log`, 유형 `USER`)에 "이름(아이디) · 내용"으로 남고, 상세의 `history` 는 그중 "내용"만 보여 줌. 기록 시각은 시연 시계 기준
+- `PUT /me/password` 에서 지금 비밀번호가 틀릴 때 401 → 화면이 로그아웃되는 문제(프론트 backend-notes 14장 1번)는 로그인 코드라 아직 그대로
+
 ## 아직 없는 것
 
 화재(fire_incident), 월간 보고서 PDF, xlsx 내보내기, 점검·OCR(`/inspections/*`, 오늘 점검은 빈 목록만),
-사용자 관리(`/users/*`), 이용 로그(`/logs`), 채팅, 공장 관리(배치 저장), 실제 FCM 전송.
+이용 로그(`/logs`), 채팅, 공장 관리(배치 저장), 실제 FCM 전송.

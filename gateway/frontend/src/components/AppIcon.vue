@@ -29,6 +29,10 @@ const PATHS = {
   arrow: '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
   cd: '<path d="m6 9 6 6 6-6"/>', // 아래 꺾쇠
   cr: '<path d="m9 18 6-6-6-6"/>', // 오른쪽 꺾쇠
+  cl: '<path d="m15 18-6-6 6-6"/>', // 왼쪽 꺾쇠
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  minus: '<path d="M5 12h14"/>',
+  cam: '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/>',
   // 상단 메뉴
   grid: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
   chart: '<path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/>',

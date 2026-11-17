@@ -10,4 +10,16 @@ export const CHART_COLORS = Object.freeze({
   axis: '#94a3b8', // --color-text-weak
   grid: '#eef2f6',
   text: '#475569', // --color-text-sub
+  normal: '#16a34a', // --color-level-normal
+  ink: '#0f172a', // --color-text (게이지 가운데 숫자)
+  track: '#eef2f6', // 게이지 빈 고리
+  prev: '#94a3b8', // 추이 '전날' 점선
+})
+
+/** 상태 → 차트 색 (정상 초록 · 주의 주황 · 경보/화재 빨강) */
+export const LEVEL_CHART_COLOR = Object.freeze({
+  NORMAL: CHART_COLORS.normal,
+  WARN: CHART_COLORS.warn,
+  ALARM: CHART_COLORS.alarm,
+  FIRE: CHART_COLORS.alarm,
 })

@@ -9,8 +9,11 @@ import { LEVEL } from '@/types/codes'
 
 const { NORMAL, WARN } = LEVEL
 
-/** 설비 (seq: 공정 흐름 순서 번호, 그림과 아래 설비 줄에 표시. 명세서에 없는 값) */
-const EQUIPMENT = [
+/**
+ * 설비 (seq: 공정 흐름 순서 번호, 그림과 아래 설비 줄에 표시. 명세서에 없는 값)
+ * - 설비 상세 예시 데이터(equipmentData.js)도 이 목록을 그대로 씀 → 두 화면 숫자가 어긋나지 않음
+ */
+export const EQUIPMENT = [
   { id: 24, code: 'PNT-PRETREAT', name: '전처리', type: 'TANK', seq: 1, manager: '이재호' },
   { id: 25, code: 'PNT-ED-TANK', name: '전착 탱크', type: 'TANK', seq: 2, manager: '이재호' },
   { id: 26, code: 'PNT-ED-OVEN', name: '전착 건조로', type: 'OVEN', seq: 3, manager: '박성훈' },
@@ -25,7 +28,7 @@ const EQUIPMENT = [
 ]
 
 /** 센서: [id, tag, 종류, 단위, 설비 id, 지금 값, 주의 기준, 경보 기준] — id 는 전류 1xx · 온도 2xx · CO 3xx */
-const SENSORS = [
+export const SENSORS = [
   [111, 'CT-11', 'CURRENT', 'A', 24, 9.8, 12, 15],
   [211, 'TE-11', 'TEMP', '℃', 24, 52, 60, 70],
   [112, 'CT-12', 'CURRENT', 'A', 25, 7.4, 10, 13],
@@ -67,7 +70,7 @@ const FANS = {
 }
 
 /** 설비 단계 = 붙은 센서 중 가장 높은 단계 */
-function equipmentLevel(equipmentId) {
+export function equipmentLevel(equipmentId) {
   const levels = SENSORS.filter((s) => s.equipmentId === equipmentId).map((s) => s.level)
   if (levels.includes(LEVEL.ALARM)) return LEVEL.ALARM
   if (levels.includes(WARN)) return WARN

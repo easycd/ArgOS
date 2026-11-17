@@ -15,6 +15,8 @@ import { LEVEL, LEVEL_META, SENSOR_TYPES } from '@/types/codes'
 const props = defineProps({
   /** 화면용 설비 목록 [{ key, name, level, fan, sensors: [{ tag, type, value, unit, level }] }] (ProcessPage 에서 만듦) */
   equipment: { type: Array, required: true },
+  /** 이 설비만 크게 보기 (설비 상세 '설비 위치'). 그림 안 설비 이름 (예: 'top-oven'), 비우면 전체 */
+  focus: { type: String, default: '' },
 })
 
 const emit = defineEmits(['select', 'fan'])
@@ -102,11 +104,40 @@ function applyLevels() {
   }
 }
 
+/**
+ * focus 설비만 크게: 그 설비 그림 + 센서 이름표를 감싸는 사각형으로 viewBox 를 좁힘
+ * - 여백은 설계안 vEquip() 과 같은 식 (가로 420 · 세로 285 보다 작으면 가운데에 두고 양옆을 채움)
+ */
+function zoomToFocus(svg) {
+  if (!props.focus) return
+  const eq = byKey(props.focus)
+  const selectors = [
+    ...(PAINT_EQUIPMENT[props.focus]?.ids ?? []).map((id) => `#${id}`),
+    ...(eq?.sensors ?? []).map((s) => `#tag-${s.tag}`),
+  ]
+  let box2 = null
+  for (const sel of selectors) {
+    const el = svg.querySelector(sel)
+    if (!el) continue
+    const b = el.getBBox()
+    box2 = box2
+      ? { x0: Math.min(box2.x0, b.x), y0: Math.min(box2.y0, b.y), x1: Math.max(box2.x1, b.x + b.width), y1: Math.max(box2.y1, b.y + b.height) }
+      : { x0: b.x, y0: b.y, x1: b.x + b.width, y1: b.y + b.height }
+  }
+  if (!box2) return
+  const w = box2.x1 - box2.x0
+  const h = box2.y1 - box2.y0
+  const padX = Math.max(40, (420 - w) / 2)
+  const padY = Math.max(24, (285 - h) / 2)
+  svg.setAttribute('viewBox', `${box2.x0 - padX} ${box2.y0 - padY} ${w + padX * 2} ${h + padY * 2}`)
+}
+
 onMounted(() => {
   const svg = box.value.querySelector('svg')
   buildHalos(svg)
   markEquipment(svg)
   applyLevels()
+  zoomToFocus(svg)
 })
 watch(() => props.equipment, () => nextTick(applyLevels), { deep: true })
 

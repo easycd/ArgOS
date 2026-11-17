@@ -24,12 +24,15 @@ export const LEVEL_META = Object.freeze({
   [LEVEL.FIRE]: { label: '화재', key: 'fire', icon: 'flame', color: 'var(--color-level-fire)' },
 })
 
-/** 센서 종류 (API 의 sensorType / levelsByType 키) — 표시 이름·아이콘(AppIcon)·단위 */
+/** 센서 종류 (API 의 sensorType / levelsByType 키) — 표시 이름·아이콘(AppIcon)·단위·소수 자릿수(dec) */
 export const SENSOR_TYPES = Object.freeze([
-  { type: 'CURRENT', label: '전류', icon: 'zap', unit: 'A' },
-  { type: 'TEMP', label: '온도', icon: 'temp', unit: '℃' },
-  { type: 'CO', label: 'CO', icon: 'wind', unit: 'ppm' },
+  { type: 'CURRENT', label: '전류', icon: 'zap', unit: 'A', dec: 1 },
+  { type: 'TEMP', label: '온도', icon: 'temp', unit: '℃', dec: 0 },
+  { type: 'CO', label: 'CO', icon: 'wind', unit: 'ppm', dec: 0 },
 ])
+
+/** 센서 종류 정보 찾기 ('CURRENT' → { label: '전류', ... }) */
+export const sensorTypeOf = (type) => SENSOR_TYPES.find((t) => t.type === type)
 
 /** 알림 진행 상태 (alarm.status) — 화면 표시 이름 */
 export const ALARM_STATUS_LABEL = Object.freeze({

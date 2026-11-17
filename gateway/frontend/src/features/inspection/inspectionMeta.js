@@ -31,12 +31,26 @@ export function statusChip(status, current = false) {
 /** 단계 4개 */
 export const STEPS = ['파일 올리기', '문자 인식', '원본 대조', '저장']
 
-/** 인식 결과 구역 (doc-forms 의 group) */
+/**
+ * 인식 결과 구역 (doc-forms 의 group) — 이 순서대로 그림
+ * - F01: overview · gas · pre · end
+ * - F02 ~ F05: info · measure · items · issues · verdict · edu · content · people · roster · risk
+ */
 export const GROUPS = {
   overview: { label: '작업 개요', icon: 'file' },
   gas: { label: '가스 농도 측정', icon: 'wind' },
   pre: { label: '사전 안전조치', icon: 'shield' },
   end: { label: '작업 종료 확인', icon: 'user' },
+  info: { label: '점검 정보', icon: 'file' },
+  edu: { label: '교육 정보', icon: 'file' },
+  measure: { label: '계측 기록', icon: 'zap' },
+  items: { label: '점검 항목', icon: 'clip' },
+  issues: { label: '이상 사항 및 조치', icon: 'alert' },
+  verdict: { label: '종합 판정', icon: 'check' },
+  content: { label: '교육 내용', icon: 'clip' },
+  people: { label: '교육 인원', icon: 'users' },
+  roster: { label: '수강자 명단', icon: 'user' },
+  risk: { label: '위험성 평가 및 감소 대책', icon: 'shield' },
 }
 
 /** 점검 일정 상태 (점 색) */

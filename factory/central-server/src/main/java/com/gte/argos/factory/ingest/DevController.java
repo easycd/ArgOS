@@ -5,6 +5,7 @@ import com.gte.argos.factory.common.time.DemoClock;
 import com.gte.argos.factory.config.ArgosProperties;
 import com.gte.argos.factory.history.HistoryImportService;
 import com.gte.argos.factory.judge.SensorReading;
+import com.gte.argos.factory.retention.RetentionService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
@@ -26,6 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
  * POST /api/v1/dev/readings        값 직접 넣기 (Redis 봇이 붙기 전 테스트용)
  * POST /api/v1/dev/history-import  7일치 가져오기 (reset=true 면 지우고 다시)
  * POST /api/v1/dev/sim/reset       시연 리셋 (시계 09:00 으로, 09:00 이후 데이터 삭제)
+ * POST /api/v1/dev/retention/run   보관 기간(기본 7일) 지난 센서 값 지금 지우기
  * </pre>
  */
 @RestController
@@ -38,11 +40,21 @@ public class DevController {
     private final DemoClock clock;
     private final ArgosProperties props;
 
-    public DevController(LiveJudgementService live, HistoryImportService history, DemoClock clock, ArgosProperties props) {
+    private final RetentionService retention;
+
+    public DevController(LiveJudgementService live, HistoryImportService history, DemoClock clock, ArgosProperties props,
+                         RetentionService retention) {
         this.live = live;
         this.history = history;
         this.clock = clock;
         this.props = props;
+        this.retention = retention;
+    }
+
+    /** 보관 기간 지난 센서 값 지금 바로 지우기 (평소에는 1시간마다 자동) */
+    @PostMapping("/retention/run")
+    public ApiResponse<RetentionService.Result> retention() {
+        return ApiResponse.ok(retention.purge());
     }
 
     /**

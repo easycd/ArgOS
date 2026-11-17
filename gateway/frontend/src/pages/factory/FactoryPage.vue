@@ -21,7 +21,7 @@ import SegButtons from '@/components/SegButtons.vue'
 import EquipmentEditPanel from '@/features/factory/EquipmentEditPanel.vue'
 import EquipmentListCard from '@/features/factory/EquipmentListCard.vue'
 import LayoutMapCard from '@/features/factory/LayoutMapCard.vue'
-import { bodyOf, changesOf, currentOf } from '@/features/factory/layoutDraft'
+import { bodyOf, changesOf, currentOf, placeOf } from '@/features/factory/layoutDraft'
 import { buildProcessEquipment } from '@/features/process/processEquipment'
 
 // 처음 고르는 범위 (설계안 기본값 울산공장 › 5공장 › 도장 공정 — 지금 배치도가 있는 공정). 없으면 첫 공장·공정
@@ -69,8 +69,8 @@ const layout = ref(null) // 저장된 배치 (없으면 null)
 const status = ref(null)
 const loading = ref(true)
 const missing = ref(false) // 배치도가 없는 공정
-const draft = reactive({}) // { 설비 id: { grid, name, kind, active } } 저장 전 변경
-const base = ref({}) // 설비 이름(key) → 기준 칸 [X, Y]
+const draft = reactive({}) // { 설비 id: { pos, name, type, active } } 저장 전 변경 (값 이름은 DB · layout 응답과 같음)
+const defaults = ref({}) // 설비 이름(key) → 그림에 그려진 자리 { x, y } (위치 값이 없을 때)
 const selectedId = ref(null)
 
 function clearDraft() {
@@ -122,12 +122,13 @@ const saved = computed(() => {
 })
 // 지금 화면에 보이는 값 (고친 값 반영)
 const shown = computed(() => saved.value.map((e) => ({ ...e, ...currentOf(e, draft) })))
-const changes = computed(() => changesOf(saved.value, draft, base.value))
+const changes = computed(() => changesOf(saved.value, draft, defaults.value))
 
 const selected = computed(() => shown.value.find((e) => e.id === selectedId.value) ?? null)
 const listRows = computed(() => shown.value.map((e) => ({ ...e, changed: changes.value.some((c) => c.id === e.id) })))
 const mapEquipment = computed(() => shown.value.map(({ key, name, level, sensors }) => ({ key, name, level, sensors })))
-const mapOffsets = computed(() => Object.fromEntries(shown.value.map((e) => [e.key, e.grid])))
+// 배치도에 그릴 위치: 저장된(또는 고친) pos 가 있는 설비만 (없으면 그림 그대로)
+const mapPositions = computed(() => Object.fromEntries(shown.value.filter((e) => e.pos).map((e) => [e.key, e.pos])))
 const mapInactive = computed(() => shown.value.filter((e) => !e.active).map((e) => e.key))
 
 /* ───────── 고치기 ───────── */
@@ -144,7 +145,7 @@ function setField(id, field, value) {
 
 const idOf = (key) => saved.value.find((e) => e.key === key)?.id
 const onMapSelect = (key) => (selectedId.value = idOf(key) ?? selectedId.value)
-const onMove = (key, grid) => setField(idOf(key), 'grid', grid)
+const onMove = (key, pos) => setField(idOf(key), 'pos', pos)
 const onUse = (on) => selected.value && setField(selected.value.id, 'active', on)
 const onPanel = (field, value) => setField(selectedId.value, field, value)
 
@@ -276,7 +277,7 @@ watch(
       <EquipmentListCard :rows="listRows" :selected-id="selectedId" :sub="`${layout.name} · ${listRows.length}대`" @select="selectedId = $event" />
       <LayoutMapCard
         :equipment="mapEquipment"
-        :offsets="mapOffsets"
+        :positions="mapPositions"
         :inactive="mapInactive"
         :selected-key="selected?.key ?? ''"
         :selected="selected"
@@ -284,11 +285,11 @@ watch(
         @select="onMapSelect"
         @move="onMove"
         @use="onUse"
-        @base="base = $event"
+        @defaults="defaults = $event"
       />
       <EquipmentEditPanel
         :eq="selected"
-        :base="(selected && base[selected.key]) || [0, 0]"
+        :place="selected ? placeOf(selected.pos, selected.key, defaults) : null"
         :changes="changes.filter((c) => c.id === selectedId)"
         @change="onPanel"
       />

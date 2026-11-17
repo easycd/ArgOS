@@ -8,10 +8,11 @@
  * - PATCH  /users/{id}/status                             : 사용 정지 · 다시 사용
  * - DELETE /users/{id}                                    : 삭제 (기록은 남음)
  * - POST   /users/{id}/reset-password                     : 비밀번호 초기화 → 임시 비밀번호
- * - GET    /me · PUT /me/password                         : 내 정보 · 비밀번호 변경 (백엔드에 있음)
- * - PUT    /me                                            : 내 이름·연락처 (명세서만, 백엔드 아직 없음)
+ * - GET    /me · PUT /me/password                         : 내 정보 · 비밀번호 변경
+ * - PUT    /me                                            : 내 이름·연락처
  *
- * /users 는 백엔드에 아직 없어 명세서 기준 (backend-notes 14장).
+ * 백엔드: /users · PUT /me 는 #28(user/UserController), /me · /me/password 는 AuthController — 주소 · 보내는 값은 이 파일과 같음.
+ * 예시 데이터와의 작은 차이는 backend-notes 14장.
  * 예시 모드에서는 로그인한 사람(auth.user)의 권한 범위로 거름 — 실제는 서버가 토큰으로 거름
  */
 import http from './http'

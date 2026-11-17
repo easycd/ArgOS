@@ -30,7 +30,7 @@ const equipment = ref(null)
 const events = ref([])
 const thermal = ref(null)
 const processEquipment = ref([])
-const placement = ref({ offsets: {}, inactive: [] })
+const placement = ref({ positions: {}, inactive: [] })
 const loading = ref(true)
 const errorMessage = ref('')
 
@@ -145,7 +145,7 @@ function onSelectEquipment(eq) {
         class="location"
         :equipment="processEquipment"
         :focus-key="svgKeyOf(equipment.code)"
-        :offsets="placement.offsets"
+        :positions="placement.positions"
         :inactive="placement.inactive"
         :sub="locationSub"
         @select="onSelectEquipment"

@@ -4,11 +4,12 @@
   - 누르면 select(설비 id) → 배치도·오른쪽 정보가 그 설비로
 -->
 <script setup>
+import { typeLabel } from './layoutDraft'
 import AppIcon from '@/components/AppIcon.vue'
 import BaseCard from '@/components/BaseCard.vue'
 
 defineProps({
-  /** [{ id, key, name, kind, active, sensors, changed }] */
+  /** [{ id, key, name, type, active, sensors, changed }] (type: DB equipment_type 코드) */
   rows: { type: Array, default: () => [] },
   selectedId: { type: Number, default: null },
   sub: { type: String, default: '' },
@@ -30,7 +31,7 @@ defineEmits(['select'])
       >
         <span class="tx">
           <b>{{ r.name }}</b>
-          <small>{{ r.kind }} · 센서 {{ r.sensors.length }}개{{ r.active ? '' : ' · 사용 안 함' }}</small>
+          <small>{{ typeLabel(r.type) }} · 센서 {{ r.sensors.length }}개{{ r.active ? '' : ' · 사용 안 함' }}</small>
         </span>
         <span v-if="r.changed" class="chg"><i />변경</span>
         <AppIcon v-else name="cr" :size="14" class="go" />

@@ -1,22 +1,24 @@
 <!--
   설비 정보 (화면설계안 vLayout() panel())
-  - 사용 상태 스위치, 설비 이름, 종류, 위치(격자 칸 X · Y — 숫자로 고치면 배치도도 0.3초에 옮겨짐)
+  - 사용 상태 스위치(DB is_active), 설비 이름, 종류(DB equipment_type 코드 — 화면에는 한글 이름),
+    위치 X · Y (DB pos_x · pos_y, 배치도 화면 좌표 — 숫자로 고치면 배치도도 옮겨짐)
   - 담당자 · 연결된 센서(지금 값·단계) — 보기만
   - 이 설비의 변경 내용 (저장 전)
   - 고른 설비가 없으면 '선택한 설비가 없습니다'
   - 바꾼 값은 change(필드, 값) 로 화면에 알림 → 화면이 저장 전 변경에 모음
 -->
 <script setup>
-import { KIND_OPTIONS } from './layoutDraft'
+import { computed } from 'vue'
+import { EQUIPMENT_TYPES, typeLabel as equipmentTypeLabel } from './layoutDraft'
 import AppIcon from '@/components/AppIcon.vue'
 import { LEVEL_META, SENSOR_TYPES } from '@/types/codes'
 import { toast } from '@/utils/toast'
 
 const props = defineProps({
-  /** 고른 설비 { id, key, name, kind, active, grid, sensors, managers } (지금 값) — 없으면 null */
+  /** 고른 설비 { id, key, name, type, active, pos, sensors, managers } (지금 값) — 없으면 null */
   eq: { type: Object, default: null },
-  /** 이 설비의 기준 칸 [X, Y] */
-  base: { type: Array, default: () => [0, 0] },
+  /** 지금 보이는 위치 { x, y } (pos 가 없으면 그림에 그려진 자리) */
+  place: { type: Object, default: null },
   /** 이 설비의 저장 전 변경 [{ type, title, detail }] */
   changes: { type: Array, default: () => [] },
 })
@@ -25,6 +27,8 @@ const emit = defineEmits(['change'])
 
 const typeLabel = (t) => SENSOR_TYPES.find((x) => x.type === t)?.label ?? t
 const TYPE_BADGE = { move: '위치 변경됨', name: '이름 변경됨', meta: '정보 변경됨' }
+/** 옮긴 설비면 위치 칸을 파랗게 */
+const moved = computed(() => props.changes.some((c) => c.type === 'move'))
 
 function onName(e) {
   const v = e.target.value.trim()
@@ -36,19 +40,23 @@ function onName(e) {
   emit('change', 'name', v)
 }
 
-/** 위치 X · Y 숫자 → 격자 칸 이동 */
+/** 위치 X · Y 숫자 (배치도 화면 좌표) → pos { x, y } */
 function onPos(axis, e) {
-  const v = Math.round(Number(e.target.value))
-  if (!Number.isFinite(v)) {
+  const v = Number(e.target.value)
+  if (e.target.value === '' || !Number.isFinite(v) || !props.place) {
     toast('위치는 숫자로 입력해 주세요.', { type: 'warn' })
-    e.target.value = axis === 'x' ? props.base[0] + props.eq.grid.a : props.base[1] + props.eq.grid.b
+    e.target.value = props.place ? Math.round(props.place[axis]) : ''
     return
   }
-  const grid = { ...props.eq.grid }
-  if (axis === 'x') grid.a = Math.max(1, Math.min(24, v)) - props.base[0]
-  else grid.b = Math.max(1, Math.min(13, v)) - props.base[1]
-  emit('change', 'grid', grid)
+  emit('change', 'pos', { ...props.place, [axis]: Math.round(v * 10) / 10 })
 }
+
+/** 종류 고르기 목록: 아는 코드 + (지금 값이 목록에 없거나 비어 있으면) 그 값 한 줄 */
+const typeOptions = computed(() => {
+  const t = props.eq?.type ?? null
+  const known = EQUIPMENT_TYPES.map((x) => ({ value: x.code, label: x.label }))
+  return EQUIPMENT_TYPES.some((x) => x.code === t) ? known : [{ value: t ?? '', label: equipmentTypeLabel(t) }, ...known]
+})
 </script>
 
 <template>
@@ -75,14 +83,14 @@ function onPos(axis, e) {
       <input id="eq-name" class="inp" :value="eq.name" maxlength="30" @change="onName" @keydown.enter="$event.target.blur()" />
 
       <label class="fl" for="eq-kind">종류</label>
-      <select id="eq-kind" class="inp" :value="eq.kind" @change="emit('change', 'kind', $event.target.value)">
-        <option v-for="k in KIND_OPTIONS" :key="k" :value="k">{{ k }}</option>
+      <select id="eq-kind" class="inp" :value="eq.type ?? ''" @change="emit('change', 'type', $event.target.value || null)">
+        <option v-for="o in typeOptions" :key="o.value" :value="o.value" :disabled="!o.value">{{ o.label }}</option>
       </select>
 
-      <div class="fl">위치 <small>격자 칸</small></div>
+      <div class="fl">위치 <small>배치도 좌표</small></div>
       <div class="pos">
-        <label :class="{ edt: eq.grid.a }"><span>X</span><input type="number" min="1" max="24" class="mono" :value="base[0] + eq.grid.a" @change="onPos('x', $event)" /></label>
-        <label :class="{ edt: eq.grid.b }"><span>Y</span><input type="number" min="1" max="13" class="mono" :value="base[1] + eq.grid.b" @change="onPos('y', $event)" /></label>
+        <label :class="{ edt: moved }"><span>X</span><input type="number" step="1" class="mono" :value="place ? Math.round(place.x) : ''" @change="onPos('x', $event)" /></label>
+        <label :class="{ edt: moved }"><span>Y</span><input type="number" step="1" class="mono" :value="place ? Math.round(place.y) : ''" @change="onPos('y', $event)" /></label>
       </div>
 
       <div class="fl">담당자 <small>{{ eq.managers.length }}명</small></div>

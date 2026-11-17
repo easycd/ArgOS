@@ -53,7 +53,11 @@ export function getTodayInspections(processId) {
 
 /**
  * 공장 관리: 배치 저장 (바꾼 것 한꺼번에, 하나라도 틀리면 전부 저장 안 됨)
- * @param {{ version, equipment: { create: [], update: [{ id, grid?, name?, kind?, active? }], delete: [] } }} body
+ * - 값 이름은 DB equipment 테이블 · GET layout 응답과 같음
+ *   · pos { x, y }: pos_x · pos_y — 배치도 화면 좌표(PaintMap 그림 좌표, 설비 가운데 점). 미터가 아님
+ *   · type: equipment_type 코드 (OVEN · FAN · BURNER · TANK · PUMP · CAMERA)
+ *   · active: is_active
+ * @param {{ version, equipment: { create: [], update: [{ id, pos?: { x, y }, name?, type?, active? }], delete: [] } }} body
  * @returns {{ version, changedCount }}
  */
 export function saveProcessLayout(processId, body) {

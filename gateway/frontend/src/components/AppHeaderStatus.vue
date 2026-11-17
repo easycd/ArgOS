@@ -1,13 +1,13 @@
 <!--
   상단 바 오른쪽: 수신 상태 + 시계
-  - 수신 상태: 실시간 연결(SSE) 작업 전이라 예시 데이터 모드에서는 회색 '예시 데이터'로 표시
-  - TODO: SSE 연결 후 연결 상태(수신 중 / 끊김)에 맞게 표시
+  - 수신 상태: 예시 데이터 모드는 회색 '예시 데이터', 실제 서버는 SSE 연결 상태('실시간 수신 중' / '연결 중…')
   - 시계: 1초마다 갱신
 -->
 <script setup>
 import { onBeforeUnmount, ref } from 'vue'
 import { USE_MOCK } from '@/api/mock'
 import { serverNow } from '@/api/clock'
+import { live } from '@/api/live'
 import { formatClock } from '@/utils/format'
 
 // 시연 시계 기준 (서버 데이터의 시각과 맞춤)
@@ -17,9 +17,9 @@ onBeforeUnmount(() => clearInterval(timer))
 </script>
 
 <template>
-  <div class="live" :class="{ wait: USE_MOCK }">
+  <div class="live" :class="{ wait: USE_MOCK || !live.connected }">
     <i />
-    <span>{{ USE_MOCK ? '예시 데이터' : '실시간 수신 중' }}</span>
+    <span>{{ USE_MOCK ? '예시 데이터' : live.connected ? '실시간 수신 중' : '연결 중…' }}</span>
   </div>
   <span class="clock mono">{{ now }}</span>
 </template>

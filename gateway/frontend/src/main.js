@@ -23,6 +23,7 @@ import router from './router'
 import VChart from '@/utils/echarts'
 import { setAuthHandlers } from '@/api/http'
 import { syncServerClock } from '@/api/clock'
+import { startLive, stopLive } from '@/api/live'
 import { USE_MOCK } from '@/api/mock'
 import { useAuthStore } from '@/stores/auth'
 
@@ -45,12 +46,17 @@ setAuthHandlers({
   },
 })
 
-// 실제 서버 모드: 로그인하면 시연 시계를 맞춤
+// 실제 서버 모드: 로그인 중이면 시연 시계를 맞추고 실시간(SSE) 연결, 로그아웃하면 끊음
 if (!USE_MOCK) {
   watch(
     () => auth.accessToken,
     (token) => {
-      if (token) syncServerClock()
+      if (token) {
+        syncServerClock()
+        startLive(() => auth.accessToken)
+      } else {
+        stopLive()
+      }
     },
     { immediate: true },
   )

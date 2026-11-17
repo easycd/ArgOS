@@ -1,26 +1,30 @@
 <!--
   상단 바 오른쪽: 수신 상태 + 시계
-  - 수신 상태: 실시간 연결(SSE) 작업 전이라 예시 데이터 모드에서는 회색 '예시 데이터'로 표시
-  - TODO: SSE 연결 후 연결 상태(수신 중 / 끊김)에 맞게 표시
+  - 수신 상태: 예시 데이터 모드는 회색 '예시 데이터', 실제 서버는 SSE 연결 상태('실시간 수신 중' / '연결 중…')
   - 시계: 1초마다 갱신
 -->
 <script setup>
 import { computed, onBeforeUnmount, ref } from 'vue'
 import { USE_MOCK } from '@/api/mock'
+import { serverNow } from '@/api/clock'
+import { live } from '@/api/live'
 import { formatClock } from '@/utils/format'
 
-const now = ref(formatClock(new Date()))
-const timer = setInterval(() => (now.value = formatClock(new Date())), 1000)
+// 시연 시계 기준 (서버 데이터의 시각과 맞춤)
+const now = ref(formatClock(serverNow()))
+const timer = setInterval(() => (now.value = formatClock(serverNow())), 1000)
 // '2026-11-17 (화) 13:23:39' → 날짜 '2026-11-17 (화)' + 시각 '13:23:39' (좁은 화면에서 날짜만 숨기려고 나눔)
 const date = computed(() => now.value.slice(0, now.value.lastIndexOf(' ')))
 const time = computed(() => now.value.slice(now.value.lastIndexOf(' ') + 1))
+// 수신 상태 문구: 예시 데이터 / 실시간 수신 중 / 연결 중…
+const liveLabel = computed(() => (USE_MOCK ? '예시 데이터' : live.connected ? '실시간 수신 중' : '연결 중…'))
 onBeforeUnmount(() => clearInterval(timer))
 </script>
 
 <template>
-  <div class="live" :class="{ wait: USE_MOCK }" :title="USE_MOCK ? '예시 데이터' : '실시간 수신 중'">
+  <div class="live" :class="{ wait: USE_MOCK || !live.connected }" :title="liveLabel">
     <i />
-    <span class="lbl">{{ USE_MOCK ? '예시 데이터' : '실시간 수신 중' }}</span>
+    <span class="lbl">{{ liveLabel }}</span>
   </div>
   <span class="clock mono" :title="now"><span class="date">{{ date }}</span>{{ time }}</span>
 </template>

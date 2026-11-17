@@ -16,7 +16,7 @@ import irNormal from '@/assets/images/thermal/ir_normal.jpg'
 import irWarn from '@/assets/images/thermal/ir_warn.jpg'
 
 /** 센서별 게이지 눈금 끝(max)과 평소 값(usual) — 설계안 EQD [눈금 끝, 평소값] */
-const GAUGE = {
+export const GAUGE = {
   'CT-11': [20, 9.5],
   'TE-11': [100, 51],
   'CT-12': [18, 7.2],
@@ -91,7 +91,8 @@ const ev = (time, type, text, detail, extra = {}) => ({ at: todayIso(time), type
 /** 상도 건조로: 오늘 기본 기록 + 예시 상황의 알림 대응 단계 */
 function topOvenEvents() {
   const list = [
-    ev('07:40:00', 'THRESHOLD', '전류 주의 기준 20.7 → 21.6 A', '오승민 · 겨울 기준 적용', { by: '오승민' }),
+    // 기준값 관리 변경 이력(thresholdData.js)의 오늘 07:40 줄과 같은 내용
+    ev('07:40:00', 'THRESHOLD', '전류 주의 기준 20.7 → 21.6 A', '오승민 · 베어링 교체 완료, 겨울 기준으로 되돌림', { by: '오승민' }),
     ev('08:30:00', 'RECORD', '가동 시작', '상도 건조로 승온 완료 142 ℃'),
     ev('09:02:40', 'RECORD', '일일 점검 완료', '배기팬 벨트·베어링 점검 · 김도현', { by: '김도현' }),
   ]

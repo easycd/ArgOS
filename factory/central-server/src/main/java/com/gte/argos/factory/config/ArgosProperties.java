@@ -13,6 +13,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * @param historyImport 7일치 더미데이터 가져오기
  * @param devApi        개발·시연용 API (값 직접 넣기, 리셋) 사용 여부
  * @param internalApiKey 연계 서버 전용 API(/api/v1/internal/**) 키. 비우면 검사하지 않음 (로컬 개발)
+ * @param retention     센서 값(그래프용) 보관 기간
  */
 @ConfigurationProperties(prefix = "argos")
 public record ArgosProperties(
@@ -20,7 +21,20 @@ public record ArgosProperties(
         @DefaultValue Clock clock,
         @DefaultValue HistoryImport historyImport,
         @DefaultValue("false") boolean devApi,
-        @DefaultValue("") String internalApiKey) {
+        @DefaultValue("") String internalApiKey,
+        @DefaultValue Retention retention) {
+
+    /**
+     * 센서 값 보관. 그래프용 1분 추이(sensor_trend)와 경보 구간 샘플(sensor_event_sample)만 지운다.
+     * 경보·이벤트 이력(alarm, sensor_event)과 경보 이미지는 통계·월간 보고서용이라 지우지 않는다.
+     *
+     * @param enabled 정기 삭제를 할지
+     * @param days    며칠 지난 값을 지울지 (시연 시계 기준)
+     */
+    public record Retention(
+            @DefaultValue("true") boolean enabled,
+            @DefaultValue("7") int days) {
+    }
 
     /**
      * @param simStart 시연 시계의 시작 시각. 서버가 켜진 순간이 이 시각이 되고, 이후 실제로 흐른 만큼 간다

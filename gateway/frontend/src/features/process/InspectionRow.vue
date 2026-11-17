@@ -45,6 +45,14 @@ const STATUS = {
   border-bottom: none;
 }
 
+.row.done {
+  cursor: pointer; /* 끝난 점검: 누르면 '점검 관리' 안내 */
+}
+
+.row.done:hover {
+  background: var(--color-surface-sub);
+}
+
 .row.delayed {
   background: #fef6f6;
 }

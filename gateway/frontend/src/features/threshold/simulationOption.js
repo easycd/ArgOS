@@ -5,12 +5,12 @@
  * - 넘었던 순간 점: 지금 기준으로도 넘음(주의 주황 / 경보 빨강), 바꾼 기준으로만 넘음(파랑), 안 넘음(회색)
  * - 가로축: 날짜만 (하루 한 번)
  */
-import { CHART_COLORS } from '@/utils/chartColors'
+import { CHART_COLORS, SENSOR_CHART_COLOR } from '@/utils/chartColors'
 import { chartMotion } from '@/utils/echarts'
 import { fmt } from './thresholdForm'
 
 /** 센서 종류 색 (설계안 SC) */
-export const TYPE_COLOR = { CURRENT: '#3b82f6', TEMP: '#8b5cf6', CO: '#0d9488' }
+export const TYPE_COLOR = SENSOR_CHART_COLOR
 
 const toMs = (iso) => new Date(iso).getTime()
 const md = (ms) => {

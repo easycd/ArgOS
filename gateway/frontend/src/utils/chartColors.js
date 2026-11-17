@@ -23,3 +23,11 @@ export const LEVEL_CHART_COLOR = Object.freeze({
   ALARM: CHART_COLORS.alarm,
   FIRE: CHART_COLORS.alarm,
 })
+
+/** 센서 종류 → 차트 색 (설계안 SC: 전류 파랑 · 온도 보라 · CO 청록) */
+export const SENSOR_CHART_COLOR = Object.freeze({
+  CURRENT: '#3b82f6',
+  TEMP: '#8b5cf6',
+  CO: '#0d9488',
+  IR: '#64748b', // 설계안에 없음 — 주의 주황과 헷갈리지 않게 회색
+})

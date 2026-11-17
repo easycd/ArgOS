@@ -63,7 +63,8 @@ function mockAlarmsOf({ siteId, factoryId, processId }) {
   const all = mockAlarms()
   if (processId) return all.filter((a) => a.processId === Number(processId))
   if (factoryId) return all.filter((a) => a.factoryId === Number(factoryId))
-  return all.filter((a) => a.siteId === Number(siteId))
+  if (siteId) return all.filter((a) => a.siteId === Number(siteId))
+  return all // 범위 없음: 본사 관리자의 모든 사업장 (사업장 선택 화면의 알림 종 목록)
 }
 
 /** 범위 파라미터: 공정 > 공장 > 사업장 순서로 하나만 */

@@ -6,19 +6,28 @@
  * - 상도 건조로: 16:30 부터 전류가 18 → 22.4 A 로 오르고, 온도·CO 도 조금 뒤따라 오름
  * - 다른 설비: 평소 값 근처에서 조금씩 흔들리다 지금 값으로 이어짐
  * - 전날(compare): 평소 값 근처의 평범한 하루
+ * - 위 시각은 설계안 시각표. 예시 상황을 바꾼 순간을 '지금'으로 옮긴 만큼(scenario.shiftSec) 그래프도 같이 옮김
  */
+import { scenario } from './scenario'
 
-/** 예시 상황의 '지금' (분 단위, 0시부터) = 16:42 */
+/** 설계안 시각표의 '지금' (분 단위, 0시부터) = 16:42 */
 export const SCENARIO_MINUTE = 16 * 60 + 42
+/** 설계안 시각표에서 그래프가 시작하는 16:00 (분) */
+const DESIGN_START = 16 * 60
+
+/** 설계안 시각을 지금 상황으로 옮긴 분 (scenario.js anchorAt 의 shiftSec) */
+const shiftMin = () => Math.round((scenario.shiftSec ?? 0) / 60)
 /** 예시 상황의 '지금' 시각 문자열 (열화상 촬영 시각 등) */
 export const SCENARIO_TIME = '16:42:10'
 
 const pad = (n) => String(n).padStart(2, '0')
 
-/** 오늘(또는 며칠 전) 날짜 + 0시부터 분 → '2026-11-16T16:42:00+09:00' */
+/** 오늘(또는 며칠 전) 날짜 + 0시부터 분 → '2026-11-16T16:42:00+09:00' (0시 전·24시 넘음은 전날·다음 날로) */
 function isoAt(minute, daysAgo = 0) {
+  const dayOff = Math.floor(minute / 1440)
+  minute -= dayOff * 1440
   const d = new Date()
-  d.setDate(d.getDate() - daysAgo)
+  d.setDate(d.getDate() - daysAgo + dayOff)
   const ymd = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
   return `${ymd}T${pad(Math.floor(minute / 60))}:${pad(minute % 60)}:00+09:00`
 }
@@ -43,7 +52,7 @@ const dayFactor = (minute) => (minute >= 8 * 60 && minute < 20 * 60 ? 1 : 0.95)
  * - i: 16:00 부터 몇 분째 (16:00 전은 음수 → 평소 값)
  */
 function topOvenValue(type, minute) {
-  const i = minute - 16 * 60
+  const i = minute - (DESIGN_START + shiftMin())
   const n = wave(i)
   const f = dayFactor(minute)
   if (type === 'CURRENT') return i > 30 ? 18 + (22.4 - 18) * Math.min(1, (i - 30) / 8) + n * 0.3 : 18 * f + n * 0.5
@@ -57,7 +66,7 @@ const usualValue = (sensor, minute, seed) =>
 
 /** 범위별 시간 칸 (분): 1시간 = 1분 간격, 6시간·오늘 = 10분 간격 + 마지막은 지금 */
 function minutesOf(range) {
-  const now = SCENARIO_MINUTE
+  const now = SCENARIO_MINUTE + shiftMin()
   if (range === '1h') return Array.from({ length: 61 }, (_, k) => now - 60 + k)
   const start = range === '6h' ? now - 360 : 0
   const list = []
@@ -73,7 +82,8 @@ const round1 = (v) => Math.round(v * 10) / 10
  * - GET /alarms/{id}/detail 의 trend.points 흉내 (설계안 trendA(): 최근 40분)
  */
 export function alarmTrendPoints() {
-  const points = Array.from({ length: 39 }, (_, k) => [isoAt(16 * 60 + k), round1(topOvenValue('CURRENT', 16 * 60 + k))])
+  const start = DESIGN_START + shiftMin()
+  const points = Array.from({ length: 39 }, (_, k) => [isoAt(start + k), round1(topOvenValue('CURRENT', start + k))])
   points[points.length - 1][1] = 22.4
   return points
 }

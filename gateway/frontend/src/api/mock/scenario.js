@@ -10,6 +10,12 @@
  *
  * 처음 상황(기본값) = 그동안 화면들이 보여 주던 상황:
  *   16:38:20 상도 건조로 배기팬 전류 CT-17 22.4 A 주의 → 16:38:31 확인 → 16:41:05 체크리스트 전송 → 김도현 2/5 진행 중
+ *
+ * 시각: 위의 시각표(16:38:20 · 16:52:08 · 16:58:04 …)는 화면설계안의 시각.
+ *   상황을 바꾸는 순간을 '지금'으로 삼아 시각표 전체를 같은 간격만큼 옮김 (anchorAt)
+ *   → 오후 4시 전에 시연해도 알림 시각이 상단 시계보다 미래로 보이지 않음. 시각 사이 간격은 설계안 그대로
+ *   옮긴 간격은 scenario.shiftSec 에 두고, 다른 예시 데이터의 설계안 시각도 designAt() 으로 같이 옮김
+ *   (자정 바로 뒤에 상황을 바꾸면 앞선 시각이 전날 밤 시각이 될 수 있음 — 예시 데이터라 날짜는 따로 맞추지 않음)
  */
 import { reactive, toRaw, watch } from 'vue'
 import { emitLive } from '../live'
@@ -54,9 +60,43 @@ const toSec = (t) => {
 }
 const toTime = (sec) => `${pad(Math.floor(sec / 3600) % 24)}:${pad(Math.floor(sec / 60) % 60)}:${pad(sec % 60)}`
 
+/* ───────── 설계안 시각표를 '지금' 기준으로 옮기기 ───────── */
+
+const DAY_SEC = 24 * 3600
+const TIME_RE = /^\d{2}:\d{2}:\d{2}$/
+/** 하루 안으로 (음수·24시 넘음 → 0~24시) */
+const wrapDay = (sec) => ((sec % DAY_SEC) + DAY_SEC) % DAY_SEC
+/** 지금 PC 시각 (0시부터 초) */
+const nowSec = () => {
+  const d = new Date()
+  return d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds()
+}
+
+/** 'HH:mm:ss' 를 sec 초만큼 옮김 (비어 있으면 그대로) */
+export const shiftTime = (t, sec) => (t ? toTime(wrapDay(toSec(t) + sec)) : t)
+
+/** 값 안의 'HH:mm:ss' 문자열을 모두 sec 초만큼 옮김 (객체 · 배열 안까지) */
+function shiftDeep(v, sec) {
+  if (typeof v === 'string') return TIME_RE.test(v) ? shiftTime(v, sec) : v
+  if (Array.isArray(v)) return v.map((x) => shiftDeep(x, sec))
+  if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, shiftDeep(x, sec)]))
+  return v
+}
+
+/**
+ * 설계안 시각표로 만든 상황을, base 시각이 '지금'이 되도록 옮김
+ * @param {string} base 설계안에서 이 상황이 시작된 시각 (예: 주의 발생 '16:38:20')
+ * @param {object} next 설계안 시각으로 적은 상황 값
+ * @returns {object} 시각을 옮긴 상황 값 + shiftSec(옮긴 초)
+ */
+export function anchorAt(base, next) {
+  const shiftSec = nowSec() - toSec(base)
+  return { ...shiftDeep(next, shiftSec), shiftSec }
+}
+
 /** 처음 상황 */
 function initial() {
-  return {
+  return anchorAt('16:42:10', {
     /** 'NORMAL' | 'WARN' | 'ALARM' | 'FIRE' */
     state: LEVEL.WARN,
     /** 상도 건조로 전류 주의 알림 (없으면 null). status: OPEN → ACKED → ACTING → CLOSED */
@@ -94,7 +134,7 @@ function initial() {
     thresholdVersion: {},
     /** 예시 시계: base 시각에서 실제로 흐른 초를 더함 */
     clock: { base: '16:42:10', at: Date.now() },
-  }
+  })
 }
 
 /** 경보·화재가 없는 상태 (상황을 통째로 바꿀 때 같이 비움) */
@@ -104,7 +144,8 @@ function load() {
   try {
     const saved = JSON.parse(sessionStorage.getItem(STORAGE_KEY))
     // 예전에 저장된 값에 새 칸이 없을 수 있어 처음 값 위에 덮음
-    if (saved?.state) return { ...initial(), ...saved }
+    // shiftSec 이 없는 예전 값은 설계안 시각 그대로였으므로 0
+    if (saved?.state) return { ...initial(), shiftSec: 0, ...saved }
   } catch {
     // 저장된 값을 못 읽으면 처음 상황
   }
@@ -132,6 +173,9 @@ export function scenarioNow() {
   const passed = Math.floor((Date.now() - scenario.clock.at) / 1000)
   return toTime(toSec(scenario.clock.base) + passed)
 }
+
+/** 설계안 시각(예: 경보 전의 '16:47:36')을 지금 상황의 시각으로 옮김 — 예시 데이터 파일들이 씀 */
+export const designAt = (t) => shiftTime(t, scenario.shiftSec ?? 0)
 
 /** 'HH:mm:ss' 두 시각 사이 초 */
 export const secondsBetween = (from, to) => toSec(to) - toSec(from)
@@ -175,24 +219,24 @@ export function replace(next, event) {
   emitLive(event)
 }
 
-/** 정상 (알림 없음, 오늘 16:30:05) */
+/** 정상 (알림 없음, 설계안 16:30:05 → 지금) */
 export function setNormal() {
   replace(
-    { state: LEVEL.NORMAL, alarm: null, checklist: null, ...NO_EMERGENCY(), clock: { base: '16:30:05', at: Date.now() } },
+    anchorAt('16:30:05', { state: LEVEL.NORMAL, alarm: null, checklist: null, ...NO_EMERGENCY(), clock: { base: '16:30:05', at: Date.now() } }),
     'level.changed',
   )
 }
 
-/** 주의 발생 (16:38:20 CT-17 22.4 A, 아직 아무도 확인 안 함) */
+/** 주의 발생 (설계안 16:38:20 → 지금, CT-17 22.4 A, 아직 아무도 확인 안 함) */
 export function raiseWarn() {
   replace(
-    {
+    anchorAt('16:38:20', {
       state: LEVEL.WARN,
       alarm: { id: 1042, status: 'OPEN', raisedAt: '16:38:20', ackedAt: null, ackedBy: null, closedAt: null },
       checklist: null,
       ...NO_EMERGENCY(),
       clock: { base: '16:38:20', at: Date.now() },
-    },
+    }),
     'alarm.created',
   )
 }

@@ -7,7 +7,7 @@
 -->
 <script setup>
 import { computed } from 'vue'
-import { TYPE_COLOR, simulationOption } from './simulationOption'
+import { TYPE_COLOR, peaksOf, simulationOption } from './simulationOption'
 import { fmt, label } from './thresholdForm'
 import BaseCard from '@/components/BaseCard.vue'
 
@@ -43,7 +43,7 @@ const option = computed(() =>
   props.series && props.sim
     ? simulationOption({
         series: props.series,
-        peaks: props.sim.peaks ?? [],
+        peaks: peaksOf(props.sim, props.series), // peaks 또는 hits(지금 백엔드) 둘 다 받음
         type: props.sensor.type,
         unit: props.sensor.unit,
         field: props.field,

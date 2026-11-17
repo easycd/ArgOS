@@ -9,7 +9,7 @@
 import { computed } from 'vue'
 
 const props = defineProps({
-  /** { doneCount, totalCount, assignee } */
+  /** { doneCount, totalCount, assignee } — assignee 는 이름 문자열 또는 { id, name } (백엔드 GET /equipment/{id} 의 activeChecklist) */
   checklist: { type: Object, required: true },
   sub: { type: String, default: '' },
 })
@@ -17,7 +17,12 @@ const props = defineProps({
 defineEmits(['click'])
 
 const done = computed(() => props.checklist.doneCount >= props.checklist.totalCount)
-const subText = computed(() => (done.value ? '완료 · 확인 필요' : props.sub || props.checklist.assignee))
+// 담당자 이름: 문자열이면 그대로, { id, name } 이면 name (객체를 그대로 쓰면 '[object Object]' 로 보임)
+const assigneeName = computed(() => {
+  const a = props.checklist.assignee
+  return typeof a === 'string' ? a : (a?.name ?? '')
+})
+const subText = computed(() => (done.value ? '완료 · 확인 필요' : props.sub || assigneeName.value))
 
 // 고리: 둘레 길이 중 완료 비율만큼 칠함
 const R = 11

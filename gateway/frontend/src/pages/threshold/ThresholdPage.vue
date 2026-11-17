@@ -10,6 +10,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { serverNow } from '@/api/clock'
 import { getEquipmentTree, getSensorWeek, getThresholdHistory, getThresholds, simulateThreshold } from '@/api/thresholds'
 import ConfirmModal from '@/components/ConfirmModal.vue'
 import EquipmentTree from '@/features/threshold/EquipmentTree.vue'
@@ -24,6 +25,7 @@ import { SEASON_META, changes as changesOf, check, draftsOf, num, savedOf } from
 import { useAlertStore } from '@/stores/alert'
 import { useAuthStore } from '@/stores/auth'
 import { ROLE_LABEL, SENSOR_TYPES } from '@/types/codes'
+import { formatYmd } from '@/utils/format'
 import { toast } from '@/utils/toast'
 
 const route = useRoute()
@@ -94,7 +96,8 @@ async function init() {
 init()
 
 /* ───────── 변경 이력 ───────── */
-const today = new Date().toISOString().slice(0, 10)
+// 오늘: 한국 시각 기준 날짜 (UTC 로 자르면 오전 9시 전에 어제가 됨). 서버 시계 기준 — 이용 로그 · 상단 시계와 같은 방식
+const today = formatYmd(serverNow())
 const historyRange = ref({ from: '2026-08-01', to: today })
 const history = ref([])
 const historyBusy = ref(false)

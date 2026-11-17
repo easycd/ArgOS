@@ -8,7 +8,7 @@
 import http from './http'
 import { USE_MOCK, mockFail, mockOk } from './mock'
 import { serverNow } from './clock'
-import { TOP_OVEN_ID, mockEquipment, mockEquipmentEvents, thermalOf } from './mock/equipmentData'
+import { THERMAL_BY_STATE, TOP_OVEN_ID, mockEquipment, mockEquipmentEvents, thermalOf } from './mock/equipmentData'
 import { buildSeries } from './mock/equipmentSeries'
 import { scenario } from './mock/scenario'
 import { LEVEL } from '@/types/codes'
@@ -34,9 +34,12 @@ export function getEquipmentEvents(equipmentId) {
  * 열화상 최신 장면: { imageUrl, capturedAt, max, min, avg, maxPoint, scale, zone }
  * - equipmentId: 이 설비 구역의 최고·최저 온도를 받기 위해 붙임 (명세서에 없음, backend-notes 참고)
  */
-export function getThermalLatest(cameraId, equipmentId) {
+export async function getThermalLatest(cameraId, equipmentId) {
   if (USE_MOCK) return mockOk(thermalOf(cameraId, equipmentId))
-  return http.get(`/thermal/${cameraId}/latest`, { params: { equipmentId } })
+  const data = await http.get(`/thermal/${cameraId}/latest`, { params: { equipmentId } })
+  // 실제 열화상 그림(VMS)이 아직 없어서 서버는 imageUrl 없이 level 만 줌 → 단계에 맞는 예시 그림 사용
+  if (!data.imageUrl) data.imageUrl = (THERMAL_BY_STATE[data.level] ?? THERMAL_BY_STATE[LEVEL.NORMAL]).image
+  return data
 }
 
 /** 범위 → 요청 기간·간격 ('1h' = 최근 1시간 1분 간격, '6h' = 최근 6시간, 'today' = 오늘 0시부터) */

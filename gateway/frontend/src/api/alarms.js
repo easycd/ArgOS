@@ -7,6 +7,8 @@
  */
 import http from './http'
 import { USE_MOCK, mockFail, mockOk } from './mock'
+import { THERMAL_BY_STATE } from './mock/equipmentData'
+import { LEVEL } from '@/types/codes'
 import { alarmDetail, alarmTimeline } from './mock/alertData'
 import { mockAlarms } from './mock/data'
 import { ackAlarm as mockAck } from './mock/scenario'
@@ -41,12 +43,17 @@ export function getAlarmTimeline(alarmId) {
 }
 
 /** 주의 상세 */
-export function getAlarmDetail(alarmId) {
+export async function getAlarmDetail(alarmId) {
   if (USE_MOCK) {
     const data = alarmDetail(alarmId)
     return data ? mockOk(data) : notFound()
   }
-  return http.get(`/alarms/${alarmId}/detail`)
+  const data = await http.get(`/alarms/${alarmId}/detail`)
+  // 실제 열화상 그림(VMS)이 아직 없어서 서버는 imageUrl 없이 level 만 줌 → 단계에 맞는 예시 그림 사용
+  if (data.thermal && !data.thermal.imageUrl) {
+    data.thermal.imageUrl = (THERMAL_BY_STATE[data.thermal.level] ?? THERMAL_BY_STATE[LEVEL.NORMAL]).image
+  }
+  return data
 }
 
 /**

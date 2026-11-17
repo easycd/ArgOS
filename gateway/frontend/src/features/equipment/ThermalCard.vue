@@ -11,6 +11,8 @@ import BaseCard from '@/components/BaseCard.vue'
 import { LEVEL } from '@/types/codes'
 
 const props = defineProps({
+  /** 공정 이름 ('도장 공정') — 설비 응답 path 에서 (화면이 넘겨 줌) */
+  processName: { type: String, default: '' },
   /** GET /thermal/{cameraId}/latest 응답 */
   thermal: { type: Object, required: true },
   /** 설비 단계 (최고 온도 글자 색) */
@@ -32,7 +34,7 @@ const time = computed(() => {
 </script>
 
 <template>
-  <BaseCard title="열화상 카메라" :sub="`도장 공정 ${thermal.tag}`">
+  <BaseCard title="열화상 카메라" :sub="[processName, thermal.tag].filter(Boolean).join(' ')">
     <template v-if="thermal.max != null" #actions>
       <span>최고&nbsp;<b class="mono temp" :class="{ hot, danger }">{{ thermal.max }} ℃</b></span>
       <span>최저&nbsp;<b class="mono temp">{{ thermal.min }} ℃</b></span>
@@ -44,7 +46,7 @@ const time = computed(() => {
         :max="thermal.max"
         :max-point="thermal.maxPoint"
         :scale="thermal.scale"
-        :zone-name="thermal.zone?.name ?? '도장 공정 전체'"
+        :zone-name="thermal.zone?.name ?? `${processName || '공정'} 전체`"
       />
       <div class="foot">
         <span>{{ thermal.zone?.desc ?? '공정마다 열화상 카메라 1대로 전체를 봅니다' }}</span>

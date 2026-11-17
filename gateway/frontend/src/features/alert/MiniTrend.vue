@@ -7,19 +7,21 @@ import { computed } from 'vue'
 import { trendOption } from '@/features/equipment/trendOption'
 
 const props = defineProps({
-  /** { unit, warn, alarm, points: [[시각, 값]] } */
+  /** { tag, unit, warn, alarm, points: [[시각, 값]] } (백엔드 AlarmService.detail 의 trend) */
   trend: { type: Object, required: true },
   title: { type: String, required: true },
   sub: { type: String, default: '' },
   level: { type: String, default: 'WARN' },
   height: { type: Number, default: 176 },
+  /** 소수 자리 (전류 1, 온도·CO 0) */
+  dec: { type: Number, default: 1 },
 })
 
 const option = computed(() =>
   trendOption({
     series: { ...props.trend, compare: [] },
     level: props.level,
-    dec: 1,
+    dec: props.dec,
     liveValue: null,
     showPrev: false,
     wholeDay: false,

@@ -11,6 +11,7 @@ import { ackAlarm } from '@/api/alarms'
 import AppIcon from '@/components/AppIcon.vue'
 import BaseModal from '@/components/BaseModal.vue'
 import HoldButton from '@/components/HoldButton.vue'
+import { siteNameOf } from './alarmPlace'
 import { useAlertStore } from '@/stores/alert'
 import { useAuthStore } from '@/stores/auth'
 import { sensorTypeOf } from '@/types/codes'
@@ -26,8 +27,10 @@ const auth = useAuthStore()
 
 const type = computed(() => sensorTypeOf(props.alarm.sensorType))
 const time = computed(() => props.alarm.raisedAt.slice(11, 19))
-// 위치 앞에 사업장 이름 (알림 응답의 location 은 공장부터)
-const location = computed(() => `울산공장 · ${props.alarm.location}`)
+// 위치 앞에 사업장 이름 (알림 응답의 location 은 공장부터 → siteId 로 사업장 이름을 받음)
+const siteName = ref('')
+siteNameOf(props.alarm.siteId).then((n) => (siteName.value = n))
+const location = computed(() => [siteName.value, props.alarm.location].filter(Boolean).join(' · '))
 
 /** 누른 시간 '1.2 / 2.0초' */
 const heldMs = ref(0)

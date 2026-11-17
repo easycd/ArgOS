@@ -2,7 +2,7 @@
   경보·화재 창 머리 (화면설계안 mAlarm() / mFire() 의 .ahead)
   - 경보: 빨강 '3단계 · 경보' + 제목 + 오른쪽 발생 시각·위치
   - 화재: 진한 빨강, 불꽃 아이콘, '화재 발생' + 위치, 오른쪽 감지 시각 · 경과(1초마다)
-  - 바탕이 0.9초마다 진해졌다 밝아짐 (설계안 headDng) — 셧다운이 끝나면 회색 '상도 건조로를 정지했습니다'
+  - 바탕이 0.9초마다 진해졌다 밝아짐 (설계안 headDng) — 셧다운이 끝나면 회색 '(정지한 설비)를 정지했습니다'
   - 오른쪽 끝 '화면 보기': 창을 접고 화면을 봄 → 상단 바 빨간 띠를 누르면 다시 열림 (화면설계서 C4)
 -->
 <script setup>
@@ -17,6 +17,10 @@ const props = defineProps({
   stopped: { type: Boolean, default: false },
   /** 경과 'HH:mm:ss' (화재만) */
   elapsed: { type: String, default: '' },
+  /** 정지한 설비 이름 ('상도 건조로', 공정 전체면 '도장 공정 전체') — 창이 응답에서 꺼내 줌 */
+  stoppedName: { type: String, default: '' },
+  /** 위치 '5공장 · 도장 공정 · 상도 건조로' (경보 대응 응답에는 없을 수 있어 창이 알림 목록 줄에서 채움) */
+  location: { type: String, default: '' },
 })
 
 defineEmits(['collapse'])
@@ -30,17 +34,17 @@ const time = computed(() => props.response.raisedAt.slice(11, 19))
     <div>
       <template v-if="fire">
         <div class="big">화재 발생</div>
-        <div class="sub">{{ response.location }}</div>
+        <div class="sub">{{ location }}</div>
       </template>
       <template v-else>
         <div class="step">{{ stopped ? '셧다운 완료' : '3단계 · 경보' }}</div>
-        <div class="title">{{ stopped ? '상도 건조로를 정지했습니다' : response.title }}</div>
+        <div class="title">{{ stopped ? `${stoppedName || '설비'}를 정지했습니다` : response.title }}</div>
       </template>
     </div>
     <div class="right">
       <div class="mono time">{{ time }}{{ fire ? ' 감지' : '' }}</div>
       <div v-if="fire" class="mono small">경과 {{ elapsed }}</div>
-      <div v-else class="small">{{ response.location.split(' · ').slice(0, 3).join(' · ') }}</div>
+      <div v-else class="small">{{ location.split(' · ').slice(0, 3).join(' · ') }}</div>
     </div>
     <button type="button" class="fold" @click="$emit('collapse')"><AppIcon name="cd" :size="16" />화면 보기</button>
   </header>

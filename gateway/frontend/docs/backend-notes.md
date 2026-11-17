@@ -368,6 +368,8 @@
 | `/alarms/{id}/response` | `shutdown { equipmentIds, steps: [{ label, at }], done, auto }` | 셧다운 단계 표시 (버너 연료 차단 → 컨베이어 정지 → 배기팬 정지). SSE `command.result` 에 단계가 오면 그걸로 대신해도 됨 |
 | `/alarms/{id}/response` | `valueStillOver` | '경보 종료' 단추 켜기 (경보 기준 위 센서가 없을 때) |
 | `/alarms/{id}/response` | `equipment[].runState` | 셧다운 고르기에서 이미 정지된 설비 막기 (코드에 있음) |
+| `/alarms/{id}/response` | `siteId` · `factoryId` · `processId` · `unitName` | 공정 담당자 호출 · 공정 전체 셧다운 · '설비 배치도에서 보기' 주소와 문구. **지금은 같은 알림의 목록 줄(`GET /alarms`)에서 꺼내 씀** (`features/alert/alarmPlace.js`) — 응답에 같이 오면 그걸 쓰면 됨 |
+| `/alarms/{id}/response` · `/fires/{id}` | `thermal.cameraTag` | 열화상 아래 'IR-01 · 도장 공정' (detail 에는 있음) |
 | `/fires/{id}` | `values { thermalMax, temp, co }` | 감지 근거 숫자 3칸 |
 | `/fires/{id}` | `actions[].text` · `running` | 자동 조치 줄 문구, '송출 중' 칩 |
 | `/fires/{id}` | `serverTime` | 경과 시간을 서버 시계로 |

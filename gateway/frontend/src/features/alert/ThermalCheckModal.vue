@@ -2,11 +2,12 @@
   센서 데이터 · 열화상 확인 창 (화면설계안 js/v-modals.js mThermal())
   - 주의 상세의 '센서 데이터 · 열화상 확인' 단추로 열림 (화면설계서 C2 는 주의 상세 가운데 단으로 합침 → 설계안을 따름)
   - 왼쪽: 주의 발생 시점 열화상 1장(저장된 사진) + 최고 온도 위치 / 최고·평균 / 평소 같은 위치
-  - 오른쪽: 그때 센서 3종 값·기준·단계 + 전류 추이
+  - 오른쪽: 그때 센서 3종 값·기준·단계 + 알림이 난 센서의 추이 (전류·온도·CO)
   - '주의 상세로 돌아가기', '확인' 모두 주의 상세로
 -->
 <script setup>
 import { computed, onMounted, ref } from 'vue'
+import { placeOf, trendInfo } from './alarmPlace'
 import MiniTrend from './MiniTrend.vue'
 import { getAlarmDetail } from '@/api/alarms'
 import AppIcon from '@/components/AppIcon.vue'
@@ -34,6 +35,9 @@ onMounted(async () => {
 
 const time = computed(() => detail.value?.raisedAt.slice(11, 19) ?? '')
 const fmt = (s) => Number(s.value).toFixed(sensorTypeOf(s.type)?.dec ?? 0)
+const trend = computed(() => trendInfo(detail.value))
+// 열화상 아래 이름 'IR-01 · 도장 공정' (공정 이름은 응답 위치에서)
+const zoneName = computed(() => [detail.value?.thermal?.cameraTag, placeOf(detail.value).processName].filter(Boolean).join(' · '))
 const back = () => alert.open('detail', { alarmId: props.alarmId })
 </script>
 
@@ -61,7 +65,7 @@ const back = () => alert.open('detail', { alarmId: props.alarmId })
             max-label="최고 온도"
             :label-offset="{ x: -160, y: 36 }"
             :live="false"
-            :zone-name="`${detail.thermal.cameraTag} · 도장 공정`"
+            :zone-name="zoneName"
             :time="time"
           />
           <div class="facts">
@@ -84,7 +88,7 @@ const back = () => alert.open('detail', { alarmId: props.alarmId })
               </span>
             </div>
           </div>
-          <MiniTrend class="gap-s" :trend="detail.trend" title="전류 추이" :sub="`${detail.rule.sensorTag} · 최근 40분`" :height="204" />
+          <MiniTrend v-if="detail.trend" class="gap-s" :trend="detail.trend" :title="trend.title" :dec="trend.dec" :sub="`${trend.tag} · 최근 40분`" :height="204" />
           <div class="m-actions buttons">
             <button type="button" class="btn" @click="back"><AppIcon name="cl" :size="16" />주의 상세로 돌아가기</button>
             <button type="button" class="btn btn-primary" @click="back">확인</button>

@@ -11,6 +11,7 @@ import { computed, ref } from 'vue'
 import { getActiveAlarms } from '@/api/alarms'
 import { getActiveChecklists } from '@/api/checklists'
 import { useAuthStore } from './auth'
+import { placeOf } from '@/features/alert/alarmPlace'
 import { LEVEL, ROLE } from '@/types/codes'
 
 /** 단계 높은 순서 (상태 띠에 대표로 보여 줄 알림 고르기) */
@@ -50,6 +51,9 @@ export const useAlertStore = defineStore('alert', () => {
       // 못 받아도 화면은 그대로 (다음 갱신 때 다시)
     }
   }
+
+  /** 알림의 공정 이름 ('도장 공정') — 체크리스트 진행 칸·창 (체크리스트 응답에는 공정 번호만 있음) */
+  const processNameOf = (alarmId) => placeOf(activeAlarms.value.find((a) => a.id === alarmId)).processName
 
   /** 설비의 진행 중 체크리스트 (공정 화면 칩, 설비 상세 배지) */
   const checklistOfEquipment = (equipmentId) => checklists.value.find((c) => c.equipmentId === equipmentId) ?? null
@@ -95,5 +99,5 @@ export const useAlertStore = defineStore('alert', () => {
     modal.value = null
   }
 
-  return { activeAlarms, checklists, modal, canAct, primary, refresh, checklistOfEquipment, open, close, openFor, reset }
+  return { activeAlarms, checklists, modal, canAct, primary, refresh, processNameOf, checklistOfEquipment, open, close, openFor, reset }
 })

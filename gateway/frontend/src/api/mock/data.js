@@ -233,6 +233,8 @@ const alarm = (id, factoryId, status, title, location, sensorTag, sensorType, va
   siteId: 1, factoryId, processId: factoryId === 5 ? 12 : null, id, level: LEVEL.WARN, status, title, location,
   equipmentId: id - 1000, sensorId: id - 900, sensorTag, sensorType, value, unit, threshold, raisedAt: todayAt(time),
   ackedBy: null, ackedAt: null, closedAt: null, checklist: null, assignee: null,
+  // 설비 이름 (백엔드 AlarmViews unitName) — 위치 마지막 칸에서 부품 이름을 뺀 것
+  unitName: location.split(' · ').at(-1).replace(/ (배기팬|버너실|순환펌프)$/, ''),
 })
 
 /** 이미 끝난 오늘 알림 (상황과 상관없음) */
@@ -255,7 +257,7 @@ function topOvenAlarm() {
   const a = scenario.alarm
   if (!a) return null
   const title = a.status === 'CLOSED' ? '전류 주의 해제' : '전류 주의 기준 초과'
-  const row = alarm(1042, 5, a.status, title, '5공장 · 도장 공정 · 상도 건조로 배기팬', 'CT-17', 'CURRENT', 22.4, 'A', 21.6, a.raisedAt)
+  const row = { ...alarm(1042, 5, a.status, title, '5공장 · 도장 공정 · 상도 건조로 배기팬', 'CT-17', 'CURRENT', 22.4, 'A', 21.6, a.raisedAt), equipmentId: 31 }
   const c = scenario.checklist
   return {
     ...row,
@@ -283,6 +285,7 @@ function emergencyAlarms() {
   const row = (id, level, title, place, tag, type, value, unit, threshold, time) => ({
     ...alarm(id, 5, status, closed ? title.replace('기준 초과', '해제').replace('감지', '해제') : title, place, tag, type, value, unit, threshold, time),
     level,
+    equipmentId: 31, // 상도 건조로
     closedAt: closed ? todayAt(inc.closedAt) : null,
   })
   const list = [

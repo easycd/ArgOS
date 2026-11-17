@@ -93,6 +93,37 @@
   animation: pop-in var(--m-pop-in) both;
 }
 
+/* ───────── 상단 바 펼침 메뉴 (알림 종 목록 · 관리 · 사용자): 화면설계안 css/extra.css .menu menuin/menuout ─────────
+ * 열릴 때 0.16초 위에서 6px 내려오며 97% → 100%, 닫힐 때 0.12초 4px 올라가며 사라짐
+ * 사용: <Transition name="menu-drop"> */
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes menu-out {
+  to {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+}
+
+.menu-drop-enter-active {
+  transform-origin: top center;
+  animation: menu-in 160ms ease-out both;
+}
+
+.menu-drop-leave-active {
+  transform-origin: top center;
+  animation: menu-out 120ms ease-in both;
+}
+
 /* ───────── 버튼 누름: 97% 로 살짝 작아짐 ───────── */
 .btn {
   transition:
@@ -117,7 +148,8 @@
   }
 
   .rise,
-  .pop-in {
+  .pop-in,
+  .menu-drop-enter-active {
     animation-name: softin;
     animation-delay: 0s;
   }

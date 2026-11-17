@@ -3,14 +3,18 @@
   - 알림 숫자: GET /notifications/summary (아직 조치 안 끝난 알림). 알림이 있으면 종 아이콘이 흔들림
   - 채팅: 누르면 오른쪽 채팅 패널 열기·닫기 (features/chat/ChatPanel.vue), 숫자는 안 읽은 채팅 (stores/chat.js 대화방 합계)
     채팅을 쓰지 않는 사람(공정 담당자)에게는 채팅 아이콘이 없음
-  - TODO: 알림 목록 펼치기는 해당 화면 작업 때 연결
+  - 알림 종을 누르면 오늘 알림 목록이 열림 (components/AppBellMenu.vue, 화면설계안 #bell)
+    바깥을 누르거나 Esc 를 누르면 닫힘 (utils/useOutsideClose.js), 다른 화면으로 가면 닫힘
 -->
 <script setup>
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
+import AppBellMenu from './AppBellMenu.vue'
 import AppIcon from './AppIcon.vue'
 import { getNotificationSummary } from '@/api/notifications'
 import { useChatStore } from '@/stores/chat'
 import { useLiveReload } from '@/utils/useLiveReload'
+import { useOutsideClose } from '@/utils/useOutsideClose'
 
 const summary = ref({ unackedAlarmCount: 0, unreadChatCount: 0 })
 const chat = useChatStore()
@@ -26,7 +30,12 @@ async function load() {
 onMounted(load)
 useLiveReload(load) // 알림이 생기거나 끝나면 숫자도 다시
 
-function onBell() {}
+/* ───────── 알림 목록 펼침 ───────── */
+const route = useRoute()
+const bellOpen = ref(false)
+const bellRoot = ref(null) // 종 단추 + 목록을 감싼 요소 (안쪽을 누르면 닫지 않음)
+useOutsideClose(bellRoot, bellOpen)
+watch(() => route.fullPath, () => (bellOpen.value = false))
 </script>
 
 <template>
@@ -43,19 +52,30 @@ function onBell() {}
     <!-- 새 글이 오면 숫자가 톡 커졌다 돌아옴 (화면설계서 I1 '120% 300ms') -->
     <em v-if="chat.unread" :key="chat.unread" class="pop">{{ chat.unread }}</em>
   </button>
-  <button
-    type="button"
-    class="icon-btn"
-    :class="{ ring: summary.unackedAlarmCount > 0 }"
-    aria-label="알림"
-    @click="onBell"
-  >
-    <AppIcon name="bell" />
-    <em v-if="summary.unackedAlarmCount">{{ summary.unackedAlarmCount }}</em>
-  </button>
+  <div ref="bellRoot" class="bell-wrap">
+    <button
+      type="button"
+      class="icon-btn"
+      :class="{ ring: summary.unackedAlarmCount > 0, on: bellOpen }"
+      aria-label="알림"
+      :aria-expanded="bellOpen"
+      @click="bellOpen = !bellOpen"
+    >
+      <AppIcon name="bell" />
+      <em v-if="summary.unackedAlarmCount">{{ summary.unackedAlarmCount }}</em>
+    </button>
+    <Transition name="menu-drop">
+      <AppBellMenu v-if="bellOpen" @close="bellOpen = false" />
+    </Transition>
+  </div>
 </template>
 
 <style scoped>
+.bell-wrap {
+  position: relative;
+  display: grid;
+}
+
 .icon-btn {
   position: relative;
   display: grid;
@@ -67,7 +87,7 @@ function onBell() {}
   cursor: pointer;
 }
 
-/* 채팅 패널이 열려 있으면 아이콘 파랗게 */
+/* 채팅 패널 · 알림 목록이 열려 있으면 아이콘 파랗게 */
 .icon-btn.on {
   color: var(--color-primary);
 }

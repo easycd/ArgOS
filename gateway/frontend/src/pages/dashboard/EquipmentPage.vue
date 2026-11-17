@@ -47,7 +47,8 @@ async function load({ silent = false } = {}) {
       getProcessStatus(processId),
     ])
     // 주소의 공정과 설비의 공정이 다르면 (주소를 직접 고친 경우) 열지 않음
-    if (eq.processId !== Number(processId)) throw new Error('이 공정의 설비가 아닙니다.')
+    // - 응답에 processId 가 있을 때만 비교 (지금 백엔드 GET /equipment/{id} 응답에는 없음 → backend-notes 8장)
+    if (eq.processId != null && eq.processId !== Number(processId)) throw new Error('이 공정의 설비가 아닙니다.')
     equipment.value = eq
     events.value = ev
     processEquipment.value = buildProcessEquipment(layout, status)

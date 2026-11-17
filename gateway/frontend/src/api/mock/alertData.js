@@ -9,7 +9,7 @@ import { alarmTrendPoints } from './equipmentSeries'
 import { mockAlarms, todayAt } from './data'
 import { THERMAL_BY_STATE, mockEquipmentEvents } from './equipmentData'
 import { EQUIPMENT, equipmentLevel, runStateOf, sensorsNow } from './processData'
-import { TOP_OVEN_VALUES, scenario, scenarioNow, workerName } from './scenario'
+import { TOP_OVEN_VALUES, designAt, scenario, scenarioNow, workerName } from './scenario'
 import { LEVEL } from '@/types/codes'
 import irWarn from '@/assets/images/thermal/ir_warn.jpg'
 
@@ -266,17 +266,17 @@ export function fireView() {
     thermal: { cameraId: 301, cameraTag: 'IR-01', imageUrl: t.image, max: t.max, min: t.min, avg: t.avg, maxPoint: t.point, scale: t.scale },
     broadcast: {
       on: f.status === 'ACTIVE',
-      startedAt: todayAt('16:58:05'),
+      startedAt: todayAt(designAt('16:58:05')), // 설계안 시각 → 지금 상황 기준
       message: '5공장 도장 공정에서 화재가 발생했습니다. 작업자는 즉시 지정 대피로로 대피하십시오.',
     },
-    hqNotifiedAt: todayAt('16:58:06'),
+    hqNotifiedAt: todayAt(designAt('16:58:06')),
     unlock: { failCount: f.failCount, maxFail: 5, locked: f.locked },
     actions: [
       { step: 'DETECTED', ...done(f.detectedAt), text: '화재 감지' },
-      { step: 'BROADCAST', ...done('16:58:05'), text: '공장 내 경고 방송 송출', running: f.status === 'ACTIVE' },
-      { step: 'SHUTDOWN', ...done('16:58:06'), text: '상도 건조로 자동 셧다운 (버너 연료 차단)' },
-      { step: 'HQ_NOTIFY', ...done('16:58:06'), text: '본사 관제 통보' },
-      { step: 'WORKER_PUSH', ...done('16:58:06'), text: '도장 공정 담당자 앱 알림' },
+      { step: 'BROADCAST', ...done(designAt('16:58:05')), text: '공장 내 경고 방송 송출', running: f.status === 'ACTIVE' },
+      { step: 'SHUTDOWN', ...done(designAt('16:58:06')), text: '상도 건조로 자동 셧다운 (버너 연료 차단)' },
+      { step: 'HQ_NOTIFY', ...done(designAt('16:58:06')), text: '본사 관제 통보' },
+      { step: 'WORKER_PUSH', ...done(designAt('16:58:06')), text: '도장 공정 담당자 앱 알림' },
       f.status === 'CLEARED'
         ? { step: 'CLEARED', at: todayAt(f.clearedAt), done: true, text: `경보 해제 · ${f.clearedBy}` }
         : { step: 'CLEARED', at: null, done: false, text: '공장 담당자 경보 해제 (비밀번호 확인 필요)' },

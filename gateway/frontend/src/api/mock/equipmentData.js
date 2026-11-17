@@ -8,7 +8,7 @@
  */
 import { EQUIPMENT, equipmentLevel, sensorsNow } from './processData'
 import { SCENARIO_TIME, todayIso } from './equipmentSeries'
-import { activeChecklist, scenario, workerName } from './scenario'
+import { activeChecklist, designAt, scenario, workerName } from './scenario'
 import { LEVEL } from '@/types/codes'
 import irAlarm from '@/assets/images/thermal/ir_alarm.jpg'
 import irFire from '@/assets/images/thermal/ir_fire.jpg'
@@ -99,7 +99,7 @@ function topOvenEvents() {
   const a = scenario.alarm
   if (a) {
     const id = { alarmId: a.id }
-    list.push(ev('16:30:12', 'ALARM', '전류 상승 시작', 'CT-17 18.0 → 19.2 A', { level: LEVEL.NORMAL }))
+    list.push(ev(designAt('16:30:12'), 'ALARM', '전류 상승 시작', 'CT-17 18.0 → 19.2 A', { level: LEVEL.NORMAL }))
     list.push(ev(a.raisedAt, 'ALARM', '전류 주의 기준 초과', 'CT-17 22.4 A (기준 21.6 A)', { level: LEVEL.WARN, ...id }))
     if (a.ackedAt) list.push(ev(a.ackedAt, 'ACTION', '주의 확인', `${a.ackedBy} · 2초 길게 눌러 확인`, { by: a.ackedBy, ...id }))
     const c = scenario.checklist
@@ -124,9 +124,10 @@ function emergencyEvents() {
   if (!inc) return []
   const id = { alarmId: inc.id }
   const list = [
-    ev('16:47:36', 'ALARM', '전류 경보 기준 초과', 'CT-17 27.5 A (기준 27.0 A)', { level: LEVEL.ALARM, ...id }),
-    ev('16:50:12', 'ALARM', '온도 주의 기준 초과', 'TE-15 164 ℃ (기준 160 ℃)', { level: LEVEL.WARN, ...id }),
-    ev('16:52:08', 'ALARM', 'CO 경보 기준 초과', 'CO-13 34 ppm (기준 30 ppm)', { level: LEVEL.ALARM, ...id }),
+    // 설계안 시각 → 지금 상황 기준 (scenario.js anchorAt)
+    ev(designAt('16:47:36'), 'ALARM', '전류 경보 기준 초과', 'CT-17 27.5 A (기준 27.0 A)', { level: LEVEL.ALARM, ...id }),
+    ev(designAt('16:50:12'), 'ALARM', '온도 주의 기준 초과', 'TE-15 164 ℃ (기준 160 ℃)', { level: LEVEL.WARN, ...id }),
+    ev(designAt('16:52:08'), 'ALARM', 'CO 경보 기준 초과', 'CO-13 34 ppm (기준 30 ppm)', { level: LEVEL.ALARM, ...id }),
   ]
   const sd = scenario.shutdown
   if (sd && !sd.auto) {
@@ -136,8 +137,8 @@ function emergencyEvents() {
   const f = scenario.fire
   if (f) {
     list.push(ev(f.detectedAt, 'ALARM', '화재 감지', '열화상 최고 486 ℃', { level: LEVEL.FIRE, ...id }))
-    list.push(ev('16:58:05', 'ACTION', '공장 내 경고 방송 송출', '작업자 대피 안내', id))
-    list.push(ev('16:58:06', 'ACTION', '상도 건조로 자동 셧다운', '버너 연료 차단', id))
+    list.push(ev(designAt('16:58:05'), 'ACTION', '공장 내 경고 방송 송출', '작업자 대피 안내', id))
+    list.push(ev(designAt('16:58:06'), 'ACTION', '상도 건조로 자동 셧다운', '버너 연료 차단', id))
     if (f.clearedAt) list.push(ev(f.clearedAt, 'ACTION', '화재 경보 해제', `${f.clearedBy} · 비밀번호 확인`, id))
   }
   if (inc.status === 'CLOSED' && !f) list.push(ev(inc.closedAt, 'ACTION', '경보 종료', inc.result || '설비 정지 후 기준 아래로 복귀', id))
@@ -178,7 +179,7 @@ export function thermalOf(cameraId, equipmentId) {
     cameraId,
     tag: 'IR-01',
     imageUrl: t.image,
-    capturedAt: todayIso(SCENARIO_TIME),
+    capturedAt: todayIso(designAt(SCENARIO_TIME)),
     max: top ? t.max : null,
     min: top ? t.min : null,
     avg: top ? t.avg : null,

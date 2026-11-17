@@ -3,13 +3,16 @@
   - 0 ~ 눈금 끝: 초록(정상) · 주황(주의) · 빨강(경보) 구간, 주의·경보 눈금과 숫자
   - 값을 바꾸면 눈금이 0.3초에 옮겨 가고 파랗게, 원래 주의 자리에는 회색 눈금이 남음
   - 위쪽 '현재 22.4' 와 아래 화살표: 지금 값 위치
+  - 눈금 끝(max): 응답의 sensors[].max (명세서 · 예시 데이터에만 있음).
+    없으면(지금 백엔드 응답) 저장된 경보 기준 · 주의 기준 · 현재값 중 큰 값의 1.25배를 보기 좋은 수로 올려 씀 (backend-notes 11장)
 -->
 <script setup>
 import { computed } from 'vue'
 import { fmt } from './thresholdForm'
 
 const props = defineProps({
-  max: { type: Number, required: true },
+  /** 눈금 끝 (없으면 기준값으로 계산) */
+  max: { type: Number, default: null },
   /** 저장된 기준 */
   saved: { type: Object, required: true },
   /** 입력 중인 기준 (숫자가 아니면 저장된 값으로) */
@@ -19,7 +22,20 @@ const props = defineProps({
   dec: { type: Number, default: 0 },
 })
 
-const pct = (v) => `${Math.max(0, Math.min(100, (v / props.max) * 100)).toFixed(2)}%`
+/** 보기 좋은 수로 올림: 33.75 → 35, 225 → 250, 37.5 → 40 (가장 큰 자리의 절반 단위) */
+function niceCeil(x) {
+  if (!(x > 0)) return 1
+  const step = 10 ** Math.floor(Math.log10(x)) / 2
+  return Math.ceil(x / step) * step
+}
+
+/** 눈금 끝: 응답 값이 있으면 그대로, 없으면 기준값 · 현재값으로 계산 */
+const top = computed(() => {
+  if (Number.isFinite(props.max) && props.max > 0) return props.max
+  return niceCeil(Math.max(props.saved.alarm ?? 0, props.saved.warn ?? 0, props.value ?? 0) * 1.25)
+})
+
+const pct = (v) => `${Math.max(0, Math.min(100, (v / top.value) * 100)).toFixed(2)}%`
 const w = computed(() => props.warn ?? props.saved.warn)
 const a = computed(() => props.alarm ?? props.saved.alarm)
 const warnChanged = computed(() => w.value !== props.saved.warn)
@@ -41,7 +57,7 @@ const alarmChanged = computed(() => a.value !== props.saved.alarm)
     <span class="tl mono" :style="{ left: pct(a), color: alarmChanged ? 'var(--color-primary-hover)' : 'var(--color-level-alarm-text)' }">{{ fmt(a) }}</span>
     <span v-if="value != null" class="mk" :style="{ left: pct(value) }">현재 {{ value.toFixed(dec) }}</span>
     <span class="ed mono" style="left: 0">0</span>
-    <span class="ed mono" style="right: 0">{{ max }}</span>
+    <span class="ed mono" style="right: 0">{{ top }}</span>
   </div>
 </template>
 

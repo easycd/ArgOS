@@ -12,7 +12,7 @@ import { computed, ref, watch } from 'vue'
 import AlarmSteps from './AlarmSteps.vue'
 import { getAlarmTimeline } from '@/api/alarms'
 import AppIcon from '@/components/AppIcon.vue'
-import { ALARM_STATUS_LABEL, LEVEL_META, SENSOR_TYPES } from '@/types/codes'
+import { alarmChipOf, alarmIconOf, alarmTimeOf, isActiveAlarm, levelKeyOf } from '@/features/alert/alarmView'
 
 const props = defineProps({
   /** GET /alarms 의 items 하나 */
@@ -25,25 +25,12 @@ const props = defineProps({
 
 const emit = defineEmits(['toggle', 'act', 'history'])
 
-const active = computed(() => props.alarm.status !== 'CLOSED')
-const levelKey = computed(() => LEVEL_META[props.alarm.level]?.key ?? 'normal')
-const icon = computed(() => SENSOR_TYPES.find((t) => t.type === props.alarm.sensorType)?.icon ?? 'alert')
+// 아이콘 · 색 · 진행 상태 칩은 상단 알림 종 목록과 같은 규칙 (features/alert/alarmView.js)
+const active = computed(() => isActiveAlarm(props.alarm))
+const levelKey = computed(() => levelKeyOf(props.alarm))
+const icon = computed(() => alarmIconOf(props.alarm))
 const c = computed(() => props.alarm.checklist)
-
-/**
- * 진행 상태 칩
- * - 발생 중: 알림 단계 색 / 확인함: 파랑 / 조치 중: '체크리스트 2/5' 파랑, 다 끝나면 '완료 · 확인 필요' 초록 / 조치 완료: 초록
- */
-const chip = computed(() => {
-  const { status } = props.alarm
-  if (status === 'OPEN') return { cls: `is-${levelKey.value}`, text: ALARM_STATUS_LABEL.OPEN }
-  if (status === 'CLOSED') return { cls: 'is-done', text: ALARM_STATUS_LABEL.CLOSED }
-  if (status === 'ACTING' && c.value) {
-    if (c.value.status === 'REPORTED') return { cls: 'is-done', text: '완료 · 확인 필요' }
-    return { cls: 'is-info', text: `체크리스트 ${c.value.doneCount}/${c.value.totalCount}` }
-  }
-  return { cls: 'is-info', text: ALARM_STATUS_LABEL[status] }
-})
+const chip = computed(() => alarmChipOf(props.alarm))
 
 /** 누가 무엇을 하는 중인지 (설계안 actSteps().txt) */
 const actor = computed(() => {
@@ -60,8 +47,7 @@ const actor = computed(() => {
   return '체크리스트 조치 후 해제'
 })
 
-// 발생 시각: '2026-11-16T16:38:20+09:00' → '16:38:20'
-const time = computed(() => props.alarm.raisedAt?.slice(11, 19) ?? '')
+const time = computed(() => alarmTimeOf(props.alarm))
 
 /* ───────── 펼치면 조치 내역 불러오기 (열 때마다, 상태가 바뀌면 다시) ───────── */
 const timeline = ref(null)

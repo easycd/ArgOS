@@ -7,7 +7,7 @@
  *   나머지 공장·공정은 늘 정상
  */
 import { maxLevel, sensorsNow } from './processData'
-import { activeChecklist, scenario, workerName } from './scenario'
+import { activeChecklist, designAt, scenario, workerName } from './scenario'
 import { LEVEL, ROLE } from '@/types/codes'
 
 const { NORMAL } = LEVEL
@@ -289,9 +289,9 @@ function emergencyAlarms() {
     closedAt: closed ? todayAt(inc.closedAt) : null,
   })
   const list = [
-    row(1051, LEVEL.ALARM, 'CO 경보 기준 초과', `${loc} 버너실`, 'CO-13', 'CO', 34, 'ppm', 30, '16:52:08'),
-    row(1049, LEVEL.WARN, '온도 주의 기준 초과', loc, 'TE-15', 'TEMP', 164, '℃', 160, '16:50:12'),
-    row(1050, LEVEL.ALARM, '전류 경보 기준 초과', `${loc} 배기팬`, 'CT-17', 'CURRENT', 27.5, 'A', 27, '16:47:36'),
+    row(1051, LEVEL.ALARM, 'CO 경보 기준 초과', `${loc} 버너실`, 'CO-13', 'CO', 34, 'ppm', 30, designAt('16:52:08')), // 설계안 시각 → 지금 상황 기준 (scenario.js anchorAt)
+    row(1049, LEVEL.WARN, '온도 주의 기준 초과', loc, 'TE-15', 'TEMP', 164, '℃', 160, designAt('16:50:12')),
+    row(1050, LEVEL.ALARM, '전류 경보 기준 초과', `${loc} 배기팬`, 'CT-17', 'CURRENT', 27.5, 'A', 27, designAt('16:47:36')),
   ]
   const f = scenario.fire
   if (f) {

@@ -25,6 +25,24 @@ const line = (y, color, label, width = 1.5, bold = false) => ({
 })
 
 /**
+ * 그래프에 찍을 '넘었던 순간' 점 [{ at, value }]
+ * - 예시 데이터 · 명세서: sim.peaks 를 그대로 씀
+ * - 지금 백엔드: sim.hits (넘은 시각만, 값 없음 — central ThresholdService) → 그 시각에 가장 가까운 추이 값을 붙임
+ * @param {object|null} sim POST /thresholds/simulate 결과
+ * @param {object|null} series GET /sensors/series 한 줄 { points: [[at, value]] }
+ */
+export function peaksOf(sim, series) {
+  if (Array.isArray(sim?.peaks)) return sim.peaks
+  const points = series?.points ?? []
+  if (!Array.isArray(sim?.hits) || !points.length) return []
+  return sim.hits.map((at) => {
+    const t = toMs(at)
+    const near = points.reduce((best, p) => (Math.abs(toMs(p[0]) - t) < Math.abs(toMs(best[0]) - t) ? p : best))
+    return { at, value: near[1] }
+  })
+}
+
+/**
  * @param {object} p
  * @param {object} p.series   GET /sensors/series 한 줄 { points }
  * @param {Array}  p.peaks    넘었던 순간 [{ at, value }]

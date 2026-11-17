@@ -14,7 +14,6 @@ import { USE_MOCK, mockFail, mockOk } from './mock'
 import { alarmResponse, fireView } from './mock/alertData'
 import { THERMAL_BY_STATE } from './mock/equipmentData'
 import { MOCK_PASSWORD } from './mock/data'
-import { scenario } from './mock/scenario'
 import { approveUnlock as mockApprove, clearFire as mockClear, closeIncident, startShutdown, valueStillOver } from './mock/scenarioEmergency'
 import { LEVEL } from '@/types/codes'
 
@@ -89,14 +88,22 @@ export function getFire(fireId) {
  * - 틀리면 401 FIRE_PASSWORD_MISMATCH (남은 횟수는 error 에), 5회면 423 FIRE_UNLOCK_LOCKED
  * - 예시 데이터: 예시 계정 비밀번호(argos1234)와 비교. 실제 서비스 비밀번호가 아님
  */
+/**
+ * 화재 해제 — 비밀번호가 틀리면 명세서 기준 401 FIRE_PASSWORD_MISMATCH (error.remaining 남은 횟수), 5회면 423 FIRE_UNLOCK_LOCKED
+ * → 401 이어도 로그아웃하지 않고 창에 문구 (http.js skipAuthLogout). 진짜 토큰 만료면 원래대로 로그아웃
+ */
+const FIRE_PASSWORD_CHECK = { skipAuthLogout: ['FIRE_PASSWORD_MISMATCH'] }
 export function clearFire(fireId, { password, memo, by }) {
   if (USE_MOCK) {
     const r = mockClear({ passwordOk: password === MOCK_PASSWORD, by })
     if (r.ok) return mockOk({ id: Number(fireId), status: 'CLEARED', clearedBy: by })
     if (r.locked) return mockFail({ code: 'FIRE_UNLOCK_LOCKED', message: '5회 틀렸습니다. 본사 관리자 승인을 받은 뒤 다시 시도할 수 있습니다.', status: 423 })
-    return mockFail({ code: 'FIRE_PASSWORD_MISMATCH', message: `비밀번호가 맞지 않습니다. 다시 입력해 주세요. (${scenario.fire.failCount}/5)`, status: 401 })
+    return mockFail(
+      { code: 'FIRE_PASSWORD_MISMATCH', message: '비밀번호가 틀렸습니다.', status: 401, details: { remaining: r.remaining } },
+      FIRE_PASSWORD_CHECK,
+    )
   }
-  return http.post(`/fires/${fireId}/clear`, { password, memo })
+  return http.post(`/fires/${fireId}/clear`, { password, memo }, FIRE_PASSWORD_CHECK)
 }
 
 /** 본사 승인으로 해제 잠금 풀기 */

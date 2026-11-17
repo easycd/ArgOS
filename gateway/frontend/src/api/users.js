@@ -81,7 +81,15 @@ export function updateMe(body) {
 }
 
 /** 비밀번호 변경 { currentPassword, newPassword } */
+/**
+ * 비밀번호 변경 — 지금 비밀번호가 틀리면 백엔드가 401 PASSWORD_MISMATCH 를 줌
+ * → 로그아웃하지 않고 창에 문구 (http.js skipAuthLogout). 진짜 토큰 만료면 원래대로 로그아웃
+ */
+const PASSWORD_CHECK = { skipAuthLogout: ['PASSWORD_MISMATCH'] }
 export function changeMyPassword(body) {
-  if (USE_MOCK) return reply(mock.changePassword(actor(), body))
-  return http.put('/me/password', body)
+  if (USE_MOCK) {
+    const r = mock.changePassword(actor(), body)
+    return r.error ? mockFail(r.error, PASSWORD_CHECK) : mockOk(r.data)
+  }
+  return http.put('/me/password', body, PASSWORD_CHECK)
 }

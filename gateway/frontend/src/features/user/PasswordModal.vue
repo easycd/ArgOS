@@ -52,7 +52,8 @@ async function submit() {
     toast('비밀번호를 바꿨습니다.')
     emit('close')
   } catch (error) {
-    bad(error.message)
+    // 지금 비밀번호 틀림: 백엔드는 401(PASSWORD_MISMATCH)이지만 로그아웃하지 않음 (api/users.js) — 400 으로 바뀌어도 같은 문구
+    bad(error.code === 'PASSWORD_MISMATCH' ? '지금 비밀번호가 맞지 않습니다.' : error.message)
   } finally {
     busy.value = false
   }

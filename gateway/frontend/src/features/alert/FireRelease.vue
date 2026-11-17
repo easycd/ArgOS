@@ -40,7 +40,12 @@ async function submit() {
     done.value = true
     setTimeout(() => emit('cleared'), 900)
   } catch (e) {
-    error.value = e.message
+    // 비밀번호 틀림: 401(FIRE_PASSWORD_MISMATCH)이어도 로그아웃하지 않음 (api/emergency.js) — 남은 횟수는 error.remaining
+    const left = e.details?.remaining
+    error.value =
+      e.code === 'FIRE_PASSWORD_MISMATCH'
+        ? `비밀번호가 맞지 않습니다.${left != null ? ` 남은 횟수 ${left}회` : ''}`
+        : e.message
     password.value = ''
     emit('wrong')
     input.value?.focus()

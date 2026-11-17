@@ -43,7 +43,7 @@ API 명세서 기준으로 구현한 것과, 명세서와 다르게 한 점입�
 | B1 | `GET /alarms/hourly?siteId·factoryId&date=` | 본사·공장 | |
 | B1 | `GET /alarms/{id}` | 전체 | 조치 내역 timeline |
 | C1 | `GET /alarms/{id}/detail` | 전체 | `templateId`, `usual`(주 센서 직전 7일 평균), `rule.max`(경보 × 1.3), `trend.unit·warn·alarm` 추가. `thermal` 은 IR 센서 값 요약 (아래 '열화상') |
-| C4 | `GET /alarms/{id}/response` | 전체 | `fireId` 는 null (화재 판정 전) |
+| C4 | `GET /alarms/{id}/response` | 전체 | `fireId` 는 null (화재 판정 전). `location`, `reasonDetail`('TE-305 163.9 ℃ (평소의 117%)', 평소 = 직전 7일 평균), `thermal`(주의 상세와 같은 IR 요약), `shutdown` 추가 (아래 '경보 셧다운 진행') |
 | C0 | `POST /alarms/{id}/ack` | 공장 | 409 `ALARM_ALREADY_ACKED` (`error.ackedBy`) |
 | C4 | `POST /alarms/{id}/close` `{ result, followUp }` | 공장 | 409 `VALUE_STILL_OVER` (`error.sensors`) |
 | I1 | `GET /notifications/summary` | 전체 | 채팅·화재는 아직 0 / null |
@@ -120,6 +120,14 @@ API 명세서 기준으로 구현한 것과, 명세서와 다르게 한 점입�
 - 알림 상세(`/alarms/{id}/detail`)의 `thermal`: `{ cameraId, cameraTag, imageUrl(null), level, max, avg, usualAtMax, maxPoint, scale, zoneName }`.
   `avg` = IR 최근 1시간 평균, `usualAtMax` = IR 지난 7일 평균. 공정에 IR 센서가 없으면 null.
 - 없는 주소는 500 이 아니라 404 `NOT_FOUND`.
+
+### 경보 셧다운 진행 (`/alarms/{id}/response` 의 `shutdown`)
+
+`{ equipmentIds, startedAt, steps: [{ label, at }], done, auto: false }`. 셧다운 전이면 null.
+- 대상 = 이 경보로 셧다운 명령을 보낸 설비 (조치 이력 `SHUTDOWN`), `done` = 대상 설비가 모두 정지(STOPPED)
+- 단계: 버너 연료 차단(명령 시각) → 컨베이어 정지(+1초) → 배기팬 정지(모두 정지된 뒤). 설비가 단계별로 응답하지 않아 시각은 명령 기준으로 보여 줍니다
+- 화면은 SSE `command.result` 가 오면 다시 불러오면 됨
+- 알림 타임라인(`/alarms/{id}`)에서 확인 단추 없이 셧다운으로 조치에 들어간 경우 단계 이름은 `ACK`, 종료는 `CLOSE` (전에는 `ACKED`·`CLOSED`)
 
 ### 주의 알림 자동 종료
 

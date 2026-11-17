@@ -15,6 +15,7 @@ import FactoryStatusCard from '@/features/dashboard/FactoryStatusCard.vue'
 import HourlyAlarmCard from '@/features/dashboard/HourlyAlarmCard.vue'
 import SensorTypeCard from '@/features/dashboard/SensorTypeCard.vue'
 import ZoneMapCard from '@/features/dashboard/ZoneMapCard.vue'
+import { useLiveReload } from '@/utils/useLiveReload'
 
 const route = useRoute()
 const router = useRouter()
@@ -28,9 +29,13 @@ const hourly = ref(null)
 const loading = ref(true)
 const errorMessage = ref('')
 
-/** 세 가지를 한꺼번에 불러옴 (하나라도 실패하면 오류 문구) */
-async function load(siteId) {
-  loading.value = true
+/**
+ * 세 가지를 한꺼번에 불러옴 (하나라도 실패하면 오류 문구)
+ * - silent: 상황이 바뀌어 다시 부를 때는 '불러오는 중'을 띄우지 않음 (카드가 다시 올라오지 않음)
+ */
+async function load({ silent = false } = {}) {
+  const { siteId } = route.params
+  if (!silent) loading.value = true
   errorMessage.value = ''
   try {
     const [o, a, h] = await Promise.all([
@@ -48,7 +53,8 @@ async function load(siteId) {
   }
 }
 
-watch(() => route.params.siteId, load, { immediate: true })
+watch(() => route.params.siteId, () => load(), { immediate: true })
+useLiveReload(load)
 
 // 지도 카드 (공장 카드를 눌렀을 때 말풍선을 열려고 참조)
 const zoneMap = ref(null)

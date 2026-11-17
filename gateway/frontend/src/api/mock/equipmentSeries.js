@@ -69,19 +69,29 @@ function minutesOf(range) {
 const round1 = (v) => Math.round(v * 10) / 10
 
 /**
+ * 주의 상세 창의 '전류 추이' (16:00 ~ 16:38, 1분 간격, 마지막은 주의 발생 값 22.4 A)
+ * - GET /alarms/{id}/detail 의 trend.points 흉내 (설계안 trendA(): 최근 40분)
+ */
+export function alarmTrendPoints() {
+  const points = Array.from({ length: 39 }, (_, k) => [isoAt(16 * 60 + k), round1(topOvenValue('CURRENT', 16 * 60 + k))])
+  points[points.length - 1][1] = 22.4
+  return points
+}
+
+/**
  * 센서 추이 응답 만들기
  * @param {Array} sensors 설비 상세의 센서 목록 (id, tag, type, unit, value, usual, warn, alarm)
- * @param {boolean} isTopOven 상도 건조로(주의 상황) 인지
+ * @param {boolean} rising 상도 건조로가 주의 상황인지 (16:30 부터 값이 오르는 그래프)
  * @param {'1h'|'6h'|'today'} range
  */
-export function buildSeries(sensors, isTopOven, range) {
+export function buildSeries(sensors, rising, range) {
   const minutes = minutesOf(range)
   // 전날: '오늘' 범위면 하루 전체, 아니면 같은 시각
   const prevMinutes = range === 'today' ? Array.from({ length: 144 }, (_, k) => k * 10) : minutes
 
   const series = sensors.map((s, idx) => {
     const seed = idx + 1
-    const points = minutes.map((m) => [isoAt(m), round1(isTopOven ? topOvenValue(s.type, m) : usualValue(s, m, seed))])
+    const points = minutes.map((m) => [isoAt(m), round1(rising ? topOvenValue(s.type, m) : usualValue(s, m, seed))])
     // 마지막 세 점은 지금 값으로 자연스럽게 이어지게 (설계안과 같은 방식)
     const last = points.length - 1
     const from = points[Math.max(0, last - 3)][1]

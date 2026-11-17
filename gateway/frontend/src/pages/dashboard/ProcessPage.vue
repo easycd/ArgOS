@@ -20,6 +20,7 @@ import InspectionTodayCard from '@/features/process/InspectionTodayCard.vue'
 import ProcessMapCard from '@/features/process/ProcessMapCard.vue'
 import { buildProcessEquipment } from '@/features/process/processEquipment'
 import { LEVEL, SENSOR_TYPES } from '@/types/codes'
+import { useLiveReload } from '@/utils/useLiveReload'
 import { useNotice } from '@/utils/useNotice'
 
 const route = useRoute()
@@ -33,9 +34,10 @@ const names = ref({ site: '', factory: '' })
 const loading = ref(true)
 const errorMessage = ref('')
 
-async function load() {
+/** 불러오기 (silent: 상황이 바뀌어 다시 부를 때는 '불러오는 중'을 띄우지 않음) */
+async function load({ silent = false } = {}) {
   const { siteId, factoryId, processId } = route.params
-  loading.value = true
+  if (!silent) loading.value = true
   errorMessage.value = ''
   try {
     const [l, s, a, i, siteName, factory] = await Promise.all([
@@ -58,7 +60,8 @@ async function load() {
   }
 }
 
-watch(() => route.params.processId, load, { immediate: true })
+watch(() => route.params.processId, () => load(), { immediate: true })
+useLiveReload(load)
 
 // 화면용 설비 목록: 배치도(layout) + 지금 값(status) 을 합침 (features/process/processEquipment.js)
 const equipment = computed(() => buildProcessEquipment(layout.value, status.value))

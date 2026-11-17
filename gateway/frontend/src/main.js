@@ -15,6 +15,8 @@ import '@/assets/styles/tokens.css'
 import '@/assets/styles/base.css'
 // 화면 전환·카드 등장·말풍선 등 움직임 (tokens.css 의 --m-* 값 사용)
 import '@/assets/styles/motion.css'
+// 알림 대응 창 공통 모양 (주의 상세·체크리스트 진행 등)
+import '@/assets/styles/alert.css'
 
 import App from './App.vue'
 import router from './router'

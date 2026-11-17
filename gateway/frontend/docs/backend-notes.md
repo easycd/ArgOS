@@ -291,3 +291,52 @@
 | 2 | 실시간 값: 지금은 예시 데이터 모드에서만 2초마다 값이 조금 흔들림. SSE `sensor.value`, `thermal.frame` 연결은 SSE 작업 때 (`features/equipment/useLiveValues.js` 자리) |
 | 3 | 기준값이 바뀐 시점의 세로 표시(화면설계서 B4): 이벤트의 `THRESHOLD` 시각으로 그릴지, series 응답에 넣어 줄지 |
 | 4 | 이벤트 시각은 예시 상황 '오늘 16:42' 기준 (16:38:20 전류 주의 → 16:38:31 확인 → 16:41:05 체크리스트 전송 → 조치 중). 실제 서버는 실제 시각 |
+
+---
+
+## 9. 알림 대응 — 주의 (명세서 C1 · C2, 화면설계서 C1 ~ C3 · I1)
+
+백엔드 코드(`gateway/backend` 의 `AlarmController` · `ChecklistController` · `StreamHub`)가 생겨서, 프론트 예시 데이터는 **코드의 주소·응답 필드**에 맞췄습니다(명세서와 다르면 코드 기준).
+
+| API | 프론트 사용 | 명세서·코드와 다른 점 |
+| --- | --- | --- |
+| `GET /alarms?status=OPEN,ACKED,ACTING&date=today&factoryId=` | 상단 바 상태 띠, 주의 창 자동 열기, 체크리스트 칩 | 없음 (공장 담당자는 담당 공장 범위로 보냄) |
+| `GET /alarms` (실시간 알림 카드) | 줄의 진행 칩·'조치 중 · 김도현 (2/5)' | 응답의 `checklist {id,status,doneCount,totalCount}` · `assignee` 사용 (코드 AlarmViews 그대로) |
+| `GET /alarms/{id}` | 알림 줄 펼치기 (발생 → 확인 → 체크리스트 전송 → 조치 → 조치 확인) | `timeline[].step` 중 `RAISED · ACK · CHECKLIST · REPORT · CONFIRM` 만 씀 |
+| `GET /alarms/{id}/detail` | 주의 상세, 센서·열화상 확인 창 | 아래 '추가 필요' 참고 |
+| `POST /alarms/{id}/ack` | 2초 길게 누르기 끝 | 없음. 이미 확인된 알림이면 409 를 가정 (`ALREADY_ACKED`) |
+| `GET /checklist-templates?equipmentType=&sensorType=` | 주의 상세 기본 5개 항목 | 없음 |
+| `GET /processes/{id}/workers` | 받는 사람 고르기, 담당자 변경 | 없음. 기본 선택 = 근무 중인 첫 사람 (진행 건 수가 응답에 없어서) |
+| `POST /checklists` | 전송 | 없음 |
+| `GET /checklists?status=ACTIVE&factoryId=` | 상단 바 체크리스트 진행 버튼, 완료 알림 띠 | 없음 |
+| `GET /checklists/{id}` | 진행 현황 창 | `serverTime` 추가 요청 (아래) |
+| `POST /checklists/{id}/remind` | 다시 알림 (30초 대기 표시) | 화면설계서는 60초, **코드 30초를 따름** |
+| `PATCH /checklists/{id}/assignee` | 담당자 변경 (사유: 응답 없음 / 부재 / 기타) | 화면설계서는 `PATCH /checklists/{id}`, **코드 주소를 따름** |
+| `POST /checklists/{id}/confirm` | 조치 확인 (결과 3가지 + 한 줄 메모) | 없음. `REPORTED` 일 때만 단추를 켬 |
+
+### 추가 필요 (명세서·코드에 없음)
+
+| 어디 | 필드 | 쓰는 곳 |
+| --- | --- | --- |
+| `GET /alarms/{id}/detail` | `usual` (평소 값) | '평소 18.0 A 대비 124%' |
+| `GET /alarms/{id}/detail` | `rule.max` (기준 띠 끝) | 발생 원인 기준 띠 (없으면 경보 × 1.2) |
+| `GET /alarms/{id}/detail` | `sensors[].warn` · `alarm` | 센서·열화상 확인 창 '주의 21.6 · 경보 27' |
+| `GET /alarms/{id}/detail` | `thermal.usualAtMax` · `maxPoint` · `zoneName` · `cameraTag` | '평소 같은 위치 52.0 ℃', 최고 지점 표시, '배기팬 모터부' |
+| `GET /alarms/{id}/detail` | `trend.unit` · `warn` · `alarm` | 작은 추이 그래프 기준선 |
+| `GET /alarms/{id}/detail` | `equipmentId` | 체크리스트 칩 위치 (설비 상세) |
+| `GET /checklists/{id}` | `serverTime` (서버 지금 시각) | '경과 시간'을 서버 시계로 셈 (PC 시계가 틀려도 맞게). 응답 헤더 `Date` 로 대신해도 됨 |
+
+### 실시간 (SSE) — 지금은 예시 상황으로 흉내
+
+- 프론트는 `src/api/live.js` 의 `emitLive(이벤트)` 한 곳으로 '바뀌었다'를 받고, 열린 화면·상단 바·창이 조용히 다시 불러옵니다(`useLiveReload`).
+- SSE 연결 때 `GET /stream` 의 `alarm.created · alarm.updated · checklist.updated · level.changed · sensor.value` 를 받으면 `emitLive` 만 부르면 됩니다.
+- 처음에는 이벤트 내용으로 부분 갱신하지 않고 **다시 불러오기**만 합니다(단순하게). 느리면 그때 이벤트 내용으로 바꿉니다.
+
+### 정해야 할 것
+
+| 번호 | 내용 |
+| --- | --- |
+| 1 | 본사 관리자: 주의 창·확인·전송·조치 확인 단추 없이 **열람만**(상태 띠는 공정 화면으로 이동, 체크리스트 진행 창은 읽기 전용). 서버도 본사 관리자의 ack·전송·confirm 을 막을지 |
+| 2 | 주의 '나중에(5분 뒤 다시)'·주의음: 설계안에 없어 프론트는 안 만듦. 필요하면 서버가 다시 알림을 보낼지 프론트 타이머로 할지 |
+| 3 | 체크리스트 '응답 없음': 프론트가 마지막 항목 완료(없으면 전송) 후 10분이 지나면 표시. 서버가 상태로 줄지 |
+| 4 | 예상 원인 단추: 지금은 보기만. 누르면 그 원인에 맞는 항목으로 바꾸려면 `GET /checklist-templates` 에 원인별 묶음이 필요 |

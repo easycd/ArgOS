@@ -1,8 +1,9 @@
 <!--
   체크리스트 진행 배지 (설계안 css/base.css .ckb: 작은 고리 + '체크리스트 진행 2/5' + 담당자)
   - 설비에 진행 중 체크리스트가 있을 때만 제목 줄에 보임
-  - 다 끝나면 초록색 (설계안 .ckb.done)
-  - 누르면 진행 현황 창(C3) 으로 가야 하지만 그 창은 아직 없음 → 지금은 표시만
+  - 다 끝나면 초록색 + 1.6초마다 초록 빛번짐 (설계안 .ckb.done, donePulse)
+  - 누르면 click → 체크리스트 진행 현황 창(C3) (상단 바 체크리스트 진행, 설비 상세 제목 줄이 같이 씀)
+  - sub: 오른쪽 작은 글자 (기본 담당자 이름, 상단 바는 '도장 공정' / 다 끝나면 '완료 · 확인 필요')
 -->
 <script setup>
 import { computed } from 'vue'
@@ -10,9 +11,13 @@ import { computed } from 'vue'
 const props = defineProps({
   /** { doneCount, totalCount, assignee } */
   checklist: { type: Object, required: true },
+  sub: { type: String, default: '' },
 })
 
+defineEmits(['click'])
+
 const done = computed(() => props.checklist.doneCount >= props.checklist.totalCount)
+const subText = computed(() => (done.value ? '완료 · 확인 필요' : props.sub || props.checklist.assignee))
 
 // 고리: 둘레 길이 중 완료 비율만큼 칠함
 const R = 11
@@ -21,9 +26,9 @@ const dash = computed(() => `${(LENGTH * props.checklist.doneCount) / props.chec
 </script>
 
 <template>
-  <span class="ckb" :class="{ done }">
+  <button type="button" class="ckb" :class="{ done }" @click="$emit('click')">
     <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true">
-      <circle cx="14" cy="14" :r="R" fill="none" stroke="#fed7aa" stroke-width="4" />
+      <circle cx="14" cy="14" :r="R" fill="none" :stroke="done ? '#bbf7d0' : '#fed7aa'" stroke-width="4" />
       <circle
         cx="14"
         cy="14"
@@ -38,8 +43,8 @@ const dash = computed(() => `${(LENGTH * props.checklist.doneCount) / props.chec
     </svg>
     <span>체크리스트 진행</span>
     <span class="mono">{{ checklist.doneCount }}/{{ checklist.totalCount }}</span>
-    <small>{{ checklist.assignee }}</small>
-  </span>
+    <small>{{ subText }}</small>
+  </button>
 </template>
 
 <style scoped>
@@ -56,6 +61,12 @@ const dash = computed(() => `${(LENGTH * props.checklist.doneCount) / props.chec
   font-size: 13px;
   font-weight: 700;
   white-space: nowrap;
+  cursor: pointer;
+  transition:
+    box-shadow 200ms,
+    background 300ms,
+    border-color 300ms,
+    color 300ms;
   /* 나타날 때 살짝 튀어 오름 (설계안 extra.css .ckb popin .4s) */
   animation: ckb-pop 400ms cubic-bezier(0.2, 1.2, 0.3, 1) both;
 }
@@ -76,7 +87,14 @@ const dash = computed(() => `${(LENGTH * props.checklist.doneCount) / props.chec
   color: var(--color-level-warn-text);
 }
 
+.ckb:hover {
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.22);
+}
+
 .ckb.done {
+  animation:
+    ckb-pop 400ms cubic-bezier(0.2, 1.2, 0.3, 1) both,
+    ckb-done 1.6s ease-in-out 400ms infinite;
   border-color: #bbf7d0;
   background: #f0fdf4;
   color: var(--color-level-normal-text);
@@ -93,6 +111,16 @@ const dash = computed(() => `${(LENGTH * props.checklist.doneCount) / props.chec
 @media (prefers-reduced-motion: reduce) {
   .ckb {
     animation-name: softin; /* base.css: 투명도만 */
+  }
+}
+
+@keyframes ckb-done {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(22, 163, 74, 0);
   }
 }
 

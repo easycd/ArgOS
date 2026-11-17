@@ -7,15 +7,17 @@
  */
 import http from './http'
 import { USE_MOCK, mockFail, mockOk } from './mock'
-import { MOCK_EQUIPMENT, MOCK_EQUIPMENT_EVENTS, TOP_OVEN_ID, thermalOf } from './mock/equipmentData'
+import { TOP_OVEN_ID, mockEquipment, mockEquipmentEvents, thermalOf } from './mock/equipmentData'
 import { buildSeries } from './mock/equipmentSeries'
+import { scenario } from './mock/scenario'
+import { LEVEL } from '@/types/codes'
 
 const notFound = () => mockFail({ code: 'EQUIPMENT_NOT_FOUND', message: '없는 설비입니다.', status: 404 })
 
 /** 설비 정보: { id, code, name, processId, seq, path, level, runState, sensors: [...], cameraId, activeChecklist } */
 export function getEquipment(equipmentId) {
   if (USE_MOCK) {
-    const data = MOCK_EQUIPMENT[Number(equipmentId)]
+    const data = mockEquipment(equipmentId) // 지금 예시 상황으로 만듦
     return data ? mockOk(data) : notFound()
   }
   return http.get(`/equipment/${equipmentId}`)
@@ -23,7 +25,7 @@ export function getEquipment(equipmentId) {
 
 /** 오늘 이벤트 이력: [{ at, type, level, text, detail, by, status, alarmId }] (최근이 위) */
 export function getEquipmentEvents(equipmentId) {
-  if (USE_MOCK) return mockOk(MOCK_EQUIPMENT_EVENTS[Number(equipmentId)] ?? [])
+  if (USE_MOCK) return mockOk(mockEquipmentEvents(equipmentId))
   return http.get(`/equipment/${equipmentId}/events`, { params: { date: 'today' } })
 }
 
@@ -53,7 +55,11 @@ function periodOf(range) {
  * - 전날 값(compare)은 늘 같이 받고, '전날 같이 보기' 스위치는 화면에서 보이기만 바꿈
  */
 export function getSensorSeries({ equipment, range }) {
-  if (USE_MOCK) return mockOk(buildSeries(equipment.sensors, equipment.id === TOP_OVEN_ID, range))
+  if (USE_MOCK) {
+    // 상도 건조로가 주의일 때만 16:30 부터 값이 오르는 그래프, 그 밖에는 평소 값 근처
+    const rising = equipment.id === TOP_OVEN_ID && scenario.state === LEVEL.WARN
+    return mockOk(buildSeries(equipment.sensors, rising, range))
+  }
   const ids = equipment.sensors.map((s) => s.id).join(',')
   return http.get('/sensors/series', { params: { ids, ...periodOf(range), compare: 'yesterday' } })
 }

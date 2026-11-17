@@ -1,6 +1,6 @@
 <!--
   설비 상세 제목 줄 (설계안 vEquip() 의 .topbar, 카드 밖 한 줄)
-  - 왼쪽: 경로 '울산공장 › 5공장 › 도장 공정 › 상도 건조로' + 상태 배지(크게) + 체크리스트 진행 배지
+  - 왼쪽: 경로 '울산공장 › 5공장 › 도장 공정 › 상도 건조로' + 상태 배지(크게) + 체크리스트 진행 배지(누르면 진행 현황 창)
   - 오른쪽: 추이 범위(1시간 / 6시간 / 오늘) + '설비 배치도' 돌아가기 버튼
 -->
 <script setup>
@@ -8,6 +8,9 @@ import ChecklistBadge from './ChecklistBadge.vue'
 import AppIcon from '@/components/AppIcon.vue'
 import LevelBadge from '@/components/LevelBadge.vue'
 import SegButtons from '@/components/SegButtons.vue'
+import { useAlertStore } from '@/stores/alert'
+
+const alert = useAlertStore()
 
 defineProps({
   /** 경로: [{ label, to }] — to 가 있으면 링크 */
@@ -41,7 +44,7 @@ const RANGES = [
     <LevelBadge :level="level" class="big" />
 
     <div class="right">
-      <ChecklistBadge v-if="checklist" :checklist="checklist" />
+      <ChecklistBadge v-if="checklist" :checklist="checklist" @click="alert.open('checklist', { checklistId: checklist.id })" />
       <SegButtons v-model="range" :options="RANGES" />
       <RouterLink :to="backTo" class="btn back"><AppIcon name="cl" :size="16" />설비 배치도</RouterLink>
     </div>

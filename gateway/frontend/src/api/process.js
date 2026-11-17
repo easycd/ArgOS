@@ -7,20 +7,20 @@
  */
 import http from './http'
 import { USE_MOCK, mockFail, mockOk } from './mock'
-import { MOCK_PROCESS } from './mock/processData'
+import { mockProcess } from './mock/processData'
 
 const notFound = () => mockFail({ code: 'NOT_FOUND', message: '설비 배치도가 등록되지 않은 공정입니다.', status: 404 })
 
 /** 배치도: { processId, name, equipment: [...], sensors: [...] } */
 export function getProcessLayout(processId) {
-  const data = MOCK_PROCESS[Number(processId)]
+  const data = mockProcess(processId)
   if (USE_MOCK) return data ? mockOk(data.layout) : notFound()
   return http.get(`/processes/${processId}/layout`)
 }
 
 /** 지금 값·단계: { processId, level, equipment: [{ id, level, runState, fan }], sensors: [{ id, tag, value, level, warn, alarm }] } */
 export function getProcessStatus(processId) {
-  const data = MOCK_PROCESS[Number(processId)]
+  const data = mockProcess(processId) // 부를 때마다 지금 예시 상황으로 만듦
   if (USE_MOCK) return data ? mockOk(data.status) : notFound()
   return http.get(`/processes/${processId}/status`)
 }
@@ -44,7 +44,7 @@ export function sendFanCommand(equipmentId, command) {
 
 /** 오늘 설비 점검: { doneCount, totalCount, items: [{ scheduleId, time, equipmentName, title, assignee, status }] } */
 export function getTodayInspections(processId) {
-  const data = MOCK_PROCESS[Number(processId)]
+  const data = mockProcess(processId)
   if (USE_MOCK) return mockOk(data?.inspections ?? { doneCount: 0, totalCount: 0, items: [] })
   return http.get('/inspections/today', { params: { processId } })
 }

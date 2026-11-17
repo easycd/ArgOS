@@ -6,13 +6,19 @@
   - 사업장 선택 → 사업장 → 공장 → 공정 → 설비가 모두 이 레이아웃이라, 화면이 바뀌어도 상단 바는 그대로 있고 본문만 전환됨
 -->
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { getSiteName } from '@/api/sites'
 import AppHeader from '@/components/AppHeader.vue'
 import AppNav from '@/components/AppNav.vue'
 import SitePill from '@/components/SitePill.vue'
 import PageTransition from '@/features/motion/PageTransition.vue'
+import AlertHost from '@/features/alert/AlertHost.vue'
+import { USE_MOCK } from '@/api/mock'
+
+// 상황 바꾸기 도구는 개발 모드(npm run dev) + 예시 데이터일 때만 불러옴 → 배포 빌드에서는 코드도 빠짐
+const DemoTool = import.meta.env.DEV && USE_MOCK ? defineAsyncComponent(() => import('@/features/demo/DemoTool.vue')) : null
+const SHOW_DEMO = !!DemoTool
 
 const route = useRoute()
 
@@ -50,6 +56,12 @@ watch(
     <main class="content">
       <PageTransition />
     </main>
+
+    <!-- 주의·체크리스트 창, 알림 띠, 화면 테두리 (body 로 옮겨 그림) -->
+    <AlertHost />
+
+    <!-- 상황 바꾸기 도구: 개발 모드 + 예시 데이터일 때만 (배포 빌드에는 없음) -->
+    <DemoTool v-if="SHOW_DEMO" />
   </div>
 </template>
 

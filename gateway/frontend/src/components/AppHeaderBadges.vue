@@ -8,16 +8,20 @@
 import { onMounted, ref } from 'vue'
 import AppIcon from './AppIcon.vue'
 import { getNotificationSummary } from '@/api/notifications'
+import { useLiveReload } from '@/utils/useLiveReload'
 
 const summary = ref({ unackedAlarmCount: 0, unreadChatCount: 0 })
 
-onMounted(async () => {
+async function load() {
   try {
     summary.value = await getNotificationSummary()
   } catch {
     // 숫자를 못 받아도 아이콘은 그대로 둠
   }
-})
+}
+
+onMounted(load)
+useLiveReload(load) // 알림이 생기거나 끝나면 숫자도 다시
 
 function onChat() {}
 function onBell() {}

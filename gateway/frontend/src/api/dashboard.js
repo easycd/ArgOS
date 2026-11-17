@@ -6,7 +6,7 @@
  */
 import http from './http'
 import { USE_MOCK, mockFail, mockOk } from './mock'
-import { MOCK_ALARMS, MOCK_SITES, MOCK_SITE_TREES } from './mock/data'
+import { mockAlarms, mockSiteTrees, mockSites } from './mock/data'
 import { factoryLevels, sumLevels } from '@/features/site/siteStats'
 
 const SENSOR_TYPES = ['CURRENT', 'TEMP', 'CO']
@@ -16,8 +16,9 @@ const SENSOR_TYPES = ['CURRENT', 'TEMP', 'CO']
  * - 사업장 펼치기(tree) 예시 데이터를 그대로 써서 사업장 선택 화면과 숫자가 항상 같게 함
  */
 function mockOverview(siteId) {
-  const site = MOCK_SITES.find((s) => s.id === siteId)
-  const tree = MOCK_SITE_TREES[siteId]
+  // 부를 때마다 지금 예시 상황으로 만듦 (api/mock/scenario.js)
+  const site = mockSites().find((s) => s.id === siteId)
+  const tree = mockSiteTrees()[siteId]
   if (!site || !tree) return null
 
   // 사업장 전체 센서 종류별 개수 = 공장들의 같은 종류 개수 합
@@ -59,9 +60,10 @@ export function getSiteOverview(siteId) {
  * - 명세서: 범위는 siteId · factoryId · processId 중 하나만 보냄
  */
 function mockAlarmsOf({ siteId, factoryId, processId }) {
-  if (processId) return MOCK_ALARMS.filter((a) => a.processId === Number(processId))
-  if (factoryId) return MOCK_ALARMS.filter((a) => a.factoryId === Number(factoryId))
-  return MOCK_ALARMS.filter((a) => a.siteId === Number(siteId))
+  const all = mockAlarms()
+  if (processId) return all.filter((a) => a.processId === Number(processId))
+  if (factoryId) return all.filter((a) => a.factoryId === Number(factoryId))
+  return all.filter((a) => a.siteId === Number(siteId))
 }
 
 /** 범위 파라미터: 공정 > 공장 > 사업장 순서로 하나만 */

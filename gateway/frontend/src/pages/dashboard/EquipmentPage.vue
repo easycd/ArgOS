@@ -21,6 +21,7 @@ import TrendCard from '@/features/equipment/TrendCard.vue'
 import { useLiveValues } from '@/features/equipment/useLiveValues'
 import { svgKeyOf } from '@/features/process/paintLayout'
 import { buildProcessEquipment } from '@/features/process/processEquipment'
+import { useLiveReload } from '@/utils/useLiveReload'
 
 const route = useRoute()
 const router = useRouter()
@@ -32,10 +33,10 @@ const processEquipment = ref([])
 const loading = ref(true)
 const errorMessage = ref('')
 
-/** 설비 정보·이벤트·열화상·설비 위치 그림 불러오기 */
-async function load() {
+/** 설비 정보·이벤트·열화상·설비 위치 그림 불러오기 (silent: 상황이 바뀌어 다시 부를 때는 '불러오는 중' 없이) */
+async function load({ silent = false } = {}) {
   const { processId, equipmentId } = route.params
-  loading.value = true
+  if (!silent) loading.value = true
   errorMessage.value = ''
   try {
     const [eq, ev, layout, status] = await Promise.all([
@@ -58,7 +59,8 @@ async function load() {
   }
 }
 
-watch(() => route.params.equipmentId, load, { immediate: true })
+watch(() => route.params.equipmentId, () => load(), { immediate: true })
+useLiveReload(load)
 
 /* ───────── 센서 추이: 범위(1시간 / 6시간 / 오늘)를 바꾸면 다시 불러옴 ───────── */
 const range = ref('1h') // 설계안 기본값 (화면설계서는 '오늘'이 기본 → 보고서 '확인할 점')

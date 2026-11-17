@@ -201,30 +201,45 @@ function openConfirm() {
 async function save() {
   saving.value = true
   try {
-    await saveAll({
+    const { saved, failed } = await saveAll({
       thresholds: thresholds.value,
       drafts: drafts.value,
       season: season.value,
       equipmentIds: scope.value === 'ovens' ? ovenIds.value : [selectedId.value],
-      reason: reason.value.trim() || '기준값 관리 화면에서 변경',
+      reason: reason.value.trim(),
       by: auth.user?.name,
     })
+    // 하나도 저장 못 했으면 확인 창을 열어 둔 채 사유만 알림
+    if (!saved.length) {
+      toast(failed[0]?.message ?? '저장하지 못했습니다.', { type: 'err' })
+      return
+    }
     confirmOpen.value = false
     reason.value = ''
-    const name = equipmentRow.value?.name
-    const s = season.value
-    toast(
-      s === thresholds.value.activeSeason
-        ? `${name} ${SEASON_META[s].label} 기준값을 저장했습니다. 지금부터 적용됩니다.`
-        : `${name} ${SEASON_META[s].label} 기준값을 저장했습니다. ${validFrom.value.slice(5).replace('-', '월 ')}일부터 적용됩니다.`,
-    )
+    if (failed.length) {
+      // 건조로 3대 중 일부만 실패: 어느 설비가 저장되지 않았는지 알림
+      const names = failed.map((f) => equipmentName(f.id)).join(', ')
+      const why = failed[0].message.replace(/\.$/, '') // 괄호 안이라 끝 마침표는 뺌
+      toast(`${names}는 저장하지 못했습니다(${why}). 나머지 설비는 저장했습니다.`, { type: 'warn' })
+    } else {
+      const name = equipmentRow.value?.name
+      const s = season.value
+      toast(
+        s === thresholds.value.activeSeason
+          ? `${name} ${SEASON_META[s].label} 기준값을 저장했습니다. 지금부터 적용됩니다.`
+          : `${name} ${SEASON_META[s].label} 기준값을 저장했습니다. ${validFrom.value.slice(5).replace('-', '월 ')}일부터 적용됩니다.`,
+      )
+    }
     await loadTree()
     await loadEquipment(selectedId.value, { keepSeason: true })
-  } catch (error) {
-    toast(error.message, { type: 'err' })
   } finally {
     saving.value = false
   }
+}
+
+/** 설비 id → 이름 (트리에서 찾음) */
+function equipmentName(id) {
+  return processOf.value?.equipment.find((e) => e.id === id)?.name ?? `설비 ${id}`
 }
 
 const validFrom = computed(() => sensors.value[0]?.seasons[season.value]?.validFrom ?? '')
@@ -306,7 +321,7 @@ const validFrom = computed(() => sensors.value[0]?.seasons[season.value]?.validF
   </div>
 
   <!-- 저장 확인 -->
-  <ConfirmModal :open="confirmOpen" title="기준값을 저장할까요?" ok-text="저장" icon="save" :busy="saving" @ok="save" @cancel="confirmOpen = false">
+  <ConfirmModal :open="confirmOpen" title="기준값을 저장할까요?" ok-text="저장" icon="save" :busy="saving" :ok-disabled="!reason.trim()" @ok="save" @cancel="confirmOpen = false">
     <SaveSummary
       v-model:reason="reason"
       :changes="changes"

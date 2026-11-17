@@ -2,7 +2,7 @@
   저장 확인 창 내용 (화면설계안 vThreshold() 저장 confirmBox)
   - 바꾼 값마다 '전류 주의  ̶2̶2̶.̶5̶ → 21.6 A'
   - 어디에 언제 적용되는지: 이 설비 / 건조로 3대, 지금 계절이면 바로, 다른 계절이면 그 계절 시작일부터
-  - 변경 사유 한 줄 (명세서 PUT 의 reason — 비우면 '기준값 관리 화면에서 변경')
+  - 변경 사유 한 줄 (명세서 PUT 의 reason, 필수 — 비어 있으면 확인 창의 저장 단추가 꺼지고 안내 문구)
 -->
 <script setup>
 import { fmt, label, SEASON_META } from './thresholdForm'
@@ -34,9 +34,10 @@ const reason = defineModel('reason', { type: String, default: '' })
     {{ season === activeSeason ? '바로 적용됩니다.' : `${SEASON_META[season].label} 기준으로 저장되고 ${validFrom.slice(5).replace('-', '월 ')}일부터 적용됩니다.` }}
   </p>
   <label class="reason">
-    <span>변경 사유</span>
+    <span>변경 사유 <em>필수</em></span>
     <input v-model="reason" type="text" maxlength="80" placeholder="예: 베어링 교체 전까지 주의 기준을 낮춤" />
   </label>
+  <p v-if="!reason.trim()" class="need">변경 사유를 적어야 저장할 수 있습니다.</p>
 </template>
 
 <style scoped>
@@ -80,6 +81,19 @@ s {
   gap: 6px;
   margin-top: 12px;
   font-size: 12.5px;
+}
+
+.reason em {
+  margin-left: 4px;
+  font-style: normal;
+  font-weight: 600;
+  color: var(--color-level-alarm);
+}
+
+.need {
+  margin-top: 6px;
+  font-size: 12.5px;
+  color: var(--color-text-weak);
 }
 
 .reason input {

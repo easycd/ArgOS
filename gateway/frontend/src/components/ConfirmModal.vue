@@ -18,6 +18,8 @@ defineProps({
   /** 확인 단추 아이콘 (없으면 글자만) */
   icon: { type: String, default: '' },
   busy: { type: Boolean, default: false },
+  /** 확인 단추 끄기 (예: 필수 입력이 비었을 때) */
+  okDisabled: { type: Boolean, default: false },
 })
 
 defineEmits(['ok', 'cancel'])
@@ -32,7 +34,7 @@ defineEmits(['ok', 'cancel'])
           <div class="body"><slot /></div>
           <div class="m-actions">
             <button type="button" class="btn" @click="$emit('cancel')">취소</button>
-            <button type="button" class="btn btn-primary" :disabled="busy" @click="$emit('ok')">
+            <button type="button" class="btn btn-primary" :disabled="busy || okDisabled" @click="$emit('ok')">
               <span v-if="busy" class="m-spin" /><AppIcon v-else-if="icon" :name="icon" :size="16" />{{ busy ? '저장 중' : okText }}
             </button>
           </div>

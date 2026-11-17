@@ -195,6 +195,7 @@ export function history({ equipmentId, from, to, sensorId, season }) {
  */
 export function save(equipmentId, { season, version: v, reason, sensors }, by) {
   const id = Number(equipmentId)
+  if (!reason?.trim()) return { error: { code: 'REASON_REQUIRED', message: '변경 사유를 적어 주세요.', status: 400 } }
   if (v !== version(id)) return { error: { code: 'THRESHOLD_CONFLICT', message: '다른 사람이 먼저 바꿨습니다. 다시 불러와 주세요.', status: 409 } }
   for (const s of sensors) {
     const d = SENSOR_DEFS.find((x) => x.id === s.sensorId)

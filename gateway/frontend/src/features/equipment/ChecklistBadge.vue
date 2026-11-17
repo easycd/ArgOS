@@ -41,7 +41,7 @@ const dash = computed(() => `${(LENGTH * props.checklist.doneCount) / props.chec
         transform="rotate(-90 14 14)"
       />
     </svg>
-    <span>체크리스트 진행</span>
+    <span class="lbl">체크리스트 진행</span>
     <span class="mono">{{ checklist.doneCount }}/{{ checklist.totalCount }}</span>
     <small>{{ subText }}</small>
   </button>
@@ -85,6 +85,19 @@ const dash = computed(() => `${(LENGTH * props.checklist.doneCount) / props.chec
   font-size: 12px;
   font-weight: 500;
   color: var(--color-level-warn-text);
+}
+
+/* 상단 바(compact): 좁은 화면에서 '도장 공정', 더 좁으면 '체크리스트 진행' 글자를 숨김 (고리와 2/5 는 남김) */
+@media (max-width: 1600px) {
+  .ckb.compact small {
+    display: none;
+  }
+}
+
+@media (max-width: 1440px) {
+  .ckb.compact .lbl {
+    display: none;
+  }
 }
 
 .ckb:hover {

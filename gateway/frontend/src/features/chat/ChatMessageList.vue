@@ -42,6 +42,7 @@ const newBelow = ref(false)
 
 function onScroll() {
   const el = box.value
+  if (!el) return // 패널이 닫히는 중
   atBottom.value = el.scrollHeight - el.scrollTop - el.clientHeight < 40
   if (atBottom.value) newBelow.value = false
 }

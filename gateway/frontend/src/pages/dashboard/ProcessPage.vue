@@ -65,7 +65,7 @@ useLiveReload(load)
 
 // 화면용 설비 목록: 배치도(layout) + 지금 값(status) 을 합침 (features/process/processEquipment.js)
 const equipment = computed(() => buildProcessEquipment(layout.value, status.value))
-// 공장 관리에서 저장한 배치(격자 칸 이동·사용 안 함)를 배치도에 반영
+// 공장 관리에서 저장한 배치(위치 pos · 사용 안 함)를 배치도에 반영
 const placement = computed(() => layoutPlacement(layout.value))
 
 /** 이 공정 센서 종류별 단계 개수 (설비에 안 붙은 예비 센서도 포함, 열화상 제외) */
@@ -143,7 +143,7 @@ async function onFanApply(eq, { power, rpm }) {
         ref="mapCard"
         :crumbs="crumbs"
         :equipment="equipment"
-        :offsets="placement.offsets"
+        :positions="placement.positions"
         :inactive="placement.inactive"
         :sending-fan="sendingFan"
         @select-equipment="onSelectEquipment"

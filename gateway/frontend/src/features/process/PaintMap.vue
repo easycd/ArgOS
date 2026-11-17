@@ -5,9 +5,11 @@
   - 설비 상태: 설비 둘레에 상태 색 테두리 (면은 칠하지 않음). 주의·경보 설비만 테두리 빛번짐
   - 센서 이름표: 주의·경보 센서는 이름표 테두리를 상태 색으로
   - 마우스를 올리면 설비 이름·상태·센서 값 말풍선, 누르면 select(설비), 배기팬을 누르면 fan(설비, 위치)
-  - 공장 관리(editable): 설비를 끌어서 격자 칸 단위로 옮김 → drag(설비 이름, { a, b }) / 끝나면 dragend
-    · offsets { 설비 이름: { a, b } }: 저장된(또는 옮기는 중인) 칸 이동 — 대시보드도 이 값으로 그림
-    · 격자 방향은 설계안 공장 관리와 같음 (GU · GV, 그림 좌표)
+  - 설비 위치 positions { 설비 이름: { x, y } }: 배치도 화면 좌표 = DB equipment.pos_x · pos_y (API layout 의 pos)
+    · 이 그림의 좌표계(SVG viewBox 단위)에서 설비 가운데 점. 값이 없는 설비는 그림에 그려진 자리 그대로
+    · 대시보드 · 설비 상세 · 공장 관리가 같은 값으로 그림
+  - 공장 관리(editable): 설비를 끌어서 옮김 → drag(설비 이름, { x, y }) / 끝나면 dragend
+    · 격자에 맞추기(snap)를 켜면 격자 한 칸씩 (격자 방향은 설계안 공장 관리 GU · GV, 그림 좌표)
     · selected: 고른 설비 파란 그림자, inactive: 사용 안 함 설비 흐리게, thin: 테두리를 더 얇게
 -->
 <script setup>
@@ -21,8 +23,8 @@ const props = defineProps({
   equipment: { type: Array, required: true },
   /** 이 설비만 크게 보기 (설비 상세 '설비 위치'). 그림 안 설비 이름 (예: 'top-oven'), 비우면 전체 */
   focus: { type: String, default: '' },
-  /** 설비별 격자 칸 이동 { 'top-oven': { a: 1, b: 0 } } (없으면 그림 그대로) */
-  offsets: { type: Object, default: () => ({}) },
+  /** 설비별 배치도 위치 { 'top-oven': { x: 412.5, y: 380 } } — 화면 좌표(DB pos_x · pos_y). 없는 설비는 그림 그대로 */
+  positions: { type: Object, default: () => ({}) },
   /** 끌어서 옮기기 (공장 관리) */
   editable: { type: Boolean, default: false },
   /** 격자에 맞추기 (끌 때 칸 단위로) */
@@ -155,7 +157,7 @@ function zoomToFocus(svg) {
   }
   if (!box2) return
   // 공장 관리에서 옮긴 설비면 그 자리로 (getBBox 는 CSS 이동을 모름)
-  const [ox, oy] = gridXY(props.offsets[props.focus] ?? { a: 0, b: 0 })
+  const [ox, oy] = shiftOf(props.focus)
   box2 = { x0: box2.x0 + ox, y0: box2.y0 + oy, x1: box2.x1 + ox, y1: box2.y1 + oy }
   const w = box2.x1 - box2.x0
   const h = box2.y1 - box2.y0
@@ -164,7 +166,34 @@ function zoomToFocus(svg) {
   svg.setAttribute('viewBox', `${box2.x0 - padX} ${box2.y0 - padY} ${w + padX * 2} ${h + padY * 2}`)
 }
 
-/* ───────── 칸 이동 · 고름 · 사용 안 함 ───────── */
+/* ───────── 위치 · 고름 · 사용 안 함 ───────── */
+/** 그림에 그려진 설비 가운데 점 { 설비 이름: [x, y] } (처음 그릴 때 한 번 잼 — 위치 값이 없을 때의 자리) */
+const centers = {}
+function measureCenters(svg) {
+  for (const key of Object.keys(PAINT_EQUIPMENT)) {
+    let x0 = Infinity
+    let y0 = Infinity
+    let x1 = -Infinity
+    let y1 = -Infinity
+    for (const id of PAINT_EQUIPMENT[key].ids) {
+      const el = svg.querySelector(`#${id}`)
+      if (!el) continue
+      const b = el.getBBox() // CSS 이동과 상관없이 그려진 자리
+      x0 = Math.min(x0, b.x)
+      y0 = Math.min(y0, b.y)
+      x1 = Math.max(x1, b.x + b.width)
+      y1 = Math.max(y1, b.y + b.height)
+    }
+    if (x0 !== Infinity) centers[key] = [(x0 + x1) / 2, (y0 + y1) / 2]
+  }
+}
+/** 그려진 자리에서 얼마나 옮겨 그릴지 [dx, dy] (위치 값 - 가운데 점) */
+function shiftOf(key) {
+  const p = props.positions[key]
+  const c = centers[key]
+  return p && c && p.x != null && p.y != null ? [p.x - c[0], p.y - c[1]] : [0, 0]
+}
+const round1 = (v) => Math.round(v * 10) / 10
 /** 설비 하나에 속한 그림 요소 (건물·팬·버너 + 상태 테두리 + 센서 이름표) */
 function partsOf(svg, key) {
   const ids = PAINT_EQUIPMENT[key]?.ids ?? []
@@ -179,7 +208,7 @@ function applyOffsets() {
   const svg = box.value?.querySelector('svg')
   if (!svg) return
   for (const key of Object.keys(PAINT_EQUIPMENT)) {
-    const [x, y] = gridXY(props.offsets[key] ?? { a: 0, b: 0 })
+    const [x, y] = shiftOf(key)
     const off = props.inactive.includes(key)
     for (const el of partsOf(svg, key)) {
       el.style.transform = x || y ? `translate(${x}px, ${y}px)` : ''
@@ -189,39 +218,14 @@ function applyOffsets() {
   }
 }
 
-/** 설비 기준 칸 번호 (설계안처럼 소각설비를 가로 16 · 세로 6 으로 두고 셈) — 공장 관리 위치 X · Y 표시 */
-function gridBase() {
-  const svg = box.value?.querySelector('svg')
-  if (!svg) return {}
-  const center = (key) => {
-    let x0 = Infinity
-    let y0 = Infinity
-    let x1 = -Infinity
-    let y1 = -Infinity
-    for (const id of PAINT_EQUIPMENT[key].ids) {
-      const el = svg.querySelector(`#${id}`)
-      if (!el) continue
-      const b = el.getBBox()
-      x0 = Math.min(x0, b.x)
-      y0 = Math.min(y0, b.y)
-      x1 = Math.max(x1, b.x + b.width)
-      y1 = Math.max(y1, b.y + b.height)
-    }
-    return [(x0 + x1) / 2, (y0 + y1) / 2]
-  }
-  const ci = center('incinerator')
-  return Object.fromEntries(
-    Object.keys(PAINT_EQUIPMENT).map((key) => {
-      const c = center(key)
-      const [a, b] = solve(c[0] - ci[0], c[1] - ci[1])
-      return [key, [Math.max(1, 16 + Math.round(a)), Math.max(1, 6 + Math.round(b))]]
-    }),
-  )
+/** 위치 값이 없을 때 쓰는 기본 위치 { 설비 이름: { x, y } } (그려진 가운데 점) — 공장 관리 위치 X · Y 표시 · 변경 계산 */
+function defaultPositions() {
+  return Object.fromEntries(Object.entries(centers).map(([key, [x, y]]) => [key, { x: round1(x), y: round1(y) }]))
 }
-defineExpose({ gridBase })
+defineExpose({ defaultPositions })
 
 /* ───────── 끌어서 옮기기 (editable) ───────── */
-let drag = null // { key, start: [x, y], from: { a, b }, scale }
+let drag = null // { key, start: [화면 x, y], from: { x, y } 그림 좌표, scale }
 function onDown(event) {
   if (!props.editable) return
   const key = event.target.closest('.eqh')?.getAttribute('data-eq')
@@ -229,7 +233,9 @@ function onDown(event) {
   event.preventDefault() // 끄는 동안 글자 선택·그림 끌기(브라우저 기본 동작) 막기
   const svg = box.value.querySelector('svg')
   const m = svg.getScreenCTM()
-  drag = { key, start: [event.clientX, event.clientY], from: { ...(props.offsets[key] ?? { a: 0, b: 0 }) }, scale: m ? m.a : 1, moved: false }
+  const c = centers[key] ?? [0, 0]
+  const from = props.positions[key]?.x != null ? { ...props.positions[key] } : { x: c[0], y: c[1] }
+  drag = { key, start: [event.clientX, event.clientY], from, scale: m ? m.a : 1, moved: false }
   box.value.setPointerCapture(event.pointerId)
   tip.value = null
   emit('select', byKey(key) ?? { key })
@@ -238,9 +244,10 @@ function onDrag(event) {
   if (!drag) return
   const dx = (event.clientX - drag.start[0]) / drag.scale
   const dy = (event.clientY - drag.start[1]) / drag.scale
+  // 격자에 맞추기: 끈 거리를 격자 칸으로 바꿔 반올림한 뒤 다시 그림 좌표로 (켜져 있지 않으면 그대로)
   const [a, b] = solve(dx, dy)
-  const round = (v) => (props.snap ? Math.round(v) : Math.round(v * 10) / 10)
-  const next = { a: drag.from.a + round(a), b: drag.from.b + round(b) }
+  const [ox, oy] = props.snap ? gridXY({ a: Math.round(a), b: Math.round(b) }) : [dx, dy]
+  const next = { x: round1(drag.from.x + ox), y: round1(drag.from.y + oy) }
   if (Math.abs(dx) + Math.abs(dy) > 3) drag.moved = true
   emit('drag', drag.key, next)
 }
@@ -254,12 +261,13 @@ onMounted(() => {
   const svg = box.value.querySelector('svg')
   buildHalos(svg)
   markEquipment(svg)
+  measureCenters(svg) // 옮기기 전에 그려진 자리를 잼
   applyLevels()
   applyOffsets()
   zoomToFocus(svg)
 })
 watch(() => props.equipment, () => nextTick(applyLevels), { deep: true })
-watch(() => [props.offsets, props.selected, props.inactive], () => nextTick(applyOffsets), { deep: true })
+watch(() => [props.positions, props.selected, props.inactive], () => nextTick(applyOffsets), { deep: true })
 
 /* ───────── 마우스 올리면 말풍선 ───────── */
 const tip = ref(null) // { x, y, eq }

@@ -1,7 +1,8 @@
 <!--
   설비 배치도 — 끌어서 옮기기 (화면설계안 vLayout() #mc)
   - 대시보드와 같은 도장 공정 그림(PaintMap)을 그대로 씀. 설비 둘레는 얇은 상태 색 테두리만 (면은 칠하지 않음)
-  - 설비를 끌면 격자 칸 단위로 옮겨짐 (격자에 맞추기 끄면 0.1칸 단위), 연결된 센서 이름표도 함께 이동
+  - 설비를 끌면 옮겨짐 (격자에 맞추기를 켜면 격자 한 칸씩), 연결된 센서 이름표도 함께 이동
+  - 위치는 배치도 화면 좌표 { x, y } (DB pos_x · pos_y) — move(설비 이름, { x, y })
   - 오른쪽 위: 고른 설비 사용 ON/OFF, 격자에 맞추기 스위치
   - 아래 왼쪽 안내: '설비를 끌어서 옮기면 연결된 센서도 함께 이동합니다'
 -->
@@ -14,8 +15,8 @@ import PaintMap from '@/features/process/PaintMap.vue'
 defineProps({
   /** PaintMap 용 설비 [{ key, name, level, sensors }] */
   equipment: { type: Array, required: true },
-  /** { 설비 이름: { a, b } } */
-  offsets: { type: Object, default: () => ({}) },
+  /** { 설비 이름: { x, y } } 배치도 화면 좌표 (DB pos_x · pos_y) */
+  positions: { type: Object, default: () => ({}) },
   inactive: { type: Array, default: () => [] },
   selectedKey: { type: String, default: '' },
   /** 고른 설비 { name, active } (없으면 null) */
@@ -23,13 +24,13 @@ defineProps({
   sub: { type: String, default: '' },
 })
 
-const emit = defineEmits(['select', 'move', 'moved', 'use', 'base'])
+const emit = defineEmits(['select', 'move', 'moved', 'use', 'defaults'])
 const snap = ref(true)
 const map = ref(null)
 
-/** 그림이 그려진 뒤 설비별 기준 칸 번호를 화면에 알려 줌 (위치 X · Y 표시용) */
+/** 그림이 그려진 뒤 설비별 그려진 자리(위치 값이 없을 때의 위치)를 화면에 알려 줌 (위치 X · Y 표시 · 변경 계산용) */
 // (자식 PaintMap 이 먼저 그려진 뒤라 그림 크기를 잴 수 있음)
-onMounted(() => emit('base', map.value?.gridBase() ?? {}))
+onMounted(() => emit('defaults', map.value?.defaultPositions() ?? {}))
 </script>
 
 <template>
@@ -53,7 +54,7 @@ onMounted(() => emit('base', map.value?.gridBase() ?? {}))
       <PaintMap
         ref="map"
         :equipment="equipment"
-        :offsets="offsets"
+        :positions="positions"
         :inactive="inactive"
         :selected="selectedKey"
         :snap="snap"

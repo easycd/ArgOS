@@ -502,21 +502,23 @@
 
 ## 14. 사용자 관리 (명세서 G1 · A1, 화면설계서 G1)
 
-백엔드(develop)에는 **`GET /me` · `PUT /me/password` 만 있고 `/users` 컨트롤러는 아직 없어** 명세서 G1 모양으로 예시 데이터를 만들었습니다(`api/users.js`, `api/mock/userData.js`). `/me` 는 코드의 `MeView`(id, loginId, name, phone, role, scope, pwResetRequired, lastLoginAt) 그대로 씁니다.
+처음에는 백엔드에 `/users` 가 없어 명세서 G1 모양으로 만들었고(`api/users.js`, `api/mock/userData.js`), **이후 #28(사용자 관리 API, `user/UserController`)로 아래 API가 모두 생겼습니다.** 주소 · 보내는 값은 프론트와 같습니다. `/me` 는 코드의 `MeView`(id, loginId, name, phone, role, scope, pwResetRequired, lastLoginAt) 그대로 씁니다.
 
 | API | 프론트 사용 | 백엔드 | 명세서와 다른 점 / 추가 필요 |
 | --- | --- | --- | --- |
-| `GET /users?role=&factoryId=&active=&q=&page=&size=` | 목록(한 쪽 15행) + 권한별 인원 도넛 | **없음** | 사용 정지 인원 `inactiveCount` 추가 필요 (도넛 옆 '사용 정지 n명'). 줄에 `factoryId` 있으면 좋음 |
-| `GET /users/{id}` | 오른쪽 패널(고른 사용자) | **없음** | `scopeText` 를 목록처럼 같이 주면 좋음 |
-| `GET /users/check-login-id?loginId=` | 추가 폼 아이디 칸을 벗어날 때 | **없음** | 화면설계서는 `/users/check-id`, 명세서 이름을 따름 |
-| `POST /users` | 사용자 추가 → 임시 비밀번호 한 번 표시(복사) | **없음** | 없음 |
-| `PUT /users/{id}` | 이름·연락처·권한·담당 범위 | **없음** | 진행 중 체크리스트가 있는 공정 담당자는 공정을 뺄 수 없음(409 `HAS_ACTIVE_CHECKLIST`) |
-| `PATCH /users/{id}/status` | 수정 폼의 사용 상태 스위치 (저장할 때 같이 보냄) | **없음** | 마지막 공장 담당자 정지 막기 → `409 LAST_PLANT_ADMIN` 가정(화면설계서 상태 문구) |
-| `DELETE /users/{id}` | 삭제(확인 창) | **없음** | 자기 자신 삭제 → `409 CANNOT_DELETE_SELF` 가정 |
-| `POST /users/{id}/reset-password` | 비밀번호 초기화 → 임시 비밀번호 | **없음** | 없음 |
+| `GET /users?role=&factoryId=&active=&q=&page=&size=` | 목록(한 쪽 15행) + 권한별 인원 도넛 | 있음 (#28) | 사용 정지 인원 `inactiveCount` 추가 필요 (도넛 옆 '사용 정지 n명'). 줄에 `factoryId` 있으면 좋음 |
+| `GET /users/{id}` | 오른쪽 패널(고른 사용자) | 있음 (#28) | `scopeText` 를 목록처럼 같이 주면 좋음 |
+| `GET /users/check-login-id?loginId=` | 추가 폼 아이디 칸을 벗어날 때 | 있음 (#28) | 화면설계서는 `/users/check-id`, 명세서 이름을 따름 |
+| `POST /users` | 사용자 추가 → 임시 비밀번호 한 번 표시(복사) | 있음 (#28) | 없음 |
+| `PUT /users/{id}` | 이름·연락처·권한·담당 범위 | 있음 (#28) | 진행 중 체크리스트가 있는 공정 담당자는 공정을 뺄 수 없음(409 `HAS_ACTIVE_CHECKLIST`) |
+| `PATCH /users/{id}/status` | 수정 폼의 사용 상태 스위치 (저장할 때 같이 보냄) | 있음 (#28) | 마지막 공장 담당자 정지 막기 → `409 LAST_PLANT_ADMIN` 가정(화면설계서 상태 문구) |
+| `DELETE /users/{id}` | 삭제(확인 창) | 있음 (#28) | 자기 자신 삭제 → `409 CANNOT_DELETE_SELF` 가정 |
+| `POST /users/{id}/reset-password` | 비밀번호 초기화 → 임시 비밀번호 | 있음 (#28) | 없음 |
 | `GET /me` | 내 정보(기본 패널) | 있음 | 담당 범위 문구(`scopeText`)가 없어 프론트가 공장 목록으로 만듦 |
-| `PUT /me` | 내 정보 수정(이름·연락처) | **없음** | 명세서 기준 |
+| `PUT /me` | 내 정보 수정(이름·연락처) | 있음 (#28) | 명세서 기준 |
 | `PUT /me/password` | 비밀번호 변경 창 | 있음 | 규칙은 코드 기준(8자 이상, 영문·숫자·특수문자 — 설계안은 영문·숫자 8자) |
+
+- #28 과 프론트 예시 데이터의 작은 차이 (화면 동작에는 영향 없음): `check-login-id` 는 백엔드가 아이디 형식이 틀려도 `available: false`(예시는 중복만 봄) · 목록 순서는 백엔드가 권한 → id 순 · 이름 1~100자 · 연락처 길이 검사(`VALIDATION_FAILED`)는 백엔드에만 · 오류 문구 몇 개가 다름(화면은 서버 문구를 그대로 보여 줌) · `GET /me` 에는 `scopeText` · `createdAt` · `history` 가 없음
 
 ### 권한 범위 (화면설계서 G1 그대로, 예시 데이터도 같은 규칙)
 
@@ -536,34 +538,51 @@
 
 ---
 
-## 15. 공장 관리 — 설비 재배치 (명세서 H1, 화면설계서 H1)
+## 15. 공장 관리 — 설비 재배치 (명세서 H1, 화면설계서 H1, DB 명세 equipment)
 
-백엔드(develop)에는 **`GET /processes/{processId}/layout` 만 있고 `PUT` (배치 저장)은 아직 없어** 명세서 H1 모양으로 예시 데이터를 만들었습니다(`api/process.js` `saveProcessLayout`, `api/mock/layoutData.js`). 저장한 값은 예시 `GET layout` 에 덮어써져서 대시보드 공정 배치도에도 바로 보입니다.
+저장 값의 이름 · 뜻을 **DB 테이블 명세(equipment)와 백엔드 `GET layout` 응답에 맞췄습니다** (2026-11-17). 백엔드에는 `GET /processes/{processId}/layout` 만 있고 `PUT`(배치 저장)은 아직 없어 예시 데이터로 저장합니다(`api/process.js` `saveProcessLayout`, `api/mock/layoutData.js`). 저장한 값은 예시 `GET layout` 에 덮어써져서 대시보드 공정 배치도 · 설비 상세 설비 위치에도 바로 보입니다.
 
-| API | 프론트 사용 | 백엔드 | 명세서와 다른 점 / 추가 필요 |
+| API | 프론트 사용 | 백엔드 | 비고 |
 | --- | --- | --- | --- |
-| `GET /processes/{processId}/layout` | 설비 목록 · 배치도 · 설비 정보 (대시보드와 같은 API) | 있음 | 설비마다 `grid`, `kind`, `active`, `managers` 필요 (아래). 배치 판 번호 `version` 필요 |
-| `PUT /processes/{processId}/layout` | '저장' — 바꾼 설비만 한 번에 | **없음** | 본문은 명세서대로 `{ version, equipment: { create, update, delete }, sensors: { create, update, delete } }`. 지금은 `equipment.update` 만 씀. 판 번호가 다르면 `409 LAYOUT_CONFLICT` 가정 |
+| `GET /processes/{processId}/layout` | 설비 목록 · 배치도 · 설비 정보 (대시보드와 같은 API) | 있음 | 설비 한 줄의 `type`(equipment_type) · `pos { x, y, z }`(pos_x · pos_y · pos_z) · `active`(is_active) 를 그대로 씀. `managers` 는 지금 빈 목록, `version` 은 1 고정 |
+| `PUT /processes/{processId}/layout` | '저장' — 바꾼 설비만 한 번에 | **없음** | 본문 `{ version, equipment: { create, update, delete }, sensors: { … } }`. 지금은 `equipment.update` 만 씀. 판 번호가 다르면 `409 LAYOUT_CONFLICT` 가정 |
 
-### 프론트가 보내는 `equipment.update` 한 줄
+### 프론트가 보내는 `equipment.update` 한 줄 (GET 응답과 같은 이름)
 
 ```json
-{ "id": 21, "grid": { "a": 3, "b": 0 }, "name": "도료 혼합실 A", "kind": "도료 공급 설비", "active": false }
+{ "id": 33, "pos": { "x": 412.5, "y": 718.0 }, "name": "도료 혼합실 A", "type": "TANK", "active": false }
 ```
 
-| 필드 | 뜻 | 명세서와 다른 점 |
+| 필드 | DB 컬럼 | 뜻 |
 | --- | --- | --- |
-| `grid.a` · `grid.b` | 그림 배치도의 격자 칸 이동 (가로 · 세로, 원래 자리 기준. 격자에 맞추기를 끄면 0.1칸 단위) | **명세서는 `pos {x, y, z}` 미터.** 지금 배치도는 고정 SVG 그림이라 미터 좌표가 없어 칸 단위로 둠. 3D 좌표로 바꾸면 이 필드만 바꾸면 됨 |
-| `name` | 설비 이름 | 없음 |
-| `kind` | 설비 종류 (건조로 · 도장 부스 · 전처리 설비 ...) | **추가 필드** (설계안 '종류' 고르기) |
-| `active` | 사용 상태 (사용 안 함이면 배치도에 흐리게) | **추가 필드** (설계안 사용 ON/OFF) |
+| `pos.x` · `pos.y` | `equipment.pos_x` · `pos_y` | 배치도 화면 좌표 — **이 화면 배치도 그림(SVG)의 좌표계에서 설비 가운데 점**. 미터가 아님. 옮긴 설비만 보냄 (값이 없으면 그림에 그려진 자리) |
+| `name` | `equipment.name` | 설비 이름 |
+| `type` | `equipment.equipment_type` | 설비 종류 코드. 화면에는 한글 이름 |
+| `active` | `equipment.is_active` | 사용 상태 (false 면 배치도에 흐리게) |
 
-- 화면에 보이는 위치 X · Y 는 '소각설비를 가로 16 · 세로 6 으로 두고 센 칸 번호 + `grid`' (설계안 셈법 그대로, 프론트 계산)
-- 연결된 센서 이름표는 설비와 함께 움직임 (프론트 그림에서만, 센서 자체 값은 바뀌지 않음)
+- 끌어서 옮기기는 그대로입니다. '격자에 맞추기'를 켜면 격자 한 칸씩 옮기고, 저장할 때 그 자리를 화면 좌표로 바꿔 `pos` 로 보냅니다.
+- 설비 정보의 위치 X · Y 는 이제 격자 칸 번호가 아니라 **화면 좌표 숫자**(pos_x · pos_y)를 보이고 고칩니다. 변경 줄도 'X 412 → 474 · Y 718 → 738' 처럼 씁니다.
+- 연결된 센서 이름표는 설비와 함께 움직임 (프론트 그림에서만 — 센서 `pos` 는 바꾸지 않음)
+
+### 설비 종류 코드 (`equipment_type`)
+
+지금 돌아가는 DB 시드와 체크리스트 양식에 실제로 있는 코드만 화면 목록에 넣었습니다 (`factory/central-server` `V2__seed_ulsan_paint.sql`, gateway `V2__gateway_alarm_response.sql`).
+
+| 코드 | 화면 이름 |
+| --- | --- |
+| `OVEN` | 건조로 |
+| `FAN` | 배기팬 |
+| `BURNER` | 버너실 |
+| `TANK` | 탱크 |
+| `PUMP` | 펌프 |
+| `CAMERA` | 열화상 카메라 |
+
+- 목록에 없는 코드가 오면 '코드 (목록에 없는 종류)', 비어 있으면 '정해지지 않음'으로 보입니다.
+- 예시 데이터의 실링 · 부스 · 공조기 · 도료 혼합실 · 소각설비는 정해진 코드가 없어 `type: null` 로 둡니다 (예전 예시 값 `BOX` · `BOOTH` 는 뺌 — `BOX` 는 모양(shape) 값).
 
 ### 아직 안 만든 것 (설계안에는 있음)
 
-- 설비 크기 · 모양 · 높이 · 담당자 바꾸기, 센서 연결 · 해제, 설비 추가 · 삭제 (`create` · `delete`)
+- 설비 크기 · 모양 · 높이(`size_*` · `shape` · `pos_z`) · 담당자 바꾸기, 센서 연결 · 해제, 설비 추가 · 삭제 (`create` · `delete`)
 - 배치도 그림 올리기(PNG · SVG · DXF), 사업장 · 공장 · 공정 추가
 - 배치도 확대 · 축소, 옮기기 전 자리(점선 그림자 · 화살표)
 - 다른 설비와 겹치는지 검사 (지금은 겹쳐도 저장됨)
@@ -572,9 +591,10 @@
 
 | 번호 | 내용 |
 | --- | --- |
-| 1 | 위치 단위: 그림 격자 칸(`grid`)으로 갈지, 명세서 미터(`pos`)로 갈지 |
-| 2 | `kind` · `active` 필드를 layout 응답 · 저장 본문에 넣을지 |
-| 3 | 판 번호가 다를 때(다른 사람이 먼저 저장) 409 와 응답 모양 — 지금은 문구만 띄우고 바꾼 값은 그대로 둠, '조회'로 다시 불러옴 |
+| 1 | **`pos_x` · `pos_y` 의 좌표계**: DB 설명은 'SCADA 배치도 화면용 X · Y 좌표'뿐이라 원점 · 단위가 정해져 있지 않음. 프론트는 이 화면 배치도 그림(SVG viewBox)의 좌표 · 설비 가운데 점으로 둠. 다른 화면(SCADA 등)과 같은 좌표를 써야 하면 기준을 정해야 함. 지금 DB 시드는 비어 있음(NULL) |
+| 2 | **`equipment_type` 코드가 두 가지로 적혀 있음**: 돌아가는 시드 · 체크리스트 양식은 영문(`OVEN` · `FAN` …), `db/argos_ddl.sql` 시드는 한글(`건조로` · `배기팬` · `탱크` …). 프론트는 영문을 따름 — 어느 쪽이 맞는지 |
+| 3 | 부스 · 실링 · 공조기 · 도료 혼합실 · 소각설비의 `equipment_type` 코드 (DB 설명에 '부스'는 있지만 코드가 없음) |
+| 4 | 판 번호가 다를 때(다른 사람이 먼저 저장) 409 와 응답 모양 — 지금은 문구만 띄우고 바꾼 값은 그대로 둠, '조회'로 다시 불러옴 |
 
 ---
 

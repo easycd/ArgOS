@@ -1,59 +1,89 @@
 /**
  * 공장 관리 — 저장 전 변경 모으기 (화면설계안 v-pages2.js vLayout() changes())
- * - saved: GET layout 의 설비 (저장된 값), draft: 화면에서 고친 값 { 설비 id: { grid, name, kind, active } }
- * - 변경 줄: 위치 이동(칸 수·방향 + 함께 옮겨지는 센서), 이름 변경, 정보 변경(종류·사용 상태)
- * - 저장 본문: 명세서 PUT /processes/{id}/layout 의 equipment.update
+ * - saved: GET layout 의 설비 (저장된 값), draft: 화면에서 고친 값 { 설비 id: { pos, name, type, active } }
+ * - 값 이름은 DB 명세(equipment 테이블) · 백엔드 layout 응답과 같음
+ *   · pos { x, y }: equipment.pos_x · pos_y — 배치도 화면 좌표 (PaintMap 그림 좌표). 비어 있으면 그림에 그려진 자리
+ *   · type: equipment.equipment_type 코드 (OVEN · FAN …) — 화면에는 한글 이름
+ *   · active: equipment.is_active
+ * - 변경 줄: 위치 이동(좌표 + 함께 옮겨지는 센서), 이름 변경, 정보 변경(종류 · 사용 상태)
+ * - 저장 본문: PUT /processes/{id}/layout 의 equipment.update
  */
 
-/** 설비 종류 고르기 (설계안 bindSelect 목록) */
-export const KIND_OPTIONS = ['건조로', '도장 부스', '전처리 설비', '전착 설비', '실링 설비', '공조 설비', '도료 공급 설비', '배기 처리 설비', '기타 설비']
+/**
+ * 설비 종류 (equipment.equipment_type 코드 → 화면 이름)
+ * - 코드는 지금 돌아가는 DB 시드와 체크리스트 양식에 실제로 있는 값만 둠
+ *   (factory/central-server V2__seed_ulsan_paint.sql, gateway V2__gateway_alarm_response.sql)
+ * - 부스 · 실링 · 공조기 · 도료 혼합실 · 소각설비 같은 설비의 코드는 정해지지 않아 넣지 않음 (backend-notes 15장 질문)
+ */
+export const EQUIPMENT_TYPES = [
+  { code: 'OVEN', label: '건조로' },
+  { code: 'FAN', label: '배기팬' },
+  { code: 'BURNER', label: '버너실' },
+  { code: 'TANK', label: '탱크' },
+  { code: 'PUMP', label: '펌프' },
+  { code: 'CAMERA', label: '열화상 카메라' },
+]
+
+/** 종류 코드 → 화면 이름 (목록에 없는 코드는 코드 그대로, 없으면 '정해지지 않음') */
+export function typeLabel(code) {
+  if (!code) return '정해지지 않음'
+  return EQUIPMENT_TYPES.find((t) => t.code === code)?.label ?? `${code} (목록에 없는 종류)`
+}
 
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b)
+/** 응답 pos { x, y, z } → 저장된 위치 { x, y } (값이 없으면 null) */
+const posOf = (p) => (p?.x != null && p?.y != null ? { x: p.x, y: p.y } : null)
+const fmt = (v) => String(Math.round(v))
 
 /** 설비 하나의 지금 값 (저장값 위에 고친 값) */
 export function currentOf(eq, draft) {
-  return { grid: eq.grid ?? { a: 0, b: 0 }, name: eq.name, kind: eq.kind, active: eq.active !== false, ...draft[eq.id] }
+  return { pos: posOf(eq.pos), name: eq.name, type: eq.type ?? null, active: eq.active !== false, ...draft[eq.id] }
 }
+
+/** 화면에 쓰는 위치: 저장된(또는 고친) 위치, 없으면 그림에 그려진 자리 (defaults: PaintMap.defaultPositions) */
+export const placeOf = (pos, key, defaults) => pos ?? defaults[key] ?? null
 
 /**
  * 변경 목록
  * @param {Array} equipment GET layout 의 equipment (+ key, sensors)
  * @param {object} draft
- * @param {object} base 설비 이름(key) → 기준 칸 [X, Y] (PaintMap.gridBase)
+ * @param {object} defaults 설비 이름(key) → 그려진 자리 { x, y }
  * @returns {Array<{ id, key, type, title, detail }>}
  */
-export function changesOf(equipment, draft, base = {}) {
+export function changesOf(equipment, draft, defaults = {}) {
   const out = []
   for (const eq of equipment) {
     const now = currentOf(eq, draft)
     const was = currentOf(eq, {})
-    if (!same(now.grid, was.grid)) {
-      const [x0, y0] = base[eq.key] ?? [0, 0]
-      const da = now.grid.a - was.grid.a
-      const db = now.grid.b - was.grid.b
-      const parts = []
-      if (da) parts.push(`가로 ${x0 + was.grid.a} → ${x0 + now.grid.a} (${Math.abs(da)}칸 ${da > 0 ? '오른쪽' : '왼쪽'})`)
-      if (db) parts.push(`세로 ${y0 + was.grid.b} → ${y0 + now.grid.b} (${Math.abs(db)}칸 ${db > 0 ? '아래' : '위'})`)
+    if (!same(now.pos, was.pos)) {
+      const a = placeOf(was.pos, eq.key, defaults)
+      const b = placeOf(now.pos, eq.key, defaults)
+      const where = a && b ? `X ${fmt(a.x)} → ${fmt(b.x)} · Y ${fmt(a.y)} → ${fmt(b.y)}` : '위치 바꿈'
       const tags = (eq.sensors ?? []).map((s) => s.tag)
-      out.push({ id: eq.id, key: eq.key, type: 'move', title: `${now.name} 위치 이동`, detail: parts.join(' · ') + (tags.length ? ` · 센서 ${tags.join(', ')} 함께 이동` : '') })
+      out.push({ id: eq.id, key: eq.key, type: 'move', title: `${now.name} 위치 이동`, detail: where + (tags.length ? ` · 센서 ${tags.join(', ')} 함께 이동` : '') })
     }
     if (now.name !== was.name) out.push({ id: eq.id, key: eq.key, type: 'name', title: '설비 이름 변경', detail: `${was.name} → ${now.name}` })
     const meta = []
-    if (now.kind !== was.kind) meta.push(`종류 ${now.kind}`)
+    if (now.type !== was.type) meta.push(`종류 ${typeLabel(now.type)}`)
     if (now.active !== was.active) meta.push(now.active ? '사용 상태 사용' : '사용 상태 사용 안 함')
     if (meta.length) out.push({ id: eq.id, key: eq.key, type: 'meta', title: `${now.name} 정보 변경`, detail: meta.join(' · ') })
   }
   return out
 }
 
-/** 저장 본문 (바뀐 설비만) */
+/**
+ * 저장 본문 (바뀐 설비만) — PUT /processes/{id}/layout
+ * - update 한 줄: { id, pos: { x, y }, name, type, active } (pos 는 정해진 경우만)
+ */
 export function bodyOf(version, equipment, draft) {
   const update = equipment
     .filter((eq) => draft[eq.id] && !same(currentOf(eq, draft), currentOf(eq, {})))
     .map((eq) => {
       const now = currentOf(eq, draft)
-      // grid 는 화면 반응형 값이라 보통 객체로 복사 (예시 데이터가 structuredClone 으로 복사함)
-      return { id: eq.id, grid: { a: now.grid.a, b: now.grid.b }, name: now.name, kind: now.kind, active: now.active }
+      // 화면 반응형 값이라 보통 객체로 복사 (예시 데이터가 structuredClone 으로 복사함)
+      const row = { id: eq.id, name: now.name, type: now.type, active: now.active }
+      if (now.pos) row.pos = { x: now.pos.x, y: now.pos.y }
+      return row
     })
   return { version, equipment: { create: [], update, delete: [] }, sensors: { create: [], update: [], delete: [] } }
 }

@@ -8,7 +8,7 @@
 -->
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { placeOf, trendInfo } from './alarmPlace'
+import { placeOf, sensorTypeOfDetail, trendInfo } from './alarmPlace'
 import ChecklistEditor from './ChecklistEditor.vue'
 import MiniTrend from './MiniTrend.vue'
 import WarnCause from './WarnCause.vue'
@@ -39,7 +39,8 @@ onMounted(async () => {
   try {
     const d = await getAlarmDetail(props.alarmId)
     const [template, list] = await Promise.all([
-      getChecklistTemplate({ equipmentType: d.equipmentType, sensorType: d.sensorType }),
+      // 센서 종류: 백엔드 detail 에는 sensorType 이 없어 알림 센서에서 찾음 (전류로 고정하지 않음)
+      getChecklistTemplate({ equipmentType: d.equipmentType, sensorType: sensorTypeOfDetail(d) }),
       getProcessWorkers(d.processId),
     ])
     detail.value = d

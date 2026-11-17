@@ -47,13 +47,21 @@ export async function siteNameOf(siteId) {
 const TYPE_BY_PREFIX = { CT: 'CURRENT', TE: 'TEMP', CO: 'CO' }
 
 /**
+ * 주의 상세의 알림 센서 종류 ('CURRENT' | 'TEMP' | 'CO')
+ * - 백엔드 detail 에는 sensorType 이 없음 → rule.sensorTag 로 sensors 에서 찾고, 없으면 이름 앞 글자
+ */
+export function sensorTypeOfDetail(detail) {
+  const tag = detail?.trend?.tag ?? detail?.rule?.sensorTag ?? ''
+  return detail?.sensorType ?? detail?.sensors?.find((s) => s.tag === tag)?.type ?? TYPE_BY_PREFIX[tag.split('-')[0]] ?? null
+}
+
+/**
  * 주의 상세의 trend → 제목 '전류 추이' · 소수 자리
  * - trend 에는 tag · unit 만 있음 (백엔드 AlarmService.detail) → 종류는 같은 응답 sensors 에서 tag 로 찾음
  * @returns {{ title: string, tag: string, dec: number }}
  */
 export function trendInfo(detail) {
   const tag = detail?.trend?.tag ?? detail?.rule?.sensorTag ?? ''
-  const type = detail?.sensors?.find((s) => s.tag === tag)?.type ?? detail?.sensorType ?? TYPE_BY_PREFIX[tag.split('-')[0]]
-  const meta = sensorTypeOf(type)
+  const meta = sensorTypeOf(sensorTypeOfDetail(detail))
   return { title: `${meta?.label ?? '센서'} 추이`, tag, dec: meta?.dec ?? 1 }
 }

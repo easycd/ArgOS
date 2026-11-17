@@ -14,6 +14,9 @@ defineProps({
   focusKey: { type: String, required: true },
   /** 카드 설명 ('도장 공정 · 8번 설비') */
   sub: { type: String, default: '' },
+  /** 공장 관리에서 저장한 칸 이동 · 사용 안 함 (processEquipment.js layoutPlacement) */
+  offsets: { type: Object, default: () => ({}) },
+  inactive: { type: Array, default: () => [] },
 })
 
 const emit = defineEmits(['select'])
@@ -23,7 +26,7 @@ const emit = defineEmits(['select'])
   <BaseCard title="설비 위치" :sub="sub">
     <div class="map">
       <!-- 배기팬을 눌러도 팬 창 대신 그 설비로 이동 (팬 조작은 공정 배치도에서) -->
-      <PaintMap :equipment="equipment" :focus="focusKey" @select="emit('select', $event)" @fan="(eq) => emit('select', eq)" />
+      <PaintMap :equipment="equipment" :focus="focusKey" :offsets="offsets" :inactive="inactive" @select="emit('select', $event)" @fan="(eq) => emit('select', eq)" />
     </div>
   </BaseCard>
 </template>

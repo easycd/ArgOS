@@ -168,7 +168,7 @@ async function save() {
     toast(`변경 ${n}건을 저장했습니다. 대시보드 배치도에 바로 반영됩니다.`)
   } catch (error) {
     // 409: 다른 사람이 먼저 저장함 → 바꾼 값은 그대로 두고 안내 (다시 불러오면 사라짐)
-    toast(error.message, { type: 'err', ms: error.status === 409 ? 0 : 3400 })
+    toast(error.message, { type: 'err', ms: error.status === 409 ? 8000 : 3400 })
   } finally {
     saving.value = false
   }

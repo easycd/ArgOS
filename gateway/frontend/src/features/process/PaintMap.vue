@@ -154,6 +154,9 @@ function zoomToFocus(svg) {
       : { x0: b.x, y0: b.y, x1: b.x + b.width, y1: b.y + b.height }
   }
   if (!box2) return
+  // 공장 관리에서 옮긴 설비면 그 자리로 (getBBox 는 CSS 이동을 모름)
+  const [ox, oy] = gridXY(props.offsets[props.focus] ?? { a: 0, b: 0 })
+  box2 = { x0: box2.x0 + ox, y0: box2.y0 + oy, x1: box2.x1 + ox, y1: box2.y1 + oy }
   const w = box2.x1 - box2.x0
   const h = box2.y1 - box2.y0
   const padX = Math.max(40, (420 - w) / 2)
@@ -223,6 +226,7 @@ function onDown(event) {
   if (!props.editable) return
   const key = event.target.closest('.eqh')?.getAttribute('data-eq')
   if (!key) return
+  event.preventDefault() // 끄는 동안 글자 선택·그림 끌기(브라우저 기본 동작) 막기
   const svg = box.value.querySelector('svg')
   const m = svg.getScreenCTM()
   drag = { key, start: [event.clientX, event.clientY], from: { ...(props.offsets[key] ?? { a: 0, b: 0 }) }, scale: m ? m.a : 1, moved: false }
@@ -343,6 +347,7 @@ function onClick(event) {
 /* 공장 관리: 설비를 잡아 끌 수 있음 */
 .svg.editable {
   touch-action: none;
+  user-select: none;
 }
 
 .svg.editable :deep(.eqh) {

@@ -13,6 +13,7 @@ import AppHeader from '@/components/AppHeader.vue'
 import AppNav from '@/components/AppNav.vue'
 import SitePill from '@/components/SitePill.vue'
 import PageTransition from '@/features/motion/PageTransition.vue'
+import AlertHost from '@/features/alert/AlertHost.vue'
 import { USE_MOCK } from '@/api/mock'
 
 // 상황 바꾸기 도구는 개발 모드(npm run dev) + 예시 데이터일 때만 불러옴 → 배포 빌드에서는 코드도 빠짐
@@ -55,6 +56,9 @@ watch(
     <main class="content">
       <PageTransition />
     </main>
+
+    <!-- 주의·체크리스트 창, 알림 띠, 화면 테두리 (body 로 옮겨 그림) -->
+    <AlertHost />
 
     <!-- 상황 바꾸기 도구: 개발 모드 + 예시 데이터일 때만 (배포 빌드에는 없음) -->
     <DemoTool v-if="SHOW_DEMO" />

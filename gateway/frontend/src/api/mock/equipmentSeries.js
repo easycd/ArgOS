@@ -69,6 +69,16 @@ function minutesOf(range) {
 const round1 = (v) => Math.round(v * 10) / 10
 
 /**
+ * 주의 상세 창의 '전류 추이' (16:00 ~ 16:38, 1분 간격, 마지막은 주의 발생 값 22.4 A)
+ * - GET /alarms/{id}/detail 의 trend.points 흉내 (설계안 trendA(): 최근 40분)
+ */
+export function alarmTrendPoints() {
+  const points = Array.from({ length: 39 }, (_, k) => [isoAt(16 * 60 + k), round1(topOvenValue('CURRENT', 16 * 60 + k))])
+  points[points.length - 1][1] = 22.4
+  return points
+}
+
+/**
  * 센서 추이 응답 만들기
  * @param {Array} sensors 설비 상세의 센서 목록 (id, tag, type, unit, value, usual, warn, alarm)
  * @param {boolean} rising 상도 건조로가 주의 상황인지 (16:30 부터 값이 오르는 그래프)

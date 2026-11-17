@@ -5,11 +5,13 @@
   - 꼭 처리해야 하는 창이라 바깥 누르기·Esc 로 안 닫힘 (흔들림). '설비 배치도에서 보기'로 접으면 상단 바 빨간 띠로 다시 열 수 있음
   - 데이터: GET /alarms/{id}/response (+ 화재면 GET /fires/{fireId}). 바뀌면(SSE, 지금은 예시 상황) 다시 불러옴
   - 본사 관리자: 열람만 (셧다운·해제 단추 없음)
+  - 공정 번호·이름, 설비 이름은 고정하지 않음: 응답에 위치 번호가 없어 같은 알림의 목록 줄(GET /alarms)에서 꺼냄 (alarmPlace.js)
 -->
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, onBeforeUnmount, onMounted, ref, watchEffect } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import AlarmHead from './AlarmHead.vue'
+import { placeOf } from './alarmPlace'
 import BroadcastBand from './BroadcastBand.vue'
 import EmergencySensors from './EmergencySensors.vue'
 import FireRelease from './FireRelease.vue'
@@ -28,6 +30,7 @@ const props = defineProps({
 })
 
 const router = useRouter()
+const route = useRoute()
 const alert = useAlertStore()
 
 const response = ref(null)
@@ -51,6 +54,32 @@ async function load() {
 onMounted(load)
 useLiveReload(load)
 
+/* ───────── 이 알림의 위치 (사업장·공장·공정 번호, 공정·설비 이름) ───────── */
+// 알림 목록 줄은 경보가 끝나면 목록에서 빠지므로, 보이는 동안 한 번 잡아 둠
+const row = ref(null)
+watchEffect(() => {
+  const a = alert.activeAlarms.find((x) => x.id === props.alarmId)
+  if (a) row.value = a
+})
+const place = computed(() => {
+  const p = placeOf(row.value ?? { location: response.value?.location })
+  const r = route.params // 목록 줄이 없으면 지금 보고 있는 화면 주소에서
+  return { ...p, siteId: p.siteId ?? r.siteId, factoryId: p.factoryId ?? r.factoryId, processId: p.processId ?? r.processId }
+})
+// 머리 위치 문구: 화재는 화재 응답, 경보는 응답 → 없으면 목록 줄 location
+const location = computed(() => fire.value?.location ?? response.value?.location ?? row.value?.location ?? '')
+// 정지한 설비 이름: 셧다운한 설비들 (공정 전체면 '도장 공정 전체'), 모르면 알림 설비
+const stoppedName = computed(() => {
+  const ids = response.value?.shutdown?.equipmentIds ?? []
+  if (response.value?.shutdown && !ids.length) return `${place.value.processName} 전체`
+  const names = (response.value?.equipment ?? []).filter((e) => ids.includes(e.id)).map((e) => e.name)
+  return names.join(', ') || place.value.equipmentName
+})
+// 열화상 아래 이름 'IR-01 · 도장 공정'
+const zoneOf = (thermal) => [thermal?.cameraTag, place.value.processName].filter(Boolean).join(' · ')
+// 화재 감지 근거 칸의 센서 이름 (응답 센서에서 종류로 찾음)
+const tagOf = (type) => response.value?.sensors?.find((s) => s.type === type)?.tag ?? ''
+
 const isFire = computed(() => !!fire.value)
 const stopped = computed(() => !isFire.value && !!response.value?.shutdown?.done && !response.value.shutdown.auto)
 
@@ -72,8 +101,8 @@ const modal = ref(null)
 
 async function onCall() {
   try {
-    const r = await callWorkers(12, { alarmId: props.alarmId })
-    toast(`도장 공정 담당자 ${r.sentCount}명에게 호출을 보냈습니다.`)
+    const r = await callWorkers(place.value.processId, { alarmId: props.alarmId })
+    toast(`${place.value.processName || '공정'} 담당자 ${r.sentCount}명에게 호출을 보냈습니다.`)
   } catch (error) {
     toast(error.message, { type: 'err' })
   }
@@ -82,7 +111,8 @@ async function onCall() {
 /** 창을 접고 그 공정 배치도로 (상단 바 빨간 띠를 누르면 다시 열림) */
 function onMap() {
   alert.close()
-  router.push({ name: 'process', params: { siteId: 1, factoryId: 5, processId: 12 } })
+  const { siteId, factoryId, processId } = place.value
+  if (siteId && factoryId && processId) router.push({ name: 'process', params: { siteId, factoryId, processId } })
   toast('상단의 빨간 띠를 누르면 이 창이 다시 열립니다.', { type: 'info' })
 }
 
@@ -95,7 +125,7 @@ function onCollapse() {
 function onClosed() {
   alert.close()
   clearToasts()
-  toast('경보를 종료했습니다. 상도 건조로는 현장 점검 후 다시 가동할 수 있습니다.')
+  toast(`경보를 종료했습니다. ${stoppedName.value || '설비'}는 현장 점검 후 다시 가동할 수 있습니다.`)
 }
 
 function onCleared() {
@@ -118,7 +148,15 @@ function shake() {
     <p v-else-if="!response" class="state">불러오는 중</p>
 
     <template v-else>
-      <AlarmHead :response="response" :fire="isFire" :stopped="stopped" :elapsed="elapsed" @collapse="onCollapse" />
+      <AlarmHead
+        :response="response"
+        :fire="isFire"
+        :stopped="stopped"
+        :stopped-name="stoppedName"
+        :location="location"
+        :elapsed="elapsed"
+        @collapse="onCollapse"
+      />
 
       <!-- 화재 -->
       <template v-if="isFire">
@@ -132,14 +170,14 @@ function shake() {
             :max-point="fire.thermal.maxPoint"
             :label-offset="{ x: -150, y: -52 }"
             :scale="fire.thermal.scale"
-            zone-name="IR-01 · 도장 공정"
+            :zone-name="zoneOf(fire.thermal)"
             class="ir fire-ir"
           />
           <div>
             <div class="vals">
               <div class="m-box"><small>열화상 최고</small><b class="mono">{{ fire.values.thermalMax }}<i>℃</i></b></div>
-              <div class="m-box"><small>온도 TE-15</small><b class="mono">{{ fire.values.temp }}<i>℃</i></b></div>
-              <div class="m-box"><small>CO CO-13</small><b class="mono">{{ fire.values.co }}<i>ppm</i></b></div>
+              <div class="m-box"><small>온도 {{ tagOf('TEMP') }}</small><b class="mono">{{ fire.values.temp }}<i>℃</i></b></div>
+              <div class="m-box"><small>CO {{ tagOf('CO') }}</small><b class="mono">{{ fire.values.co }}<i>ppm</i></b></div>
             </div>
             <p class="basis">{{ fire.basis }}</p>
             <div class="m-sect top"><AppIcon name="shield" :size="15" />자동 조치</div>
@@ -160,7 +198,7 @@ function shake() {
               :max-point="response.thermal.maxPoint"
               :label-offset="{ x: -150, y: 32 }"
               :scale="response.thermal.scale"
-              zone-name="IR-01 · 도장 공정"
+              :zone-name="zoneOf(response.thermal)"
               class="gap ir"
             />
             <div class="m-sect top"><AppIcon name="info" :size="15" />경보 사유</div>
@@ -178,7 +216,12 @@ function shake() {
             <ProblemLog :logs="response.logs" class="gap fill" />
           </section>
         </div>
-        <ShutdownPanel :response="response" :can-act="alert.canAct" @call="onCall" @map="onMap" @closed="onClosed" />
+        <ShutdownPanel
+          :response="response"
+          :can-act="alert.canAct"
+          :process-id="place.processId"
+          :process-name="place.processName"
+          @call="onCall" @map="onMap" @closed="onClosed" />
       </template>
     </template>
   </BaseModal>

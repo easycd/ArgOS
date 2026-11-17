@@ -151,7 +151,7 @@ function onSelectEquipment(eq) {
         @select="onSelectEquipment"
       />
       <SensorGaugeCard class="gauges" :sensors="equipment.sensors" :live-values="liveValues" />
-      <ThermalCard v-if="thermal" class="thermal" :thermal="thermal" :level="equipment.level" :elapsed-sec="elapsedSec" />
+      <ThermalCard v-if="thermal" class="thermal" :thermal="thermal" :process-name="equipment.path?.[2] ?? ''" :level="equipment.level" :elapsed-sec="elapsedSec" />
 
       <TrendCard
         class="trend"

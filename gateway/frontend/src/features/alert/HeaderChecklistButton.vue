@@ -19,6 +19,8 @@ const badge = computed(() => {
   if (!c) return null
   return { doneCount: c.items.filter((i) => i.doneAt).length, totalCount: c.items.length, assignee: c.assignee.name }
 })
+// 칸 옆 공정 이름 ('도장 공정') — 체크리스트의 알림 위치에서
+const processName = computed(() => (first.value ? alert.processNameOf(first.value.alarmId) : ''))
 </script>
 
 <template>
@@ -27,7 +29,7 @@ const badge = computed(() => {
     v-if="badge"
     class="compact"
     :checklist="badge"
-    sub="도장 공정"
+    :sub="processName"
     @click="alert.open('checklist', { alarmId: first.alarmId, checklistId: first.id })"
   />
 </template>

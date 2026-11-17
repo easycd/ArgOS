@@ -11,7 +11,8 @@ import AppIcon from '@/components/AppIcon.vue'
 const props = defineProps({
   /** [{ id, name, onDuty }] */
   workers: { type: Array, required: true },
-  processName: { type: String, default: '도장 공정' },
+  /** 공정 이름 ('도장 공정') — 알림 위치에서 꺼내 넘겨 줌 */
+  processName: { type: String, default: '' },
   except: { type: Number, default: null },
 })
 
@@ -29,7 +30,7 @@ const offDutyPicked = computed(() => list.value.find((w) => w.id === selected.va
         <span class="av"><AppIcon name="user" :size="18" /></span>
         <span class="name">
           <b>{{ w.name }}</b>
-          <small>{{ processName }} 담당자 · 모바일 앱</small>
+          <small>{{ processName ? `${processName} 담당자` : '공정 담당자' }} · 모바일 앱</small>
         </span>
         <span class="m-chip" :class="w.onDuty ? 'ok' : 'gray'">{{ w.onDuty ? '근무 중' : '근무 외' }}</span>
       </label>

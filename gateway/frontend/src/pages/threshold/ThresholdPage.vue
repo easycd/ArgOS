@@ -21,15 +21,17 @@ import SimulationCard from '@/features/threshold/SimulationCard.vue'
 import ThresholdHeader from '@/features/threshold/ThresholdHeader.vue'
 import { saveAll } from '@/features/threshold/saveFlow'
 import { SEASON_META, changes as changesOf, check, draftsOf, num, savedOf } from '@/features/threshold/thresholdForm'
+import { useAlertStore } from '@/stores/alert'
 import { useAuthStore } from '@/stores/auth'
 import { ROLE_LABEL, SENSOR_TYPES } from '@/types/codes'
 import { toast } from '@/utils/toast'
 
 const route = useRoute()
 const auth = useAuthStore()
+const alert = useAlertStore()
 
-/** 지금 기준값을 정할 수 있는 공장 (설계 범위: 5공장) */
-const FACTORY_ID = 5
+/** 기준값을 보는 공장: 공장 담당자는 담당 공장, 본사 관리자는 설계 범위 5공장 (공장 고르기는 설계에 없음) */
+const FACTORY_ID = auth.user?.scope?.factoryIds?.[0] ?? 5
 
 const tree = ref([])
 const selectedId = ref(null)
@@ -77,7 +79,11 @@ async function init() {
     await loadTree()
     const all = tree.value.flatMap((p) => p.equipment)
     const want = Number(route.query.equipmentId)
-    await loadEquipment(all.some((e) => e.id === want) ? want : 31)
+    // 처음 고르는 설비: 주소의 설비 → 지금 알림이 난 설비 → 첫 설비 (설비 번호를 고정하지 않음)
+    if (!alert.primary) await alert.refresh() // 새로고침 직후에는 알림 목록이 아직 없을 수 있음
+    const alarmEq = alert.primary?.equipmentId
+    const first = all.find((e) => e.id === want) ?? all.find((e) => e.id === alarmEq) ?? all[0]
+    if (first) await loadEquipment(first.id)
   } catch (error) {
     errorMessage.value = error.message
   } finally {

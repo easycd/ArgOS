@@ -50,6 +50,8 @@ async function load() {
 onMounted(load)
 useLiveReload(load) // 앱에서 항목을 체크하면 (SSE checklist.updated) 다시
 
+// 담당자 옆 공정 이름 (체크리스트 응답에는 공정 번호만 → 알림 위치에서)
+const processName = computed(() => (checklist.value ? alert.processNameOf(checklist.value.alarmId) : ''))
 const total = computed(() => checklist.value?.items.length ?? 0)
 const doneCount = computed(() => checklist.value?.items.filter((i) => i.doneAt).length ?? 0)
 const reported = computed(() => checklist.value?.status === 'REPORTED')
@@ -178,7 +180,7 @@ async function onConfirm() {
             <div><dt>대상 설비</dt><dd>{{ checklist.equipmentName }}</dd></div>
             <div>
               <dt>담당자</dt>
-              <dd :class="{ flash: nameHighlight }">{{ checklist.assignee.name }} (도장 공정)</dd>
+              <dd :class="{ flash: nameHighlight }">{{ checklist.assignee.name }}<template v-if="processName"> ({{ processName }})</template></dd>
             </div>
             <div><dt>전송 시각</dt><dd class="mono">{{ checklist.sentAt.slice(11, 19) }}</dd></div>
             <div><dt>경과 시간</dt><dd class="mono">{{ elapsed }}</dd></div>
@@ -206,6 +208,7 @@ async function onConfirm() {
                 v-if="reassignOpen"
                 :workers="workers"
                 :current-id="checklist.assignee.id"
+                :process-name="processName"
                 :busy="busy"
                 @apply="onReassign"
                 @cancel="reassignOpen = false"

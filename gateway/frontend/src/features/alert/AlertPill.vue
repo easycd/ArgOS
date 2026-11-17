@@ -2,8 +2,9 @@
   상단 바 상태 띠 (화면설계안 js/shell.js updateHeader() #stpill, css/extra.css)
   - 대응 중 알림이 있을 때만: '⚠ 주의 1건  상도 건조로 · 눌러서 확인'
   - 나타날 때 튀어 오름(.4s) 후 1.6초마다 주황 빛번짐, 아이콘은 1초마다 깜빡임
-  - 누르면: 공장 담당자 → 알림 상태에 맞는 창 (주의 알림 / 주의 상세 / 체크리스트 진행)
-            본사 관리자 → 그 공정 배치도 화면으로 (조치는 공장 담당자 몫)
+  - 화재: '🔥 화재 발생  상도 건조로 버너실' (설계안)
+  - 누르면: 공장 담당자 → 알림 상태에 맞는 창 (주의 알림 / 주의 상세 / 체크리스트 진행 / 경보·화재 대응)
+            본사 관리자 → 화재면 사업장 선택(화재 현황), 그 밖에는 그 공정 배치도 화면으로 (조치는 공장 담당자 몫)
   - 색: 재원님이 정한 주의색 #F97316 (설계안은 띠 바탕만 조금 진한 #EA580C)
 -->
 <script setup>
@@ -19,12 +20,20 @@ const alert = useAlertStore()
 const a = computed(() => alert.primary)
 const meta = computed(() => LEVEL_META[a.value?.level] ?? null)
 const count = computed(() => alert.activeAlarms.filter((x) => x.level === a.value?.level).length)
-// 설비 이름: 위치의 마지막 칸에서 부품 이름을 뺌 ('상도 건조로 배기팬' → '상도 건조로')
-const where = computed(() => a.value?.location.split(' · ').at(-1).replace(/ (배기팬|버너실|순환펌프)$/, '') ?? '')
+const isFire = computed(() => a.value?.level === LEVEL.FIRE)
+// 설비 이름: 위치의 마지막 칸에서 부품 이름을 뺌 ('상도 건조로 배기팬' → '상도 건조로'), 화재는 부품까지
+const where = computed(() => {
+  const last = a.value?.location.split(' · ').at(-1) ?? ''
+  return isFire.value ? last : last.replace(/ (배기팬|버너실|순환펌프)$/, '')
+})
 
 function onClick() {
   if (alert.canAct) {
     alert.openFor(a.value)
+    return
+  }
+  if (isFire.value) {
+    router.push({ name: 'site-select' })
     return
   }
   const { siteId, factoryId, processId } = a.value
@@ -44,8 +53,11 @@ function onClick() {
       @click="onClick"
     >
       <AppIcon :name="meta.icon" :size="18" class="ico" />
-      {{ meta.label }} {{ count }}건
-      <small>{{ where }} · 눌러서 확인</small>
+      <template v-if="isFire">화재 발생<small>{{ where }}</small></template>
+      <template v-else>
+        {{ meta.label }} {{ count }}건
+        <small>{{ where }} · 눌러서 확인</small>
+      </template>
     </button>
   </Transition>
 </template>

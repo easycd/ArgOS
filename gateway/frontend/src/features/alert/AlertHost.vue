@@ -4,13 +4,17 @@
   - 열린 창: stores/alert.js 의 modal (주의 알림 → 주의 상세 → 센서·열화상 확인 / 체크리스트 진행)
   - 하는 일
     · 처음 + 데이터가 바뀔 때마다 대응 중인 알림·체크리스트를 다시 받음 (useLiveReload)
-    · 새 주의(확인 전)가 생기면: 공장 담당자는 주의 알림 창을 바로 띄움 / 본사 관리자는 알림 띠 '위치 보기'
+    · 새 알림이 생기면 (화재 > 경보 > 주의 중 높은 것 하나)
+      공장 담당자: 주의 알림 창 / 경보·화재 대응 창을 바로 띄움 (경보·화재는 열려 있던 창 위로)
+      본사 관리자: 알림 띠 ('위치 보기', 화재는 '화재 현황 보기'로 닫을 때까지)
     · 담당자가 체크리스트를 모두 마치면: 알림 띠 '확인하기' → 체크리스트 진행 창
-    · 대응 중 알림이 있으면 화면 가장자리 주황 테두리가 1.6초마다 숨쉬듯 (설계안 #vig), 탭 제목 앞에 [주의]
+    · 대응 중 알림이 있으면 화면 가장자리 테두리가 숨쉬듯 (설계안 #vig: 주의 주황 1.6초, 경보·화재 빨강 0.8초)
+      탭 제목 앞에 [주의] / [경보] / [화재]
 -->
 <script setup>
 import { computed, onBeforeUnmount, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import AlarmResponseModal from './AlarmResponseModal.vue'
 import ChecklistProgressModal from './ChecklistProgressModal.vue'
 import ThermalCheckModal from './ThermalCheckModal.vue'
 import WarnDetailModal from './WarnDetailModal.vue'
@@ -30,32 +34,58 @@ useLiveReload(alert.refresh)
 /** 열린 창에 넘길 알림 (주의 알림 창은 알림 한 건 전체가 필요) */
 const modalAlarm = computed(() => alert.activeAlarms.find((a) => a.id === alert.modal?.alarmId) ?? null)
 
-/* ───────── 새 주의 · 체크리스트 완료 알아채기 ───────── */
-let known = null // 지난번 받은 { 알림 id: 상태 } (처음 한 번은 비교하지 않음)
+/* ───────── 새 알림 · 체크리스트 완료 알아채기 ───────── */
+let known = null // 지난번 받은 { 알림 id: 상태 } (처음 한 번은 '모두 새것'으로 보고 창만 띄움, 알림 띠는 안 띄움)
 let reportedIds = new Set()
+
+const isEmergency = (a) => a.level === LEVEL.ALARM || a.level === LEVEL.FIRE
+const where = (a) => `울산공장 ${a.location.split(' · ').slice(0, 2).join(' ')}`
+const goProcess = (a) => router.push({ name: 'process', params: { siteId: a.siteId, factoryId: a.factoryId, processId: a.processId } })
+
+/** 화재 알림 띠 닫기 함수 (화재가 해제되면 같이 닫음) */
+let closeFireToast = null
+
+/** 본사 관리자 알림 띠 (설계안 onState() hq: 주의 · 경보 · 화재) */
+function notifyHq(a) {
+  if (a.level === LEVEL.FIRE) {
+    closeFireToast = toast(`${where(a).split(' ').slice(0, 2).join(' ')}에서 화재가 감지되었습니다.`, {
+      type: 'err',
+      ms: 0, // 화재는 직접 닫을 때까지
+      action: '화재 현황 보기',
+      onAction: () => router.push({ name: 'site-select' }),
+    })
+  } else if (a.level === LEVEL.ALARM) {
+    toast(`${where(a)} 상도 건조로에서 경보가 발생했습니다.`, { type: 'err', ms: 6000, action: '위치 보기', onAction: () => goProcess(a) })
+  } else {
+    toast(`${where(a)}에서 주의가 발생했습니다.`, { type: 'warn', action: '위치 보기', onAction: () => goProcess(a) })
+  }
+}
 
 watch(
   () => alert.activeAlarms,
   (list) => {
-    const before = known
+    const first = !known
+    const before = known ?? {}
     known = Object.fromEntries(list.map((a) => [a.id, a.status]))
-    if (!before) {
-      // 처음 화면을 열었을 때도 확인 전 주의가 있으면 공장 담당자에게는 창을 띄움 (설계안: 로그인 후 0.65초)
-      const open = list.find((a) => a.status === 'OPEN' && a.level === LEVEL.WARN)
-      if (open && alert.canAct && !alert.modal) setTimeout(() => alert.modal || alert.open('warn', { alarmId: open.id }), 650)
-      return
+    // 화재가 끝났으면 '닫을 때까지' 띄워 둔 화재 알림 띠도 닫음
+    if (closeFireToast && !list.some((a) => a.level === LEVEL.FIRE)) {
+      closeFireToast()
+      closeFireToast = null
     }
-    for (const a of list) {
-      if (a.status !== 'OPEN' || before[a.id] === 'OPEN') continue // 새로 '확인 전'이 된 알림만
-      if (alert.canAct) {
-        if (!alert.modal) setTimeout(() => alert.open('warn', { alarmId: a.id }), 650)
-      } else {
-        toast(`울산공장 ${a.location.split(' · ').slice(0, 2).join(' ')}에서 주의가 발생했습니다.`, {
-          type: 'warn',
-          action: '위치 보기',
-          onAction: () => router.push({ name: 'process', params: { siteId: a.siteId, factoryId: a.factoryId, processId: a.processId } }),
-        })
-      }
+    // 새로 '발생 중(OPEN)'이 된 알림 (처음이면 지금 OPEN 인 것 전부)
+    const fresh = list.filter((a) => a.status === 'OPEN' && before[a.id] !== 'OPEN')
+    if (!fresh.length) return
+
+    // 높은 단계 하나만 처리: 화재 > 경보 > 주의 (설계안: 화재 창이 경보 창 위를 덮음)
+    const fire = fresh.find((a) => a.level === LEVEL.FIRE)
+    const top = fire ?? fresh.find(isEmergency) ?? fresh[0]
+
+    if (alert.canAct) {
+      // 경보·화재는 열린 창이 있어도 바로 바꿔 띄움, 주의는 다른 창이 없을 때만 (설계안: 0.65초 뒤)
+      if (isEmergency(top)) setTimeout(() => alert.openFor(top), 650)
+      else if (!alert.modal) setTimeout(() => alert.modal || alert.open('warn', { alarmId: top.id }), 650)
+    } else if (!first) {
+      notifyHq(top)
     }
   },
 )
@@ -107,6 +137,7 @@ onBeforeUnmount(() => {
       <WarnNoticeModal v-if="alert.modal?.type === 'warn' && modalAlarm" :key="`warn-${alert.modal.alarmId}`" :alarm="modalAlarm" />
       <WarnDetailModal v-else-if="alert.modal?.type === 'detail'" :key="`detail-${alert.modal.alarmId}`" :alarm-id="alert.modal.alarmId" />
       <ThermalCheckModal v-else-if="alert.modal?.type === 'thermal'" :key="`thermal-${alert.modal.alarmId}`" :alarm-id="alert.modal.alarmId" />
+      <AlarmResponseModal v-else-if="alert.modal?.type === 'alarm'" :key="`alarm-${alert.modal.alarmId}`" :alarm-id="alert.modal.alarmId" />
       <ChecklistProgressModal
         v-else-if="alert.modal?.type === 'checklist'"
         :key="`ck-${alert.modal.checklistId}`"
@@ -132,12 +163,19 @@ onBeforeUnmount(() => {
   animation: vig-warn var(--m-pulse-warn) ease-in-out infinite;
 }
 
-.vignette.alarm,
-.vignette.fire {
+.vignette.alarm {
   box-shadow:
     inset 0 0 0 7px var(--color-level-alarm),
     inset 0 0 90px rgba(220, 38, 38, 0.28);
   animation: vig-warn var(--m-pulse-alarm) ease-in-out infinite;
+}
+
+/* 화재: 더 굵고 진하게, 0.7초 (설계안 #vig.fire) */
+.vignette.fire {
+  box-shadow:
+    inset 0 0 0 9px #b91c1c,
+    inset 0 0 160px rgba(220, 38, 38, 0.42);
+  animation: vig-warn 0.7s ease-in-out infinite;
 }
 
 @keyframes vig-warn {

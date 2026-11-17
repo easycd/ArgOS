@@ -11,9 +11,10 @@ const ARC = { startAngle: 220, endAngle: -40 }
 const HIDE = { pointer: { show: false }, axisTick: { show: false }, splitLine: { show: false }, axisLabel: { show: false } }
 
 /**
- * @param {{ value: number, max: number, warn: number, alarm: number, unit: string, level: string, dec: number }} s
+ * @param {{ value: number, max: number, warn: number, alarm: number, unit: string, level: string, dec: number,
+ *           fontSize?: number, width?: number }} s  fontSize·width: 숫자 크기·고리 굵기 (경보 창의 작은 게이지는 22 · 9)
  */
-export function gaugeOption({ value, max, warn, alarm, unit, level, dec }) {
+export function gaugeOption({ value, max, warn, alarm, unit, level, dec, fontSize = 34, width = 14 }) {
   return {
     ...chartMotion(), // 처음 500ms, 값 바뀜 400ms (바늘 대신 고리 길이·숫자가 움직임)
     series: [
@@ -44,14 +45,15 @@ export function gaugeOption({ value, max, warn, alarm, unit, level, dec }) {
         min: 0,
         max,
         radius: '84%',
-        axisLine: { roundCap: true, lineStyle: { width: 14, color: [[1, CHART_COLORS.track]] } },
-        progress: { show: true, width: 14, roundCap: true, itemStyle: { color: LEVEL_CHART_COLOR[level] ?? CHART_COLORS.normal } },
+        axisLine: { roundCap: true, lineStyle: { width, color: [[1, CHART_COLORS.track]] } },
+        progress: { show: true, width, roundCap: true, itemStyle: { color: LEVEL_CHART_COLOR[level] ?? CHART_COLORS.normal } },
         detail: {
           valueAnimation: true, // 숫자도 같이 굴러감
           offsetCenter: [0, '-2%'],
-          formatter: (x) => `{v|${x.toFixed(dec)}}\n{u|${unit}}`,
+          // 눈금 끝을 넘으면 고리는 끝까지만 칠하고 숫자는 실제 값 (화재 CO 120 ppm 등)
+          formatter: (x) => `{v|${(value > max && x >= max ? value : x).toFixed(dec)}}\n{u|${unit}}`,
           rich: {
-            v: { fontFamily: 'Fira Code', fontSize: 34, fontWeight: 600, color: CHART_COLORS.ink, lineHeight: 38 },
+            v: { fontFamily: 'Fira Code', fontSize, fontWeight: 600, color: CHART_COLORS.ink, lineHeight: fontSize + 4 },
             u: { fontSize: 12, color: CHART_COLORS.axis, lineHeight: 16 },
           },
         },

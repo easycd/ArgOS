@@ -23,7 +23,7 @@ export const useAlertStore = defineStore('alert', () => {
   const activeAlarms = ref([])
   /** 진행 중 체크리스트 (GET /checklists?status=ACTIVE) */
   const checklists = ref([])
-  /** 열린 창: { type: 'warn'|'detail'|'thermal'|'checklist', alarmId, checklistId } 또는 null */
+  /** 열린 창: { type: 'warn'|'detail'|'thermal'|'checklist'|'alarm', alarmId, checklistId } 또는 null */
   const modal = ref(null)
 
   /** 주의 확인·전송·조치 확인을 할 수 있는 사람 (공장 담당자) */
@@ -64,12 +64,21 @@ export const useAlertStore = defineStore('alert', () => {
 
   /**
    * 알림에 맞는 창 열기 (상태 띠·알림 줄 '주의 상세 열기')
-   * - 확인 전 → 주의 알림(2초 길게) / 확인함 → 주의 상세 / 조치 중 → 체크리스트 진행
-   * - 본사 관리자는 체크리스트 진행(열람)만 열 수 있음
+   * - 경보·화재 → 경보 대응 창 (본사 관리자도 열람으로 열림)
+   * - 주의: 확인 전 → 주의 알림(2초 길게) / 확인함 → 주의 상세 / 조치 중 → 체크리스트 진행
+   * - 본사 관리자는 주의 쪽은 체크리스트 진행(열람)만 열 수 있음
    * @returns {boolean} 열었는지
    */
   function openFor(alarm) {
     if (!alarm) return false
+    if (alarm.level === LEVEL.ALARM || alarm.level === LEVEL.FIRE) {
+      // 화재가 있으면 화재 창, 아니면 가장 최근 경보 — 경보 줄을 눌러도 대표 건 하나로 엶 (같은 설비의 경보는 한 창에서 대응)
+      const latest = (level) =>
+        activeAlarms.value.filter((a) => a.level === level).sort((a, b) => b.raisedAt.localeCompare(a.raisedAt))[0]
+      const main = latest(LEVEL.FIRE) ?? latest(LEVEL.ALARM) ?? alarm
+      open('alarm', { alarmId: main.id })
+      return true
+    }
     if (alarm.status === 'ACTING' && alarm.checklist) {
       open('checklist', { alarmId: alarm.id, checklistId: alarm.checklist.id })
       return true

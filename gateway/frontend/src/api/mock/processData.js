@@ -6,10 +6,10 @@
  *   예) 주의: CT-17 22.4 A 주의 / 정상: 18.1 A → 공장·사업장 화면 숫자도 같이 바뀜
  * - 센서 19개 = 전류 9 + 온도 6 + CO 4 (CO-14 는 예비 센서라 그림에 위치 없음)
  */
-import { topOvenValue } from './scenario'
+import { scenario, topOvenValue } from './scenario'
 import { LEVEL } from '@/types/codes'
 
-const { NORMAL, WARN, ALARM } = LEVEL
+const { NORMAL, WARN, ALARM, FIRE } = LEVEL
 
 /**
  * 설비 (seq: 공정 흐름 순서 번호, 그림과 아래 설비 줄에 표시. 명세서에 없는 값)
@@ -67,20 +67,33 @@ export function sensorsNow() {
 const ORDER = [NORMAL, WARN, ALARM, LEVEL.FIRE]
 export const maxLevel = (levels) => levels.reduce((a, b) => (ORDER.indexOf(b) > ORDER.indexOf(a) ? b : a), NORMAL)
 
-/** 설비 단계 = 붙은 센서 중 가장 높은 단계 */
+/** 설비 단계 = 붙은 센서 중 가장 높은 단계 (화재 중에는 상도 건조로가 '화재') */
 export function equipmentLevel(equipmentId, sensors = sensorsNow()) {
+  if (equipmentId === 31 && scenario.state === FIRE) return FIRE
   return maxLevel(sensors.filter((s) => s.equipmentId === equipmentId).map((s) => s.level))
 }
 
-/** 배기팬이 있는 설비 → 팬 상태 (상도 건조로는 주의 이상이면 회전수를 올려 둔 상태) */
+/**
+ * 설비 운전 상태 (셧다운 명령을 받은 설비만 바뀜)
+ * - RUNNING 가동 / STOPPING 정지 중(셧다운 단계 진행) / STOPPED 정지됨
+ */
+export function runStateOf(equipmentId) {
+  const sd = scenario.shutdown
+  if (!sd || !sd.equipmentIds.includes(equipmentId)) return 'RUNNING'
+  return sd.steps.every(Boolean) ? 'STOPPED' : 'STOPPING'
+}
+
+/** 배기팬이 있는 설비 → 팬 상태 (상도 건조로는 주의 이상이면 회전수를 올려 둔 상태, 정지되면 꺼짐) */
 function fansNow(topLevel) {
   const fan = { power: 'ON', rpm: 1180, targetRpm: 1180 }
+  const fanOf = (id, normalFan) =>
+    runStateOf(id) === 'STOPPED' || (id === 31 && scenario.shut) ? { power: 'OFF', rpm: 0, targetRpm: 0 } : normalFan
   return {
-    26: fan,
-    28: fan,
-    29: fan,
-    30: fan,
-    31: topLevel === NORMAL ? fan : { power: 'ON', rpm: 1240, targetRpm: 1240 },
+    26: fanOf(26, fan),
+    28: fanOf(28, fan),
+    29: fanOf(29, fan),
+    30: fanOf(30, fan),
+    31: fanOf(31, topLevel === NORMAL ? fan : { power: 'ON', rpm: 1240, targetRpm: 1240 }),
   }
 }
 
@@ -123,8 +136,8 @@ export function mockProcess(processId) {
     // GET /processes/{processId}/status
     status: {
       processId: 12,
-      level: maxLevel(sensors.map((s) => s.level)),
-      equipment: EQUIPMENT.map((e) => ({ id: e.id, level: levelOfEq(e.id), runState: 'RUNNING', fan: fans[e.id] ?? null })),
+      level: scenario.state === FIRE ? FIRE : maxLevel(sensors.map((s) => s.level)),
+      equipment: EQUIPMENT.map((e) => ({ id: e.id, level: levelOfEq(e.id), runState: runStateOf(e.id), fan: fans[e.id] ?? null })),
       sensors: sensors.map(({ id, tag, value, level, warn, alarm }) => ({ id, tag, value, level, warn, alarm })),
     },
     // GET /inspections/today?processId=12

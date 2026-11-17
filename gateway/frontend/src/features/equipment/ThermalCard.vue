@@ -19,7 +19,9 @@ const props = defineProps({
   elapsedSec: { type: Number, default: 0 },
 })
 
+// 최고 온도 글자 색: 주의 주황, 경보·화재 빨강
 const hot = computed(() => props.level !== LEVEL.NORMAL)
+const danger = computed(() => props.level === LEVEL.ALARM || props.level === LEVEL.FIRE)
 
 /** 마지막 수신 시각 'HH:mm:ss' (촬영 시각 + 지난 초) */
 const time = computed(() => {
@@ -32,7 +34,7 @@ const time = computed(() => {
 <template>
   <BaseCard title="열화상 카메라" :sub="`도장 공정 ${thermal.tag}`">
     <template v-if="thermal.max != null" #actions>
-      <span>최고&nbsp;<b class="mono temp" :class="{ hot }">{{ thermal.max }} ℃</b></span>
+      <span>최고&nbsp;<b class="mono temp" :class="{ hot, danger }">{{ thermal.max }} ℃</b></span>
       <span>최저&nbsp;<b class="mono temp">{{ thermal.min }} ℃</b></span>
     </template>
 
@@ -60,6 +62,10 @@ const time = computed(() => {
 
 .temp.hot {
   color: var(--color-level-warn-text);
+}
+
+.temp.danger {
+  color: var(--color-level-alarm-text);
 }
 
 .body {

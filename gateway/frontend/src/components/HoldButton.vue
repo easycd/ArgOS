@@ -16,6 +16,8 @@ const props = defineProps({
   /** 눌러야 하는 시간 (ms) */
   ms: { type: Number, default: 2000 },
   disabled: { type: Boolean, default: false },
+  /** 가운데 아이콘: 'touch'(손가락, 기본) 또는 'power'(셧다운) */
+  icon: { type: String, default: 'touch' },
 })
 
 const emit = defineEmits(['progress', 'done'])
@@ -115,7 +117,10 @@ onBeforeUnmount(() => {
     </svg>
     <span class="core" :style="{ inset: `${STROKE + 8}px`, background: color }">
       <!-- 손가락 아이콘 (설계안 touch) / 다 차면 체크 -->
-      <svg v-if="!done" viewBox="0 0 24 24" :width="size * 0.2" :height="size * 0.2" class="icon" aria-hidden="true">
+      <svg v-if="!done && icon === 'power'" viewBox="0 0 24 24" :width="size * 0.2" :height="size * 0.2" class="icon" aria-hidden="true">
+        <path d="M12 2v10" /><path d="M18.4 6.6a9 9 0 1 1-12.77.04" />
+      </svg>
+      <svg v-else-if="!done" viewBox="0 0 24 24" :width="size * 0.2" :height="size * 0.2" class="icon" aria-hidden="true">
         <path d="M18 11V6a2 2 0 0 0-4 0" /><path d="M14 10V4a2 2 0 0 0-4 0v2" /><path d="M10 10.5V6a2 2 0 0 0-4 0v8" />
         <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />
       </svg>

@@ -2,10 +2,12 @@
  * 공정 3D 배치도 API (설계 자료 API 명세서 B3 '도장 공정 3D 배치도' 기준)
  * - GET  /processes/{processId}/layout : 설비·센서 목록 (잘 안 바뀌는 값)
  * - GET  /processes/{processId}/status : 지금 값·단계, 배기팬 상태
+ * - PUT  /processes/{processId}/layout : 공장 관리 배치 저장 (명세서 H1 — 백엔드 아직 없음)
  * - POST /equipment/{equipmentId}/fan  : 배기팬 켜기·끄기·회전수 (명령 접수만, 결과는 SSE command.result)
  * - GET  /inspections/today            : 오늘 설비 점검 목록
  */
 import http from './http'
+import { saveLayout } from './mock/layoutData'
 import { USE_MOCK, mockFail, mockOk } from './mock'
 import { mockProcess } from './mock/processData'
 
@@ -47,4 +49,17 @@ export function getTodayInspections(processId) {
   const data = mockProcess(processId)
   if (USE_MOCK) return mockOk(data?.inspections ?? { doneCount: 0, totalCount: 0, items: [] })
   return http.get('/inspections/today', { params: { processId } })
+}
+
+/**
+ * 공장 관리: 배치 저장 (바꾼 것 한꺼번에, 하나라도 틀리면 전부 저장 안 됨)
+ * @param {{ version, equipment: { create: [], update: [{ id, grid?, name?, kind?, active? }], delete: [] } }} body
+ * @returns {{ version, changedCount }}
+ */
+export function saveProcessLayout(processId, body) {
+  if (USE_MOCK) {
+    const r = saveLayout(processId, body)
+    return r.error ? mockFail(r.error) : mockOk(r.data)
+  }
+  return http.put(`/processes/${processId}/layout`, body)
 }

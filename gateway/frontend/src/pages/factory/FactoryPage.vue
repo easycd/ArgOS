@@ -1,16 +1,440 @@
 <!--
-  공장 관리 화면
-  - 지금은 제목만 있는 자리 표시
+  공장 관리 화면 — 설비 재배치 · 변경 (화면설계안 v-pages2.js vLayout(), 화면설계서 H1, API 명세서 H1)
+  - 이 화면은 범위(사업장 › 공장 › 공정)를 들고 배치도를 불러오고, 바꾼 값을 모아 한 번에 저장하는 일만 함
+    그리는 부분은 features/factory/ (설비 목록 · 설비 배치도 · 설비 정보)
+  - 배치 (설계안 1920): 탭 줄 / 설비 목록 300 | 설비 배치도 1128 | 설비 정보 420
+  - 바꾼 값은 저장 전까지 draft 에만 있음 → '저장'을 누르면 PUT /processes/{id}/layout 한 번
+  - 저장하지 않은 변경이 있는데 다른 화면·범위로 가면 확인 창
+  - 배치도가 있는 공정은 지금 5공장 도장 공정뿐 (다른 공정은 '등록된 배치도가 없습니다')
 -->
+<script setup>
+import { computed, reactive, ref, watch } from 'vue'
+import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
+import { getProcessLayout, getProcessStatus, saveProcessLayout } from '@/api/process'
+import { getSiteName, getSiteTree, getSites } from '@/api/sites'
+import { useAuthStore } from '@/stores/auth'
+import { ROLE } from '@/types/codes'
+import { toast } from '@/utils/toast'
+import AppIcon from '@/components/AppIcon.vue'
+import ConfirmModal from '@/components/ConfirmModal.vue'
+import SegButtons from '@/components/SegButtons.vue'
+import EquipmentEditPanel from '@/features/factory/EquipmentEditPanel.vue'
+import EquipmentListCard from '@/features/factory/EquipmentListCard.vue'
+import LayoutMapCard from '@/features/factory/LayoutMapCard.vue'
+import { bodyOf, changesOf, currentOf } from '@/features/factory/layoutDraft'
+import { buildProcessEquipment } from '@/features/process/processEquipment'
+
+// 처음 고르는 범위 (설계안 기본값 울산공장 › 5공장 › 도장 공정 — 지금 배치도가 있는 공정). 없으면 첫 공장·공정
+const DEFAULT_FACTORY = '5공장'
+const DEFAULT_PROCESS = '도장'
+
+const route = useRoute()
+const router = useRouter()
+const auth = useAuthStore()
+const isHq = computed(() => auth.role === ROLE.HQ_ADMIN)
+
+/* ───────── 범위: 사업장 › 공장 › 공정 ───────── */
+const sites = ref([])
+const tree = ref(null) // GET /sites/{id}/tree
+const pick = reactive({ siteId: '', factoryId: '', processId: '' }) // 고르는 중
+const scope = reactive({ processId: null, name: '' }) // 조회한 범위
+
+const factories = computed(() => {
+  const all = tree.value?.factories ?? []
+  const mine = auth.user?.scope?.factoryIds ?? []
+  return isHq.value ? all : all.filter((f) => mine.includes(f.id))
+})
+const processes = computed(() => factories.value.find((f) => String(f.id) === String(pick.factoryId))?.processes ?? [])
+
+async function loadTree(siteId) {
+  tree.value = await getSiteTree(siteId)
+  const f = factories.value.find((x) => x.name === DEFAULT_FACTORY) ?? factories.value[0]
+  pick.factoryId = f ? String(f.id) : ''
+  pickFirstProcess()
+}
+function pickFirstProcess() {
+  const p = processes.value.find((x) => x.name.includes(DEFAULT_PROCESS)) ?? processes.value[0]
+  pick.processId = p ? String(p.id) : ''
+}
+async function onSite() {
+  try {
+    await loadTree(pick.siteId)
+  } catch (error) {
+    toast(error.message, { type: 'err' })
+  }
+}
+
+/* ───────── 배치도 불러오기 ───────── */
+const layout = ref(null) // 저장된 배치 (없으면 null)
+const status = ref(null)
+const loading = ref(true)
+const missing = ref(false) // 배치도가 없는 공정
+const draft = reactive({}) // { 설비 id: { grid, name, kind, active } } 저장 전 변경
+const base = ref({}) // 설비 이름(key) → 기준 칸 [X, Y]
+const selectedId = ref(null)
+
+function clearDraft() {
+  for (const id of Object.keys(draft)) delete draft[id]
+}
+
+async function load() {
+  loading.value = true
+  missing.value = false
+  try {
+    const [l, s] = await Promise.all([getProcessLayout(scope.processId), getProcessStatus(scope.processId)])
+    layout.value = l
+    status.value = s
+  } catch (error) {
+    layout.value = null
+    status.value = null
+    if (error.code === 'NOT_FOUND') missing.value = true
+    else toast(error.message, { type: 'err' })
+  } finally {
+    clearDraft()
+    selectedId.value = layout.value?.equipment[0]?.id ?? null
+    loading.value = false
+  }
+}
+
+/** 조회: 고른 범위로 다시 불러오기 */
+function query() {
+  guard(() => {
+    const p = processes.value.find((x) => String(x.id) === String(pick.processId))
+    if (!p) {
+      toast('공정을 골라 주세요.', { type: 'warn' })
+      return
+    }
+    const f = factories.value.find((x) => String(x.id) === String(pick.factoryId))
+    scope.processId = p.id
+    scope.name = `${f?.name ?? ''} ${p.name}`
+    load()
+  })
+}
+
+/* ───────── 화면용 설비 (저장값 + 지금 값 + 고친 값) ───────── */
+// 저장된 설비 + 그림 이름(key) · 센서 (변경 목록 계산용)
+const saved = computed(() => {
+  const built = buildProcessEquipment(layout.value, status.value)
+  return (layout.value?.equipment ?? []).map((e) => {
+    const b = built.find((x) => x.id === e.id)
+    return { ...e, key: b.key, level: b.level, sensors: b.sensors }
+  })
+})
+// 지금 화면에 보이는 값 (고친 값 반영)
+const shown = computed(() => saved.value.map((e) => ({ ...e, ...currentOf(e, draft) })))
+const changes = computed(() => changesOf(saved.value, draft, base.value))
+
+const selected = computed(() => shown.value.find((e) => e.id === selectedId.value) ?? null)
+const listRows = computed(() => shown.value.map((e) => ({ ...e, changed: changes.value.some((c) => c.id === e.id) })))
+const mapEquipment = computed(() => shown.value.map(({ key, name, level, sensors }) => ({ key, name, level, sensors })))
+const mapOffsets = computed(() => Object.fromEntries(shown.value.map((e) => [e.key, e.grid])))
+const mapInactive = computed(() => shown.value.filter((e) => !e.active).map((e) => e.key))
+
+/* ───────── 고치기 ───────── */
+/** 설비 하나의 값 하나 고치기 (저장값과 같아지면 지움) */
+function setField(id, field, value) {
+  const eq = saved.value.find((e) => e.id === id)
+  if (!eq) return
+  const next = { ...draft[id], [field]: value }
+  const was = currentOf(eq, {})
+  if (JSON.stringify(was[field]) === JSON.stringify(value)) delete next[field]
+  if (Object.keys(next).length) draft[id] = next
+  else delete draft[id]
+}
+
+const idOf = (key) => saved.value.find((e) => e.key === key)?.id
+const onMapSelect = (key) => (selectedId.value = idOf(key) ?? selectedId.value)
+const onMove = (key, grid) => setField(idOf(key), 'grid', grid)
+const onUse = (on) => selected.value && setField(selected.value.id, 'active', on)
+const onPanel = (field, value) => setField(selectedId.value, field, value)
+
+/** 되돌리기: 저장 전 변경을 모두 버림 */
+function undo() {
+  clearDraft()
+  toast('저장하기 전 배치로 되돌렸습니다.', { type: 'info' })
+}
+
+/* ───────── 저장 (한 번에) ───────── */
+const saving = ref(false)
+async function save() {
+  const n = changes.value.length
+  if (!n || saving.value) return
+  saving.value = true
+  try {
+    await saveProcessLayout(scope.processId, bodyOf(layout.value.version, saved.value, draft))
+    const keep = selectedId.value
+    await load()
+    selectedId.value = keep
+    toast(`변경 ${n}건을 저장했습니다. 대시보드 배치도에 바로 반영됩니다.`)
+  } catch (error) {
+    // 409: 다른 사람이 먼저 저장함 → 바꾼 값은 그대로 두고 안내 (다시 불러오면 사라짐)
+    toast(error.message, { type: 'err', ms: error.status === 409 ? 8000 : 3400 })
+  } finally {
+    saving.value = false
+  }
+}
+
+/* ───────── 저장하지 않고 나가기 확인 ───────── */
+const pending = ref(null)
+let leaving = false
+
+function guard(action) {
+  if (changes.value.length) pending.value = action
+  else action()
+}
+function confirmLeave() {
+  const action = pending.value
+  pending.value = null
+  action()
+}
+onBeforeRouteLeave((to) => {
+  if (leaving || !changes.value.length) return true
+  pending.value = () => {
+    leaving = true
+    router.push(to.fullPath)
+  }
+  return false
+})
+
+/* ───────── 탭 줄 ───────── */
+const TABS = [
+  { value: 'users', label: '사용자 관리' },
+  { value: 'logs', label: '이용 로그' },
+  { value: 'factory', label: '공장 관리' },
+]
+const tab = computed({
+  get: () => 'factory',
+  set: (v) => {
+    if (v === 'users') router.push({ name: 'user', params: { siteId: route.params.siteId } })
+    else if (v === 'logs') toast('이용 로그 화면은 준비 중입니다.', { type: 'info' })
+  },
+})
+
+/* ───────── 처음 ───────── */
+watch(
+  () => route.params.siteId,
+  async (siteId) => {
+    if (!siteId) return
+    try {
+      // 본사 관리자는 사업장을 고를 수 있고, 공장 담당자는 담당 사업장 하나로 고정
+      sites.value = isHq.value
+        ? (await getSites()).map((s) => ({ id: s.id, name: s.name }))
+        : [{ id: Number(siteId), name: await getSiteName(siteId) }]
+      pick.siteId = String(siteId)
+      await loadTree(siteId)
+    } catch (error) {
+      toast(error.message, { type: 'err' })
+    }
+    query()
+  },
+  { immediate: true },
+)
+</script>
+
 <template>
-  <section>
-    <h1 class="page-title">공장 관리</h1>
-    <p class="placeholder">준비 중입니다.</p>
-  </section>
+  <div class="factory-page">
+    <!-- 탭 줄: 탭 / 범위 고르기 + 조회 / 저장하지 않은 변경 · 되돌리기 · 저장 -->
+    <div class="mtab">
+      <SegButtons v-model="tab" :options="TABS" />
+      <span class="scope">
+        <select v-model="pick.siteId" class="sel" aria-label="사업장" :disabled="!isHq" @change="onSite">
+          <option v-for="s in sites" :key="s.id" :value="String(s.id)">{{ s.name }}</option>
+        </select>
+        <AppIcon name="cr" :size="14" class="sep" />
+        <select v-model="pick.factoryId" class="sel" aria-label="공장" :disabled="!isHq" @change="pickFirstProcess">
+          <option v-for="f in factories" :key="f.id" :value="String(f.id)">{{ f.name }}</option>
+        </select>
+        <AppIcon name="cr" :size="14" class="sep" />
+        <select v-model="pick.processId" class="sel" aria-label="공정">
+          <option v-for="p in processes" :key="p.id" :value="String(p.id)">{{ p.name }}</option>
+        </select>
+        <button type="button" class="btn btn-primary qry" @click="query"><AppIcon name="search" :size="16" />조회</button>
+      </span>
+
+      <span class="acts">
+        <Transition name="fade">
+          <span v-if="changes.length" class="dirty">저장하지 않은 변경 {{ changes.length }}건</span>
+        </Transition>
+        <button type="button" class="btn" :disabled="!changes.length || saving" @click="undo"><AppIcon name="undo" :size="16" />되돌리기</button>
+        <button type="button" class="btn" :class="{ 'btn-primary': changes.length }" :disabled="!changes.length || saving" @click="save">
+          <span v-if="saving" class="m-spin" /><AppIcon v-else name="save" :size="16" />{{ saving ? '저장 중' : '저장' }}
+        </button>
+      </span>
+    </div>
+
+    <p v-if="loading" class="state">불러오는 중</p>
+
+    <!-- 배치도가 없는 공정 -->
+    <div v-else-if="!layout" class="none base-card">
+      <AppIcon name="layers" :size="30" />
+      <b>등록된 배치도가 없습니다</b>
+      <span>{{ scope.name }}</span>
+      <small v-if="missing">배치도 올리기는 아직 지원하지 않습니다. 지금은 5공장 도장 공정만 배치를 바꿀 수 있습니다.</small>
+    </div>
+
+    <div v-else class="grid">
+      <EquipmentListCard :rows="listRows" :selected-id="selectedId" :sub="`${layout.name} · ${listRows.length}대`" @select="selectedId = $event" />
+      <LayoutMapCard
+        :equipment="mapEquipment"
+        :offsets="mapOffsets"
+        :inactive="mapInactive"
+        :selected-key="selected?.key ?? ''"
+        :selected="selected"
+        :sub="layout.name"
+        @select="onMapSelect"
+        @move="onMove"
+        @use="onUse"
+        @base="base = $event"
+      />
+      <EquipmentEditPanel
+        :eq="selected"
+        :base="(selected && base[selected.key]) || [0, 0]"
+        :changes="changes.filter((c) => c.id === selectedId)"
+        @change="onPanel"
+      />
+    </div>
+
+    <ConfirmModal :open="!!pending" title="저장하지 않은 변경이 있습니다" ok-text="저장하지 않고 나가기" @ok="confirmLeave" @cancel="pending = null">
+      저장하지 않고 나가면 바꾼 배치가 사라집니다.
+    </ConfirmModal>
+  </div>
 </template>
 
 <style scoped>
-.placeholder {
+/*
+ * 배치 (설계안 1920 기준): 목록 300 | 배치도 1128 | 정보 420 — 같은 비율로 줄어듦
+ * 1600px 이하는 목록을 아래로 보내고 배치도 | 정보 두 칸
+ */
+.factory-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.mtab {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.scope {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sel {
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  font-size: 13.5px;
+  color: var(--color-text);
+}
+
+.sel:disabled {
+  background: var(--color-surface-sub);
   color: var(--color-text-sub);
+}
+
+.sep {
+  color: var(--color-text-weak);
+}
+
+.qry {
+  height: 36px;
+  margin-left: 4px;
+}
+
+.acts {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.acts .btn {
+  height: 38px;
+}
+
+.dirty {
+  margin-right: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-level-warn-text);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 300fr) minmax(0, 1128fr) minmax(0, 420fr);
+  gap: 16px;
+  align-items: stretch;
+  height: max(760px, calc(100vh - var(--topbar-height) - 110px));
+}
+
+.grid > * {
+  min-height: 0;
+}
+
+.none {
+  height: 480px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--color-border-card);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text-weak);
+  text-align: center;
+  animation: softin 240ms both;
+}
+
+.none b {
+  font-size: 16px;
+  color: var(--color-text);
+}
+
+.none span {
+  font-size: 14px;
+  color: var(--color-text-sub);
+}
+
+.none small {
+  font-size: 13px;
+}
+
+.state {
+  color: var(--color-text-sub);
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 200ms;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+@media (max-width: 1600px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 380px);
+    height: auto;
+  }
+
+  .grid > :first-child {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    max-height: 420px;
+  }
+
+  .grid > :nth-child(3) {
+    height: 760px;
+  }
 }
 </style>

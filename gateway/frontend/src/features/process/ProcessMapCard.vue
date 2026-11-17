@@ -17,6 +17,10 @@ const props = defineProps({
   crumbs: { type: Array, required: true },
   /** 화면용 설비 목록 */
   equipment: { type: Array, required: true },
+  /** 공장 관리에서 저장한 설비 칸 이동 { 'top-oven': { a, b } } */
+  offsets: { type: Object, default: () => ({}) },
+  /** 사용 안 함 설비 (흐리게) */
+  inactive: { type: Array, default: () => [] },
   /** 배기팬 명령 보내는 중 */
   sendingFan: { type: Boolean, default: false },
 })
@@ -53,7 +57,7 @@ defineExpose({ closeFan: () => (fan.value = null) })
     </template>
 
     <div class="map-area" @click.self="fan = null">
-      <PaintMap :equipment="equipment" @select="emit('select-equipment', $event)" @fan="openFan" />
+      <PaintMap :equipment="equipment" :offsets="offsets" :inactive="inactive" @select="emit('select-equipment', $event)" @fan="openFan" />
       <FanPopover
         v-if="fan && fanEquipment()"
         :equipment="fanEquipment()"

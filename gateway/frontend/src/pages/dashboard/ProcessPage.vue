@@ -18,7 +18,7 @@ import AlarmListCard from '@/features/dashboard/AlarmListCard.vue'
 import SensorTypeCard from '@/features/dashboard/SensorTypeCard.vue'
 import InspectionTodayCard from '@/features/process/InspectionTodayCard.vue'
 import ProcessMapCard from '@/features/process/ProcessMapCard.vue'
-import { buildProcessEquipment } from '@/features/process/processEquipment'
+import { buildProcessEquipment, layoutPlacement } from '@/features/process/processEquipment'
 import { LEVEL, SENSOR_TYPES } from '@/types/codes'
 import { useLiveReload } from '@/utils/useLiveReload'
 import { useNotice } from '@/utils/useNotice'
@@ -65,6 +65,8 @@ useLiveReload(load)
 
 // 화면용 설비 목록: 배치도(layout) + 지금 값(status) 을 합침 (features/process/processEquipment.js)
 const equipment = computed(() => buildProcessEquipment(layout.value, status.value))
+// 공장 관리에서 저장한 배치(격자 칸 이동·사용 안 함)를 배치도에 반영
+const placement = computed(() => layoutPlacement(layout.value))
 
 /** 이 공정 센서 종류별 단계 개수 (설비에 안 붙은 예비 센서도 포함, 열화상 제외) */
 const levelsByType = computed(() => {
@@ -141,6 +143,8 @@ async function onFanApply(eq, { power, rpm }) {
         ref="mapCard"
         :crumbs="crumbs"
         :equipment="equipment"
+        :offsets="placement.offsets"
+        :inactive="placement.inactive"
         :sending-fan="sendingFan"
         @select-equipment="onSelectEquipment"
         @fan-apply="onFanApply"

@@ -6,6 +6,7 @@
  *   예) 주의: CT-17 22.4 A 주의 / 정상: 18.1 A → 공장·사업장 화면 숫자도 같이 바뀜
  * - 센서 19개 = 전류 9 + 온도 6 + CO 4 (CO-14 는 예비 센서라 그림에 위치 없음)
  */
+import { LAYOUT, editsOf } from './layoutData'
 import { scenario, topOvenValue } from './scenario'
 import { seasonThreshold } from './thresholdRules'
 import { LEVEL } from '@/types/codes'
@@ -121,6 +122,21 @@ const INSPECTIONS = {
   ],
 }
 
+/** 설비 종류 (설계안 공장 관리 KIND — 명세서 layout 에 없는 추가 필드) */
+const KIND = {
+  'PNT-PRETREAT': '전처리 설비',
+  'PNT-ED-TANK': '전착 설비',
+  'PNT-ED-OVEN': '건조로',
+  'PNT-SEALING': '실링 설비',
+  'PNT-PRIMER-BOOTH': '도장 부스',
+  'PNT-PRIMER-OVEN': '건조로',
+  'PNT-TOP-BOOTH': '도장 부스',
+  'PNT-TOP-OVEN': '건조로',
+  'PNT-AHU': '공조 설비',
+  'PNT-PAINT-MIX': '도료 공급 설비',
+  'PNT-INCINERATOR': '배기 처리 설비',
+}
+
 /**
  * 공정 예시 데이터 (부를 때마다 지금 상황으로 만듦)
  * @returns {{ layout, status, inspections } | null}
@@ -135,12 +151,16 @@ export function mockProcess(processId) {
     layout: {
       processId: 12,
       name: '도장 공정',
-      version: 14,
+      version: LAYOUT.version,
       floorplan: null,
+      // 공장 관리에서 저장한 값(이름·종류·사용·격자 칸 이동)을 덮어씀 (layoutData.js)
       equipment: EQUIPMENT.map(({ manager, ...e }) => ({
         ...e,
         active: true,
+        kind: KIND[e.code] ?? '기타 설비',
+        grid: { a: 0, b: 0 },
         managers: [{ id: 0, name: manager, primary: true }],
+        ...editsOf(e.id),
       })),
       sensors: sensors.map(({ id, tag, type, unit, equipmentId }) => ({ id, tag, type, unit, equipmentId, active: true })),
     },

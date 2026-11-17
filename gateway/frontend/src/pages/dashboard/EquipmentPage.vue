@@ -20,7 +20,7 @@ import ThermalCard from '@/features/equipment/ThermalCard.vue'
 import TrendCard from '@/features/equipment/TrendCard.vue'
 import { useLiveValues } from '@/features/equipment/useLiveValues'
 import { svgKeyOf } from '@/features/process/paintLayout'
-import { buildProcessEquipment } from '@/features/process/processEquipment'
+import { buildProcessEquipment, layoutPlacement } from '@/features/process/processEquipment'
 import { useLiveReload } from '@/utils/useLiveReload'
 
 const route = useRoute()
@@ -30,6 +30,7 @@ const equipment = ref(null)
 const events = ref([])
 const thermal = ref(null)
 const processEquipment = ref([])
+const placement = ref({ offsets: {}, inactive: [] })
 const loading = ref(true)
 const errorMessage = ref('')
 
@@ -50,6 +51,7 @@ async function load({ silent = false } = {}) {
     equipment.value = eq
     events.value = ev
     processEquipment.value = buildProcessEquipment(layout, status)
+    placement.value = layoutPlacement(layout) // 공장 관리에서 옮긴 자리·사용 안 함
     thermal.value = eq.cameraId ? await getThermalLatest(eq.cameraId, eq.id) : null
     await loadSeries()
   } catch (error) {
@@ -143,6 +145,8 @@ function onSelectEquipment(eq) {
         class="location"
         :equipment="processEquipment"
         :focus-key="svgKeyOf(equipment.code)"
+        :offsets="placement.offsets"
+        :inactive="placement.inactive"
         :sub="locationSub"
         @select="onSelectEquipment"
       />

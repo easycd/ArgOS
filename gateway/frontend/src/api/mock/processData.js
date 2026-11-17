@@ -7,6 +7,7 @@
  * - 센서 19개 = 전류 9 + 온도 6 + CO 4 (CO-14 는 예비 센서라 그림에 위치 없음)
  */
 import { scenario, topOvenValue } from './scenario'
+import { seasonThreshold } from './thresholdRules'
 import { LEVEL } from '@/types/codes'
 
 const { NORMAL, WARN, ALARM, FIRE } = LEVEL
@@ -55,10 +56,20 @@ const SENSOR_ROWS = [
 /** 값 → 단계 (경보 기준 이상 경보, 주의 기준 이상 주의) */
 export const levelOf = (value, warn, alarm) => (value >= alarm ? ALARM : value >= warn ? WARN : NORMAL)
 
-/** 지금 센서 목록 (상도 건조로 3개는 예시 상황 값, 나머지는 평상시 값) */
+/** 센서 정의 (기본 겨울 기준 포함) — 기준값 관리 예시 데이터가 씀 */
+export const SENSOR_DEFS = SENSOR_ROWS.map(([id, tag, type, unit, equipmentId, usualValue, warn, alarm]) => ({
+  id, tag, type, unit, equipmentId, usualValue, warn, alarm,
+}))
+
+/**
+ * 지금 센서 목록 (상도 건조로 3개는 예시 상황 값, 나머지는 평상시 값)
+ * - 기준은 지금 계절 기준 (기준값 관리에서 저장했으면 그 값) → 단계·게이지·기준선이 같이 바뀜
+ */
 export function sensorsNow() {
-  return SENSOR_ROWS.map(([id, tag, type, unit, equipmentId, usualValue, warn, alarm]) => {
-    const value = topOvenValue(id) ?? usualValue
+  return SENSOR_DEFS.map((d) => {
+    const value = topOvenValue(d.id) ?? d.usualValue
+    const { warn, alarm } = seasonThreshold(d)
+    const { id, tag, type, unit, equipmentId } = d
     return { id, tag, type, unit, equipmentId, value, warn, alarm, level: levelOf(value, warn, alarm) }
   })
 }

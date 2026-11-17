@@ -275,6 +275,8 @@ public class ChecklistService {
         out.put("id", c.id());
         out.put("alarmId", c.alarmId());
         out.put("status", c.status());
+        // 화면이 '경과 시간'을 시연 시계로 세도록 서버의 지금을 같이 줌
+        out.put("serverTime", time.now());
         out.put("level", a == null ? null : Codes.level(a.stage()));
         out.put("processId", a == null ? null : a.processId());
         out.put("equipmentId", eq == null ? null : eq.id());

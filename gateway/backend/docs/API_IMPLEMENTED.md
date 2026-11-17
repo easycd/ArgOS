@@ -42,7 +42,7 @@ API 명세서 기준으로 구현한 것과, 명세서와 다르게 한 점입�
 | B1 | `GET /alarms?siteId·factoryId·processId&date=&from=&to=&status=&minLevel=&page=&size=` | 전체 | 줄마다 `checklist`(진행), `assignee`, `actionMinutes`, `valueStillOver` 추가 |
 | B1 | `GET /alarms/hourly?siteId·factoryId&date=` | 본사·공장 | |
 | B1 | `GET /alarms/{id}` | 전체 | 조치 내역 timeline |
-| C1 | `GET /alarms/{id}/detail` | 전체 | `thermal` 은 null (열화상 그림 없음), `templateId` 추가 |
+| C1 | `GET /alarms/{id}/detail` | 전체 | `templateId`, `usual`(주 센서 직전 7일 평균), `rule.max`(경보 × 1.3), `trend.unit·warn·alarm` 추가. `thermal` 은 IR 센서 값 요약 (아래 '열화상') |
 | C4 | `GET /alarms/{id}/response` | 전체 | `fireId` 는 null (화재 판정 전) |
 | C0 | `POST /alarms/{id}/ack` | 공장 | 409 `ALARM_ALREADY_ACKED` (`error.ackedBy`) |
 | C4 | `POST /alarms/{id}/close` `{ result, followUp }` | 공장 | 409 `VALUE_STILL_OVER` (`error.sensors`) |
@@ -51,7 +51,7 @@ API 명세서 기준으로 구현한 것과, 명세서와 다르게 한 점입�
 | C1 | `GET /processes/{id}/workers` | 본사·공장 | `onDuty` 는 항상 true (근무조 정보 없음) |
 | C1 | `POST /checklists` | 공장 | 푸시 실패해도 201, `push: "FAILED"` (명세서는 502) |
 | I1 | `GET /checklists?status=&factoryId=` | 본사·공장 | |
-| C2 | `GET /checklists/{id}` | 전체 | 공정 담당자는 자기 것만 |
+| C2 | `GET /checklists/{id}` | 전체 | 공정 담당자는 자기 것만. `serverTime`(시연 시계 지금) 추가 → 화면 경과 시간용 |
 | C2 | `POST /checklists/{id}/remind` | 공장 | 30초 잠금, 429 `REMIND_COOLDOWN` |
 | C2 | `PATCH /checklists/{id}/assignee` | 공장 | |
 | C2 | `POST /checklists/{id}/confirm` | 공장 | 값이 아직 기준 위면 체크리스트는 확인, 알림은 열린 채 409 `VALUE_STILL_OVER` |
@@ -110,7 +110,24 @@ API 명세서 기준으로 구현한 것과, 명세서와 다르게 한 점입�
 - 월간 보고서 PDF (`/reports/monthly`) 는 아직 없습니다.
 - 계산은 연계 서버에서 합니다: 기간 경보를 중앙에서 500건씩 받아 거른 뒤 셉니다 (시연 데이터 규모 기준).
 
+### 열화상 · 오늘 점검 (시연용 최소 구현)
+
+| 화면 | API | 권한 | 비고 |
+| --- | --- | --- | --- |
+| B4 | `GET /thermal/{cameraId}/latest?equipmentId=` | 전체 | `cameraId` = IR 센서 id. 실제 그림(VMS)이 없어 `imageUrl` 은 null, `level` 로 화면이 예시 그림을 고름. `max` = IR 지금 값, `min`·`avg` 는 null. 카메라가 보는 설비(IR 센서가 든 관제 단위의 설비)가 아니면 값·`zone` 없이 줌 |
+| B3 | `GET /inspections/today?processId=` | 전체 | 점검 기능 전이라 `{ doneCount: 0, totalCount: 0, items: [] }` |
+
+- 알림 상세(`/alarms/{id}/detail`)의 `thermal`: `{ cameraId, cameraTag, imageUrl(null), level, max, avg, usualAtMax, maxPoint, scale, zoneName }`.
+  `avg` = IR 최근 1시간 평균, `usualAtMax` = IR 지난 7일 평균. 공정에 IR 센서가 없으면 null.
+- 없는 주소는 500 이 아니라 404 `NOT_FOUND`.
+
+### 주의 알림 자동 종료
+
+값이 기준 위일 때 조치 확인을 하면(409 `VALUE_STILL_OVER`) 체크리스트만 확인되고 알림은 열려 있습니다.
+주의 창에는 종료 단추가 없으므로, 연계 서버가 실시간 피드에서 그 알림의 값이 기준 아래로 돌아온 것(`valueStillOver: false`)을 보면
+체크리스트를 확인한 사람 이름으로 알림을 닫습니다 (조치 이력 `CLOSE` "값이 기준 아래로 돌아와 자동 종료"). 경보(3단계)는 대상이 아닙니다 (셧다운 뒤 '경보 종료').
+
 ## 아직 없는 것
 
-화재(fire_incident), 월간 보고서 PDF, xlsx 내보내기, 점검·OCR(`/inspections/*`),
+화재(fire_incident), 월간 보고서 PDF, xlsx 내보내기, 점검·OCR(`/inspections/*`, 오늘 점검은 빈 목록만),
 사용자 관리(`/users/*`), 이용 로그(`/logs`), 채팅, 공장 관리(배치 저장), 실제 FCM 전송.

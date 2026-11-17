@@ -27,7 +27,8 @@ management:
 argos:
   auth:
     jwt-secret-base64: ${GATEWAY_JWT_SECRET_BASE64}
-    access-seconds: 1800
+    # 로그인 유지 13시간 (A안 확정, 리프레시 토큰 없음)
+    access-seconds: 46800
     session-seconds: 46800
     cookie-secure: ${GATEWAY_COOKIE_SECURE:true}
     cookie-same-site: Strict

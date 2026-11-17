@@ -17,6 +17,7 @@ import com.gte.argos.gateway.checklist.ChecklistRepository.Action;
 import com.gte.argos.gateway.checklist.ChecklistRepository.Checklist;
 import com.gte.argos.gateway.checklist.ChecklistRepository.Template;
 import com.gte.argos.gateway.common.api.ApiException;
+import com.gte.argos.gateway.thermal.ThermalService;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -40,14 +41,16 @@ public class AlarmService {
     private final CurrentUser currentUser;
     private final SimTime time;
     private final ChecklistRepository checklists;
+    private final ThermalService thermal;
 
     public AlarmService(CentralClient central, MasterCache masterCache, CurrentUser currentUser, SimTime time,
-                        ChecklistRepository checklists) {
+                        ChecklistRepository checklists, ThermalService thermal) {
         this.central = central;
         this.masterCache = masterCache;
         this.currentUser = currentUser;
         this.time = time;
         this.checklists = checklists;
+        this.thermal = thermal;
     }
 
     /**
@@ -177,17 +180,25 @@ public class AlarmService {
         }
         Map<String, Object> rule = null;
         Map<String, Object> trend = null;
+        Double usual = null;
         String cause = AlarmViews.title(a);
         Equipment eq = null;
         if (e != null) {
             CentralDto.Sensor def = m.sensor(e.sensorId());
             int hold = def == null || def.threshold() == null ? 0
                     : (e.stage() >= 3 ? def.threshold().alarmSamples() : def.threshold().warnSamples()) * def.sampleSec();
+            Double ruleWarn = e.lowSide() ? e.lowWarn() : e.warn();
+            Double ruleAlarm = e.lowSide() ? e.lowAlarm() : e.alarm();
             rule = new LinkedHashMap<>();
             rule.put("sensorTag", e.tag());
-            rule.put("warn", e.lowSide() ? e.lowWarn() : e.warn());
-            rule.put("alarm", e.lowSide() ? e.lowAlarm() : e.alarm());
+            rule.put("warn", ruleWarn);
+            rule.put("alarm", ruleAlarm);
             rule.put("holdSec", hold);
+            // 기준 띠 끝 = 설비 상세 게이지와 같은 값 (경보 기준 × 1.3)
+            rule.put("max", ruleAlarm == null ? null : Math.round(ruleAlarm * 1.3 * 10) / 10.0);
+            // 평소 값 = 알림 직전 7일 평균 (10분 평균의 평균)
+            usual = ThermalService.mean(central.series(List.of(e.sensorId()),
+                    a.raisedAt().minusDays(7), a.raisedAt(), "10m"));
             eq = m.equipment(e.equipmentId());
             cause = (eq == null ? "" : eq.name() + " ") + Codes.sensorName(e.type()) + "이(가) "
                     + Codes.stageName(e.stage()) + " 기준(" + num(e.threshold()) + " " + nz(e.unit()) + ")을 "
@@ -203,6 +214,10 @@ public class AlarmService {
             }
             trend = new LinkedHashMap<>();
             trend.put("sensorId", e.sensorId());
+            trend.put("tag", e.tag());
+            trend.put("unit", e.unit());
+            trend.put("warn", ruleWarn);
+            trend.put("alarm", ruleAlarm);
             trend.put("points", points);
         }
         Template template = e == null ? null
@@ -216,9 +231,11 @@ public class AlarmService {
         out.put("location", sitePrefix(a, m) + AlarmViews.location(a, m));
         out.put("raisedAt", a.raisedAt());
         out.put("cause", cause);
+        out.put("usual", usual != null ? usual : (e == null ? null : e.peak()));
         out.put("rule", rule);
         out.put("sensors", sensors);
-        out.put("thermal", null); // 열화상 그림은 아직 없음 (VMS 연동 후)
+        // 열화상 그림(VMS)은 아직 없어서 IR 센서 값으로 요약 (imageUrl 은 null → 화면이 단계별 예시 그림 사용)
+        out.put("thermal", thermal.forAlarm(a.processId(), eq == null ? null : eq.id(), status, time.now()));
         out.put("trend", trend);
         out.put("causeCandidates", template == null ? List.of() : List.of(template.cause()));
         out.put("templateId", template == null ? null : template.id());

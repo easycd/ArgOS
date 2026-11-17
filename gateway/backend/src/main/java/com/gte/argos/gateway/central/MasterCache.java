@@ -95,6 +95,11 @@ public class MasterCache {
             return units.get(id);
         }
 
+        /** 관제 단위 전부 */
+        public java.util.Collection<Unit> units() {
+            return units.values();
+        }
+
         public List<Plant> plants() {
             return master.plants();
         }

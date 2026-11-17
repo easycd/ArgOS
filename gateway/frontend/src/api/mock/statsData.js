@@ -150,7 +150,10 @@ const EQUIPMENT_BY_NAME = Object.fromEntries(POOL.filter((p) => p[3]).map((p) =>
 function processIdOf(a, trees) {
   const [, processName] = a.location.split(' · ')
   const factory = trees[a.siteId]?.factories.find((f) => f.id === a.factoryId)
-  return factory?.processes.find((p) => p.name === processName)?.id ?? null
+  const list = factory?.processes ?? []
+  // 이름이 같은 공정, 없으면 앞 단어가 같은 공정 ('가공 라인' → '가공 공정')
+  const head = (processName ?? '').split(' ')[0]
+  return (list.find((p) => p.name === processName) ?? list.find((p) => head && p.name.startsWith(head)))?.id ?? null
 }
 
 /** 오늘 알림 (지금 예시 상황) + 지난 알림, 최근 것이 앞 */

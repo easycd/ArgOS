@@ -261,14 +261,14 @@ select:disabled {
   padding: 0 20px;
 }
 
-/* 1920 보다 좁으면 선택 상자를 줄여서 한 줄 유지 */
+/* 1700px 보다 좁으면 두 줄로 (선택 상자가 찌그러지지 않게 오른쪽 단추가 아래로 내려감) */
 @media (max-width: 1700px) {
-  label {
-    margin-left: 2px;
-  }
-
-  select {
-    max-width: 120px;
+  .fbar {
+    height: auto;
+    min-height: 60px;
+    flex-wrap: wrap;
+    row-gap: 8px;
+    padding: 12px 16px;
   }
 }
 </style>

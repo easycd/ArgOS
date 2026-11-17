@@ -169,4 +169,21 @@ watch(() => route.fullPath, () => (adminOpen.value = false))
   font-size: 12px;
   color: var(--color-text-weak);
 }
+
+/* 1920 보다 좁은 화면: 탭 여백을 줄이고 아이콘은 숨김 (글자만) */
+@media (max-width: 1600px) {
+  .app-nav {
+    margin-left: 0;
+  }
+
+  .app-nav > .tab,
+  .admin > .tab {
+    padding: 0 10px;
+  }
+
+  .app-nav > .tab > .app-icon,
+  .admin > .tab > .app-icon:first-child {
+    display: none;
+  }
+}
 </style>

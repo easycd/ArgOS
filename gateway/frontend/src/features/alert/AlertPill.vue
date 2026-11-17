@@ -166,6 +166,17 @@ function onClick() {
   }
 }
 
+/* 좁은 화면: 설명 글자는 숨기고 '주의 1건' 은 끝까지 보이게 (줄어들지 않음) */
+@media (max-width: 1600px) {
+  .pill {
+    flex-shrink: 0;
+  }
+
+  .pill small {
+    display: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .pill,
   .pill .ico {

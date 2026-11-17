@@ -9,16 +9,24 @@
  *
  * 화면/API 모듈에서는 응답의 data 만 받아서 쓰도록 여기서 꺼내 줌.
  * 실패하면 항상 ApiError 를 던지므로 화면에서는 error.message 만 보여 주면 됨.
+ *
+ * 401 처리 (로그인 상태에서 401 이면 로그아웃 → 로그인 화면)
+ *  - 예외: 요청 설정에 skipAuthLogout: ['오류 코드', …] 를 주면, 401 이어도 그 코드면 로그아웃하지 않고
+ *    오류를 그대로 부른 쪽에 넘김 (비밀번호를 다시 확인하는 요청 — 백엔드가 '비밀번호 틀림'도 401 로 줘서)
+ *    · PUT /me/password            → PASSWORD_MISMATCH       (api/users.js)
+ *    · POST /fires/{id}/clear      → FIRE_PASSWORD_MISMATCH  (api/emergency.js)
+ *  - 같은 요청이라도 진짜 토큰 만료(TOKEN_EXPIRED · AUTH_REQUIRED 등 목록에 없는 코드)면 원래대로 로그아웃
  */
 import axios from 'axios'
 
 /** API 실패를 한 가지 모양으로 통일한 에러 */
 export class ApiError extends Error {
-  constructor({ code, message, status }) {
+  constructor({ code, message, status, details = null }) {
     super(message)
     this.name = 'ApiError'
     this.code = code // 백엔드 오류 코드 (예: AUTH_INVALID)
     this.status = status // HTTP 상태 코드 (네트워크 오류면 0)
+    this.details = details // 오류에 붙은 나머지 값 (예: 화재 해제 error.remaining 남은 횟수)
   }
 }
 
@@ -32,6 +40,18 @@ const handlers = {
 export function setAuthHandlers({ getToken, onUnauthorized }) {
   handlers.getToken = getToken
   handlers.onUnauthorized = onUnauthorized
+}
+
+/**
+ * 401 이면 로그아웃할지 정함 (실제 요청 · 예시 데이터 mockFail 이 같이 씀)
+ * @param {number} status HTTP 상태
+ * @param {string} code 오류 코드
+ * @param {string[]} [skip] 요청별 skipAuthLogout — 이 코드면 로그아웃하지 않음
+ */
+export function handleUnauthorized(status, code, skip) {
+  if (status !== 401 || !handlers.getToken()) return // 로그인 전 401 = 아이디 · 비밀번호 오류 (화면이 문구만)
+  if (skip?.includes(code)) return // 비밀번호 다시 확인 요청의 '틀림' — 부른 쪽이 문구로 보여 줌
+  handlers.onUnauthorized()
 }
 
 const http = axios.create({
@@ -68,17 +88,18 @@ http.interceptors.response.use(
     if (error.response) {
       const { status, data } = error.response
 
-      // 401: 토큰 만료 등 → 로그아웃 후 로그인 화면으로
-      // (리프레시 토큰은 쓰지 않음: 토큰 13시간 유효 A안 확정 — 만료되면 다시 로그인)
-      // (로그인 전 401 = 아이디·비밀번호 오류이므로 이동하지 않고 에러 문구만 표시)
-      if (status === 401 && handlers.getToken()) {
-        handlers.onUnauthorized()
-      }
+      const code = data?.error?.code ?? `HTTP_${status}`
 
+      // 401: 토큰 만료 등 → 로그아웃 후 로그인 화면으로 (요청별 skipAuthLogout 예외는 위 handleUnauthorized)
+      // (리프레시 토큰은 쓰지 않음: 토큰 13시간 유효 A안 확정 — 만료되면 다시 로그인)
+      handleUnauthorized(status, code, error.config?.skipAuthLogout)
+
+      const { code: _c, message: _m, ...details } = data?.error ?? {}
       throw new ApiError({
-        code: data?.error?.code ?? `HTTP_${status}`,
+        code,
         message: data?.error?.message ?? '요청을 처리하지 못했습니다.',
         status,
+        details,
       })
     }
 

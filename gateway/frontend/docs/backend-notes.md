@@ -19,7 +19,7 @@
 | 성공 응답 | `{ success: true, data }` → 화면에는 `data` 만 전달 | `src/api/http.js` |
 | 실패 응답 | `{ success: false, error: { code, message } }` → `error.message` 를 화면에 그대로 표시 | `src/api/http.js` |
 | 인증 | `Authorization: Bearer <accessToken>` | `src/api/http.js` |
-| 401 | 지금은 로그인 상태에서 401 이면 로그아웃 후 로그인 화면으로 | `src/api/http.js` |
+| 401 | 로그인 상태에서 401 이면 로그아웃 후 로그인 화면으로. 단, 비밀번호를 다시 확인하는 요청의 '틀림' 코드(`PASSWORD_MISMATCH` · `FIRE_PASSWORD_MISMATCH`)는 로그아웃하지 않음 (요청별 `skipAuthLogout`) | `src/api/http.js` |
 | 단계 | `NORMAL` / `WARN` / `ALARM` / `FIRE` | `src/types/codes.js` |
 | 권한 | `HQ_ADMIN` / `PLANT_ADMIN` / `WORKER` | `src/types/codes.js` |
 
@@ -354,7 +354,7 @@
 | `POST /alarms/{id}/close` | 경보 종료 (셧다운 뒤, 결과 한 줄) | 있음 | 없음. 409 `VALUE_STILL_OVER` 면 알림 띠 |
 | `GET /fires?status=ACTIVE` | 본사 사업장 선택 화면 화재 띠·화재 상세 | **없음** | 명세서 C5 기준으로 프론트 구현 |
 | `GET /fires/{id}` | 화재 창, 본사 화재 상세 | **없음** | 명세서 C4F + 추가 필드 |
-| `POST /fires/{id}/clear` | 비밀번호 다시 입력 해제 | **없음** | **틀릴 때 401 이면 프론트가 로그아웃시킴** (아래) |
+| `POST /fires/{id}/clear` | 비밀번호 다시 입력 해제 | **없음** | 틀릴 때 401 `FIRE_PASSWORD_MISMATCH` 는 **프론트에서 처리함** — 로그아웃하지 않고 '비밀번호가 맞지 않습니다 · 남은 횟수'(`error.remaining`) (아래) |
 | `POST /fires/{id}/approve-unlock` | 본사 관리자 '잠금 풀기 승인' | **없음** | 명세서 기준 |
 | `GET /notifications/summary` | 상단 바 | 있음 | `activeFire` 를 `{ id, location }` 로 가정 |
 
@@ -378,7 +378,7 @@
 
 | 번호 | 내용 |
 | --- | --- |
-| 1 | **화재 해제 비밀번호가 틀릴 때 401**: 프론트 공통 처리(`src/api/http.js`)가 로그인 상태의 401 을 '토큰 만료'로 보고 로그아웃시킴 → `400 FIRE_PASSWORD_MISMATCH` 로 바꾸거나, 프론트가 이 주소만 예외로 둘지 |
+| 1 | ~~화재 해제 비밀번호가 틀릴 때 401 → 로그아웃되는 문제~~ → **프론트에서 처리함** (2026-11-17 재원님 결정: 백엔드는 401 그대로). `api/emergency.js` 가 `skipAuthLogout: ['FIRE_PASSWORD_MISMATCH']` 를 붙여, 이 코드면 로그아웃하지 않음. 같은 요청에서도 `TOKEN_EXPIRED` · `AUTH_REQUIRED` 면 원래대로 로그아웃. 백엔드가 400 으로 바꿔도 그대로 동작 |
 | 2 | 본사 관리자: 경보·화재 창은 **열람만** (셧다운·해제 단추 없음), 해제 잠금 풀기 승인만 함 — 명세서 가정. 서버도 403 `ACTION_NOT_ALLOWED` 로 막는지 |
 | 3 | 경보 창 '공정 내 센서 데이터': 명세서는 공정 센서 전부, 설계안은 상도 건조로 3종 → 프론트는 응답의 `sensors` 를 그대로 그림(지금 예시는 3개) |
 | 4 | 화재 중 추가 셧다운(다른 설비): 화면설계서에 있지만 설계안 화재 창에는 없어 아직 안 만듦 |
@@ -530,7 +530,7 @@
 
 | 번호 | 내용 |
 | --- | --- |
-| 1 | **`PUT /me/password` 에서 지금 비밀번호가 틀리면 401 `PASSWORD_MISMATCH`** → 프론트 공통 처리(`http.js`)가 로그인 상태의 401 을 '토큰 만료'로 보고 로그아웃시킴. 400 으로 바꾸거나 이 주소만 예외로 둘지 (화재 해제 비밀번호와 같은 문제, 10장) |
+| 1 | ~~`PUT /me/password` 에서 지금 비밀번호가 틀리면 401 → 로그아웃되는 문제~~ → **프론트에서 처리함** (2026-11-17 재원님 결정: 백엔드는 401 그대로). `api/users.js` 가 `skipAuthLogout: ['PASSWORD_MISMATCH']` 를 붙여 로그아웃하지 않고 '지금 비밀번호가 맞지 않습니다'. 같은 요청에서도 `TOKEN_EXPIRED` · `AUTH_REQUIRED` 면 원래대로 로그아웃 (10장 화재 해제와 같은 방식) |
 | 2 | 공장 담당자의 담당 범위: 설계안은 '울산공장 전체', 코드·예시 계정(`ulsan5_admin`)은 5공장(`factoryIds: [5]`) → 코드대로 **공장 단위**로 함 |
 | 3 | 알림 받기 켜기·끄기: 설계안 폼에 스위치가 있지만 API 에 필드가 없음 → '모바일 앱 등록됨 · 알림 받음'(`pushReady`) 표시만 |
 

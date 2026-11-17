@@ -102,8 +102,13 @@ public class ThermalService {
         }
         CentralDto.SensorStatus cur = status.sensors().stream()
                 .filter(s -> s.sensorId() == ir.id()).findFirst().orElse(null);
-        Double max = cur == null ? null : cur.value();
-        Double avg = mean(central.series(java.util.List.of(ir.id()), now.minusHours(1), now, "1m"));
+        CentralDto.Series hour = central.series(java.util.List.of(ir.id()), now.minusHours(1), now, "1m");
+        Double avg = mean(hour);
+        // 최고 = 최근 1시간 최댓값과 지금 값 중 큰 것 (평균보다 작아지지 않게)
+        Double max = peak(hour);
+        if (cur != null && cur.value() != null && (max == null || cur.value() > max)) {
+            max = cur.value();
+        }
         Double usual = mean(central.series(java.util.List.of(ir.id()), now.minusDays(7), now, "10m"));
 
         Set<Long> covered = coveredEquipment(m, ir.id(), ir.equipmentId());
@@ -142,6 +147,22 @@ public class ThermalService {
             }
         }
         return n == 0 ? null : Math.round(sum / n * 10) / 10.0;
+    }
+
+    /** 추이 점들의 최댓값 (points: [시각, 평균, 최소, 최대]). 값이 없으면 null */
+    static Double peak(CentralDto.Series series) {
+        if (series == null || series.series() == null || series.series().isEmpty()
+                || series.series().get(0).points() == null) {
+            return null;
+        }
+        Double max = null;
+        for (java.util.List<Object> p : series.series().get(0).points()) {
+            Object v = p.size() > 3 ? p.get(3) : p.size() > 1 ? p.get(1) : null;
+            if (v instanceof Number n && (max == null || n.doubleValue() > max)) {
+                max = n.doubleValue();
+            }
+        }
+        return max;
     }
 
     /** IR 센서가 들어 있는 관제 단위의 설비들 (+ 카메라 자신) */

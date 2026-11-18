@@ -138,8 +138,19 @@ com.gte.argos.factory
 
 기준값은 시연 시계 날짜의 계절 행이 우선이고, 없으면 `ALL` 행을 씁니다 (`Seasons`).
 
+공장 관리 (연계 서버 → 수집 서버, H1)
+
+| API | 설명 |
+| --- | --- |
+| `POST /internal/plants` · `/internal/factories` · `/internal/processes` | 사업장·공장·공정 추가. 이름·코드가 겹치면 409 `CODE_TAKEN` |
+| `GET /internal/processes/{id}/layout-meta` | `version`, `floorplan`, 설비별 `rot` |
+| `PUT /internal/processes/{id}/layout` | 설비·센서 추가·수정·삭제를 한 트랜잭션으로. 버전 다르면 409 `LAYOUT_CONFLICT`, `TAG_TAKEN`, `SENSOR_HAS_OPEN_ALARM`. 저장하면 판정 엔진 다시 불러옴 |
+| `PUT /internal/processes/{id}/floorplan` `{ url, widthM, depthM }` | 배치도 정보 |
+
+바뀌면 피드 `MASTER_CHANGED` `{ what, id }`. 테이블 변경: `V3__process_layout.sql` (process.layout_version · floorplan_*, equipment.rot)
+
 피드 항목 `type`: `SENSOR_VALUES`(`values: [[sensorId, ts, value], ...]`), `EVENT_OPENED`, `EVENT_ESCALATED`,
-`EVENT_CLOSED`, `ALARM_OPENED`, `ALARM_UPDATED`, `ALARM_CLEARED`(이벤트가 모두 끝남), `ALARM_STATUS`(확인·조치·종료), `COMMAND_RESULT`, `THRESHOLD_CHANGED`, `RESET`.
+`EVENT_CLOSED`, `ALARM_OPENED`, `ALARM_UPDATED`, `ALARM_CLEARED`(이벤트가 모두 끝남), `ALARM_STATUS`(확인·조치·종료), `COMMAND_RESULT`, `THRESHOLD_CHANGED`, `MASTER_CHANGED`, `RESET`.
 `bootId` 가 바뀌면 중앙 서버가 다시 켜진 것이므로 `after=0` 부터, `gap=true` 면 `status`·`alarms` 를 다시 조회합니다.
 
 ## 아직 안 한 것

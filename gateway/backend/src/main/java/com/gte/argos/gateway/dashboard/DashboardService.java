@@ -1,5 +1,7 @@
 package com.gte.argos.gateway.dashboard;
 
+import com.gte.argos.gateway.factory.FactoryAdminService;
+
 import com.gte.argos.gateway.access.CurrentUser;
 import com.gte.argos.gateway.access.UserScope;
 import com.gte.argos.gateway.central.CentralClient;
@@ -45,9 +47,11 @@ public class DashboardService {
     private final CurrentUser currentUser;
     private final SimTime time;
     private final ChecklistRepository checklists;
+    private final FactoryAdminService factoryAdmin;
 
     public DashboardService(CentralClient central, MasterCache masterCache, CurrentUser currentUser, SimTime time,
-                            ChecklistRepository checklists) {
+                            ChecklistRepository checklists, FactoryAdminService factoryAdmin) {
+        this.factoryAdmin = factoryAdmin;
         this.central = central;
         this.masterCache = masterCache;
         this.currentUser = currentUser;
@@ -300,6 +304,14 @@ public class DashboardService {
         MasterCache.Snapshot m = masterCache.get();
         Process p = processOr404(m, processId);
         currentUser.checkProcess(scope, processId);
+        Map<String, Object> meta = layoutMeta(processId);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> rot = (Map<String, Object>) meta.getOrDefault("rot", Map.of());
+        List<Long> ids = new ArrayList<>();
+        for (Equipment e : m.equipmentOf(processId)) {
+            ids.add(e.id());
+        }
+        Map<Long, List<Map<String, Object>>> managers = factoryAdmin.managersOf(ids);
         List<Map<String, Object>> equipment = new ArrayList<>();
         List<Map<String, Object>> sensors = new ArrayList<>();
         for (Equipment e : m.equipmentOf(processId)) {
@@ -311,9 +323,9 @@ public class DashboardService {
             row.put("shape", e.shape());
             row.put("size", xyz("w", e.sizeW(), "d", e.sizeD(), "h", e.sizeH()));
             row.put("pos", xyz("x", e.posX(), "y", e.posY(), "z", e.posZ()));
-            row.put("rot", 0);
+            row.put("rot", rot.getOrDefault(String.valueOf(e.id()), 0));
             row.put("active", e.active());
-            row.put("managers", List.of());
+            row.put("managers", managers.getOrDefault(e.id(), List.of()));
             equipment.add(row);
             for (Sensor s : m.sensorsOf(e.id())) {
                 Map<String, Object> sr = new LinkedHashMap<>();
@@ -330,11 +342,20 @@ public class DashboardService {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("processId", p.id());
         out.put("name", p.name());
-        out.put("version", 1);
-        out.put("floorplan", null);
+        out.put("version", meta.getOrDefault("version", 1));
+        out.put("floorplan", meta.get("floorplan"));
         out.put("equipment", equipment);
         out.put("sensors", sensors);
         return out;
+    }
+
+    /** 배치 버전 · 배치도 · 회전 (수집 서버). 못 받으면 기본값 */
+    private Map<String, Object> layoutMeta(long processId) {
+        try {
+            return central.layoutMeta(processId);
+        } catch (RuntimeException e) {
+            return Map.of("version", 1);
+        }
     }
 
     /** GET /processes/{processId}/status */

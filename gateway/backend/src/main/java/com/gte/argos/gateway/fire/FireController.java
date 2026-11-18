@@ -43,6 +43,11 @@ public class FireController {
         return ApiResponse.ok(service.approveUnlock(fireId));
     }
 
+    @PostMapping("/fires/{fireId}/evacuated")
+    public ApiResponse<Map<String, Object>> evacuated(@PathVariable long fireId) {
+        return ApiResponse.ok(service.evacuated(fireId));
+    }
+
     public record ClearRequest(String password, String memo) {
     }
 }

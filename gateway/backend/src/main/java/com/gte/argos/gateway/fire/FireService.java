@@ -50,13 +50,15 @@ public class FireService {
     private final ChecklistRepository checklists;
     private final ActivityLogger activity;
     private final BroadcastSender broadcast;
+    private final com.gte.argos.gateway.push.PushSender push;
     private final StreamHub hub;
     private final SimTime time;
 
     public FireService(NamedParameterJdbcTemplate jdbc, CentralClient central, MasterCache masterCache,
                        CurrentUser currentUser, AuthRepository auth, PasswordEncoder passwords,
                        ChecklistRepository checklists, ActivityLogger activity, BroadcastSender broadcast,
-                       StreamHub hub, SimTime time) {
+                       StreamHub hub, SimTime time, com.gte.argos.gateway.push.PushSender push) {
+        this.push = push;
         this.jdbc = jdbc;
         this.central = central;
         this.masterCache = masterCache;
@@ -121,6 +123,7 @@ public class FireService {
                     new MapSqlParameterSource("now", now).addValue("id", fireId));
         }
         checklists.addAction(a.alarmId(), "BROADCAST", "공장 경고 방송", ok ? "OK" : "FAIL", message, null, now);
+        pushWorkers(a.processId(), "FIRE", fireId);
         log.info("화재 판정: fire={} alarm={} max={}", fireId, a.alarmId(), ir.peak());
 
         Map<String, Object> ev = new LinkedHashMap<>();
@@ -246,6 +249,7 @@ public class FireService {
                 WHERE fire_id = :id
                 """, new MapSqlParameterSource("by", scope.userId()).addValue("now", now).addValue("id", fireId));
         broadcast.stop(fireId);
+        pushWorkers(f.processId(), "FIRE_CLEARED", fireId);
         checklists.addAction(f.alarmId(), "MANUAL_NOTE", "화재 해제", "OK",
                 memo == null || memo.isBlank() ? "화재 경보 해제" : "화재 경보 해제: " + memo, scope.userId(), now);
         try {
@@ -276,6 +280,47 @@ public class FireService {
         hub.publish("fire.updated", Map.of("fireId", fireId, "unlock", unlock(0)),
                 s -> s.scope().isHq() || s.scope().canSite(f.plantId(), masterCache.get()));
         return Map.of("id", fireId, "unlock", Map.of("failCount", 0, "locked", false));
+    }
+
+    /** POST /fires/{fireId}/evacuated: 공정 담당자 "대피했습니다" (명세서 M2) */
+    public Map<String, Object> evacuated(long fireId) {
+        UserScope scope = currentUser.require(UserScope.WORKER);
+        Fire f = find(fireId);
+        if (f.processId() == null || !scope.canProcess(f.processId(), masterCache.get())) {
+            throw com.gte.argos.gateway.common.api.ApiException.outOfScope();
+        }
+        boolean already = false;
+        for (ChecklistRepository.Action a : checklists.actions(f.alarmId())) {
+            if ("EVACUATED".equals(a.action()) && a.userId() != null && a.userId() == scope.userId()) {
+                already = true;
+            }
+        }
+        if (!already) {
+            checklists.addAction(f.alarmId(), "EVACUATED", "대피 완료", "OK", null, scope.userId(), time.now());
+        }
+        java.util.Set<Long> done = new java.util.HashSet<>();
+        for (ChecklistRepository.Action a : checklists.actions(f.alarmId())) {
+            if ("EVACUATED".equals(a.action()) && a.userId() != null) {
+                done.add(a.userId());
+            }
+        }
+        int total = checklists.workers(f.processId()).size();
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("evacuatedCount", done.size());
+        out.put("totalCount", total);
+        hub.publish("fire.updated", Map.of("fireId", fireId, "evacuated", out),
+                s -> s.scope().isHq() || s.scope().canSite(f.plantId(), masterCache.get()));
+        return out;
+    }
+
+    /** 그 공정 담당자들에게 화재 · 해제 푸시 (종류와 번호만) */
+    private void pushWorkers(Long processId, String type, long fireId) {
+        if (processId == null) {
+            return;
+        }
+        for (ChecklistRepository.Worker w : checklists.workers(processId)) {
+            push.send(checklists.fcmToken(w.id()), type, Map.of("fireId", String.valueOf(fireId)));
+        }
     }
 
     // ------------------------------------------------------------------

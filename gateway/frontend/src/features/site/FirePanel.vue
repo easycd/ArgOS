@@ -69,7 +69,7 @@ function contact() {
         :max-point="fire.thermal.maxPoint"
         :label-offset="{ x: -150, y: -52 }"
         :scale="fire.thermal.scale"
-        zone-name="IR-01 · 도장 공정"
+        :zone-name="[fire.thermal.cameraTag, parts[2]].filter(Boolean).join(' · ')"
       />
     </div>
 
@@ -85,7 +85,7 @@ function contact() {
         <button type="button" class="btn btn-primary" @click="approve">잠금 풀기 승인</button>
       </div>
       <div class="m-actions btns">
-        <button type="button" class="btn btn-primary" @click="emit('go')">5공장 대시보드로 이동</button>
+        <button type="button" class="btn btn-primary" @click="emit('go')">{{ parts[1] }} 대시보드로 이동</button>
         <button type="button" class="btn" @click="contact"><AppIcon name="user" :size="16" />공장 담당자 연락</button>
       </div>
     </div>

@@ -6,6 +6,7 @@
  *   예) 주의: CT-17 22.4 A 주의 / 정상: 18.1 A → 공장·사업장 화면 숫자도 같이 바뀜
  * - 센서 19개 = 전류 9 + 온도 6 + CO 4 (CO-14 는 예비 센서라 그림에 위치 없음)
  */
+import { LAYOUT, editsOf } from './layoutData'
 import { scenario, topOvenValue } from './scenario'
 import { seasonThreshold } from './thresholdRules'
 import { LEVEL } from '@/types/codes'
@@ -15,19 +16,21 @@ const { NORMAL, WARN, ALARM, FIRE } = LEVEL
 /**
  * 설비 (seq: 공정 흐름 순서 번호, 그림과 아래 설비 줄에 표시. 명세서에 없는 값)
  * - 설비 상세 예시 데이터(equipmentData.js)도 이 목록을 그대로 씀 → 두 화면 숫자가 어긋나지 않음
+ * - type: DB equipment.equipment_type 코드. 지금 DB 시드 · 체크리스트 양식에 있는 코드(OVEN · TANK …)만 쓰고,
+ *   코드가 정해지지 않은 설비(실링 · 부스 · 공조기 · 도료 혼합실 · 소각설비)는 null (backend-notes 15장 질문)
  */
 export const EQUIPMENT = [
   { id: 24, code: 'PNT-PRETREAT', name: '전처리', type: 'TANK', seq: 1, manager: '이재호' },
   { id: 25, code: 'PNT-ED-TANK', name: '전착 탱크', type: 'TANK', seq: 2, manager: '이재호' },
   { id: 26, code: 'PNT-ED-OVEN', name: '전착 건조로', type: 'OVEN', seq: 3, manager: '박성훈' },
-  { id: 27, code: 'PNT-SEALING', name: '실링', type: 'BOX', seq: 4, manager: '박성훈' },
-  { id: 28, code: 'PNT-PRIMER-BOOTH', name: '중도 부스', type: 'BOOTH', seq: 5, manager: '박성훈' },
+  { id: 27, code: 'PNT-SEALING', name: '실링', type: null, seq: 4, manager: '박성훈' },
+  { id: 28, code: 'PNT-PRIMER-BOOTH', name: '중도 부스', type: null, seq: 5, manager: '박성훈' },
   { id: 29, code: 'PNT-PRIMER-OVEN', name: '중도 건조로', type: 'OVEN', seq: 6, manager: '박성훈' },
-  { id: 30, code: 'PNT-TOP-BOOTH', name: '상도 부스', type: 'BOOTH', seq: 7, manager: '김도현' },
+  { id: 30, code: 'PNT-TOP-BOOTH', name: '상도 부스', type: null, seq: 7, manager: '김도현' },
   { id: 31, code: 'PNT-TOP-OVEN', name: '상도 건조로', type: 'OVEN', seq: 8, manager: '김도현' },
-  { id: 32, code: 'PNT-AHU', name: '공조기 (AHU)', type: 'BOX', seq: null, manager: '이재호' },
-  { id: 33, code: 'PNT-PAINT-MIX', name: '도료 혼합실', type: 'BOX', seq: null, manager: '이재호' },
-  { id: 34, code: 'PNT-INCINERATOR', name: '소각설비', type: 'BOX', seq: null, manager: '이재호' },
+  { id: 32, code: 'PNT-AHU', name: '공조기 (AHU)', type: null, seq: null, manager: '이재호' },
+  { id: 33, code: 'PNT-PAINT-MIX', name: '도료 혼합실', type: null, seq: null, manager: '이재호' },
+  { id: 34, code: 'PNT-INCINERATOR', name: '소각설비', type: null, seq: null, manager: '이재호' },
 ]
 
 /** 센서: [id, tag, 종류, 단위, 설비 id, 평상시 값, 주의 기준, 경보 기준] — id 는 전류 1xx · 온도 2xx · CO 3xx */
@@ -121,6 +124,7 @@ const INSPECTIONS = {
   ],
 }
 
+
 /**
  * 공정 예시 데이터 (부를 때마다 지금 상황으로 만듦)
  * @returns {{ layout, status, inspections } | null}
@@ -135,12 +139,16 @@ export function mockProcess(processId) {
     layout: {
       processId: 12,
       name: '도장 공정',
-      version: 14,
+      version: LAYOUT.version,
       floorplan: null,
+      // 백엔드 DashboardService.processLayout 과 같은 모양: type(equipment_type) · pos{x,y,z}(pos_x · pos_y · pos_z) · active(is_active)
+      // 위치는 DB 시드처럼 처음엔 비어 있음(그림에 그려진 자리). 공장 관리에서 저장한 값을 덮어씀 (layoutData.js)
       equipment: EQUIPMENT.map(({ manager, ...e }) => ({
         ...e,
+        pos: { x: null, y: null, z: null },
         active: true,
         managers: [{ id: 0, name: manager, primary: true }],
+        ...editsOf(e.id),
       })),
       sensors: sensors.map(({ id, tag, type, unit, equipmentId }) => ({ id, tag, type, unit, equipmentId, active: true })),
     },

@@ -34,6 +34,11 @@ argos:
   dev-api: ${ARGOS_DEV_API:false}
   # 연계 서버 전용 API(/api/v1/internal/**) 키. 연계 서버는 X-Argos-Internal-Key 헤더로 보낸다. 비우면 검사 안 함
   internal-api-key: ${ARGOS_INTERNAL_API_KEY:}
+  # 센서 값(그래프용 1분 추이·경보 샘플) 보관 기간. 1시간마다 시연 시계 기준 N일 지난 값을 지운다.
+  # 경보·이벤트 이력과 경보 이미지는 지우지 않는다 (통계·월간 보고서용)
+  retention:
+    enabled: ${ARGOS_RETENTION_ENABLED:true}
+    days: ${ARGOS_RETENTION_DAYS:7}
 
 management:
   endpoints:

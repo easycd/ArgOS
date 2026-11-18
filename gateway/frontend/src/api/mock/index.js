@@ -5,7 +5,7 @@
  * - 실제 백엔드에 붙일 때: .env 에 VITE_USE_MOCK=false → API 모듈이 http(Axios)로 요청
  * - 화면은 항상 src/api 모듈만 부르므로 모드가 바뀌어도 화면 코드는 그대로
  */
-import { ApiError } from '../http'
+import { ApiError, handleUnauthorized } from '../http'
 
 /** true 면 예시 데이터 사용 */
 export const USE_MOCK = import.meta.env.VITE_USE_MOCK !== 'false'
@@ -23,9 +23,17 @@ export function mockOk(data) {
   })
 }
 
-/** 실패 응답 흉내: http.js 와 같은 ApiError 를 던짐 */
-export function mockFail({ code, message, status = 400 }) {
+/**
+ * 실패 응답 흉내: http.js 와 같은 ApiError 를 던짐
+ * - 401 도 실제처럼 처리: 로그인 상태면 로그아웃 (options.skipAuthLogout 의 코드는 예외 — http.js handleUnauthorized)
+ * @param {{ code, message, status?, details? }} error
+ * @param {{ skipAuthLogout?: string[] }} [options]
+ */
+export function mockFail({ code, message, status = 400, details = null }, { skipAuthLogout } = {}) {
   return new Promise((_, reject) => {
-    setTimeout(() => reject(new ApiError({ code, message, status })), DELAY)
+    setTimeout(() => {
+      handleUnauthorized(status, code, skipAuthLogout)
+      reject(new ApiError({ code, message, status, details }))
+    }, DELAY)
   })
 }

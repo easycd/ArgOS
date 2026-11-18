@@ -1,13 +1,14 @@
 <!--
   주의 상세 · 체크리스트 전송 창 (화면설계안 js/v-modals.js mWarnDetail(), 화면설계서 C2)
-  - 왼쪽: 발생 원인(문장·기준 띠) / 전류 추이(최근 40분) / 예상 원인 / '센서 데이터 · 열화상 확인' 단추
+  - 왼쪽: 발생 원인(문장·기준 띠) / 센서 추이(최근 40분 — 전류·온도·CO 중 알림이 난 센서) / 예상 원인 / '센서 데이터 · 열화상 확인' 단추
   - 오른쪽: 조치 체크리스트(빼기·추가) / 전송 대상(공정 담당자) / 닫기 · 공정 담당자 앱으로 전송
   - 데이터: GET /alarms/{id}/detail, GET /checklist-templates, GET /processes/{id}/workers
   - 전송: POST /checklists → '보내는 중' → 알림 띠 → 창 닫힘 (상단 바에 체크리스트 진행이 나타남)
   - 이미 보낸 알림이면 항목을 고칠 수 없고 단추는 '전송 완료'
 -->
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import { placeOf, sensorTypeOfDetail, trendInfo } from './alarmPlace'
 import ChecklistEditor from './ChecklistEditor.vue'
 import MiniTrend from './MiniTrend.vue'
 import WarnCause from './WarnCause.vue'
@@ -38,7 +39,8 @@ onMounted(async () => {
   try {
     const d = await getAlarmDetail(props.alarmId)
     const [template, list] = await Promise.all([
-      getChecklistTemplate({ equipmentType: d.equipmentType, sensorType: d.sensorType }),
+      // 센서 종류: 백엔드 detail 에는 sensorType 이 없어 알림 센서에서 찾음 (전류로 고정하지 않음)
+      getChecklistTemplate({ equipmentType: d.equipmentType, sensorType: sensorTypeOfDetail(d) }),
       getProcessWorkers(d.processId),
     ])
     detail.value = d
@@ -51,6 +53,9 @@ onMounted(async () => {
     errorMessage.value = error.message
   }
 })
+
+/** 추이 제목 '전류 추이' · '온도 추이' · 'CO 추이' (알림이 난 센서 종류) */
+const trend = computed(() => trendInfo(detail.value))
 
 /** 이미 보낸 알림 (조치 중) */
 const sent = () => detail.value?.status === 'ACTING'
@@ -97,7 +102,7 @@ async function send() {
         <section class="left">
           <div class="m-sect"><AppIcon name="info" :size="15" />발생 원인</div>
           <WarnCause :detail="detail" class="gap" />
-          <MiniTrend :trend="detail.trend" title="전류 추이" :sub="`${detail.rule.sensorTag} · 최근 40분`" class="gap-s" />
+          <MiniTrend v-if="detail.trend" :trend="detail.trend" :title="trend.title" :dec="trend.dec" :sub="`${trend.tag} · 최근 40분`" class="gap-s" />
 
           <div class="m-sect top"><AppIcon name="gear" :size="15" />예상 원인</div>
           <div class="causes">
@@ -114,7 +119,7 @@ async function send() {
           <ChecklistEditor v-model="items" :readonly="sent()" class="gap" />
 
           <div class="m-sect top"><AppIcon name="phone" :size="15" />전송 대상</div>
-          <WorkerPicker v-model="assigneeId" :workers="workers" class="gap" />
+          <WorkerPicker v-model="assigneeId" :workers="workers" :process-name="placeOf(detail).processName" class="gap" />
 
           <p class="note">
             체크리스트와 센서 값, 열화상 이미지가 함께 전송됩니다.<br />

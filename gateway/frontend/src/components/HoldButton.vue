@@ -4,6 +4,8 @@
   - 중간에 떼면 취소, 고리가 0.2초에 0으로 돌아감
   - 누르기 전에는 가운데 동그라미가 천천히 숨쉬듯 커졌다 작아짐(1.8초), 다 차면 한 번 튐
   - 끝나는 시점은 '누른 시각 + 2초' 타이머로 정함 (화면 그리기가 느려져도 정확히 2초)
+  - 다 차면 다시 눌리지 않음. 부모가 reset() 을 부르면 처음 상태로 돌아가 다시 누를 수 있음
+    (예: 셧다운 확인을 취소했거나 요청이 실패했을 때 — ShutdownPanel)
   - 사용 예: <HoldButton :size="148" color="#F97316" label="길게 눌러 확인" @progress="..." @done="..." />
 -->
 <script setup>
@@ -34,6 +36,7 @@ const releasing = ref(false) // 손을 떼서 0으로 돌아가는 중 (고리�
 let startAt = 0
 let frame = 0
 let doneTimer = 0
+let emitTimer = 0 // 다 찬 뒤 done 을 알리기까지 잠깐 기다리는 타이머
 
 function draw() {
   progress.value = Math.min(1, (performance.now() - startAt) / props.ms)
@@ -57,8 +60,22 @@ function finish() {
   progress.value = 1
   done.value = true
   emit('progress', props.ms)
-  setTimeout(() => emit('done'), 180) // 체크 표시가 튀는 것을 잠깐 보여 준 뒤
+  emitTimer = setTimeout(() => emit('done'), 180) // 체크 표시가 튀는 것을 잠깐 보여 준 뒤
 }
+
+/** 처음 상태로 되돌림 (다 찬 뒤에도 다시 누를 수 있게) — 부모가 ref 로 부름 */
+function reset() {
+  cancelAnimationFrame(frame)
+  clearTimeout(doneTimer)
+  clearTimeout(emitTimer)
+  holding.value = false
+  done.value = false
+  releasing.value = true // 고리가 0.2초에 걸쳐 0으로
+  progress.value = 0
+  emit('progress', 0)
+}
+
+defineExpose({ reset })
 
 function stop() {
   if (!holding.value || done.value) return
@@ -81,6 +98,7 @@ function onKeyup(e) {
 onBeforeUnmount(() => {
   cancelAnimationFrame(frame)
   clearTimeout(doneTimer)
+  clearTimeout(emitTimer)
 })
 </script>
 

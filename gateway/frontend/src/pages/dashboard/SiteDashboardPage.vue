@@ -1,7 +1,8 @@
 <!--
   사업장 현황 화면 (예: 울산공장 — 화면설계안 js/v-dash.js vSite() 기준, 설계안 이름 '구역 현황')
-  - 왼쪽: 구역 현황 지도(ZoneMapCard), 전체 공장 상태(FactoryStatusCard)
-  - 오른쪽: 센서별 단계 현황(SensorTypeCard), 실시간 알림(AlarmListCard), 시간대별 알림(HourlyAlarmCard)
+  - 왼쪽: 구역 현황 지도(ZoneMapCard)
+  - 오른쪽: 전일 시간대별 알림(HourlyAlarmCard), 실시간 알림(AlarmListCard)
+  - 아래: 전체 공장 상태(FactoryStatusCard)를 화면 끝까지 (2026-11-18 센서별 단계 현황 삭제)
   - 이 파일은 데이터 불러오기와 화면 이동만 담당, 모양은 features/dashboard 의 카드가 담당
   - 데이터 (지금은 예시 데이터): GET /sites/{siteId}/overview, GET /alarms, GET /alarms/hourly
   - TODO: 실시간(SSE) 연결 후 값이 바뀌면 카드가 다시 그려지게
@@ -13,7 +14,6 @@ import { getAlarms, getHourlyAlarms, getSiteOverview } from '@/api/dashboard'
 import AlarmListCard from '@/features/dashboard/AlarmListCard.vue'
 import FactoryStatusCard from '@/features/dashboard/FactoryStatusCard.vue'
 import HourlyAlarmCard from '@/features/dashboard/HourlyAlarmCard.vue'
-import SensorTypeCard from '@/features/dashboard/SensorTypeCard.vue'
 import ZoneMapCard from '@/features/dashboard/ZoneMapCard.vue'
 import { useLiveReload } from '@/utils/useLiveReload'
 
@@ -76,32 +76,40 @@ function onFactorySelect(factory) {
   <p v-else-if="errorMessage" class="state error">{{ errorMessage }}</p>
 
   <div v-else class="site-dashboard">
-    <div class="left">
-      <ZoneMapCard
-        ref="zoneMap"
-        :site-name="overview.site.name"
-        :factories="overview.factories"
-        :enterable-factory-id="ENTERABLE_FACTORY_ID"
-        @enter-factory="enterFactory"
-      />
-      <FactoryStatusCard :factories="overview.factories" @select="onFactorySelect" />
-    </div>
+    <ZoneMapCard
+      ref="zoneMap"
+      :site-name="overview.site.name"
+      :factories="overview.factories"
+      :enterable-factory-id="ENTERABLE_FACTORY_ID"
+      @enter-factory="enterFactory"
+    />
 
     <div class="right">
-      <SensorTypeCard :site-name="overview.site.name" :levels-by-type="overview.levelsByType" />
-      <AlarmListCard :alarms="alarms" />
       <HourlyAlarmCard :hourly="hourly" />
+      <AlarmListCard class="fill" :alarms="alarms" />
     </div>
+
+    <FactoryStatusCard class="wide" :factories="overview.factories" @select="onFactorySelect" />
   </div>
 </template>
 
 <style scoped>
-/* 배치: 왼쪽 넓은 열 + 오른쪽 628px 열 (설계안 1920 화면 기준), 좁은 화면에서는 위아래로 */
+/*
+ * 배치 (설계안 1920 화면 기준)
+ * - 위 줄: 왼쪽 넓은 열(구역 현황 지도) + 오른쪽 628px 열
+ * - 아래 줄: 전체 공장 상태가 두 열을 모두 차지
+ * - 위 줄 높이는 지도 카드가 정하고, 오른쪽 실시간 알림은 남는 높이를 채운 뒤 안에서 스크롤
+ * - 좁은 화면에서는 위아래로
+ */
 .site-dashboard {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 628px;
   gap: 16px;
-  align-items: start;
+  align-items: stretch;
+}
+
+.wide {
+  grid-column: 1 / -1;
 }
 
 @media (max-width: 1400px) {
@@ -110,12 +118,24 @@ function onFactorySelect(factory) {
   }
 }
 
-.left,
 .right {
   display: flex;
   flex-direction: column;
   gap: 16px;
   min-width: 0;
+}
+
+/* 실시간 알림: 남는 높이를 채우고 목록만 스크롤 (AlarmListCard 의 .list) */
+.fill {
+  flex: 1 1 0;
+  min-height: 240px;
+  display: flex;
+  flex-direction: column;
+}
+
+.fill :deep(.list) {
+  flex: 1 1 0;
+  max-height: none;
 }
 
 .state {

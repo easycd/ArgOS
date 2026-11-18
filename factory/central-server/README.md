@@ -77,6 +77,22 @@ com.gte.argos.factory
 | `POST /api/v1/dev/readings` | 센서값 직접 넣기. `[{ "tag": "AT-301", "value": 18.5 }]` (ts 비우면 시연 시계 지금) |
 | `POST /api/v1/dev/history-import?reset=true` | 7일치 다시 가져오기 |
 | `POST /api/v1/dev/sim/reset` | 시연 리셋: 시계를 09:00 으로, 09:00 이후 이벤트·경보·명령·추이 삭제 |
+| `POST /api/v1/dev/retention/run` | 보관 기간 지난 센서 값 지금 지우기 (평소에는 1시간마다 자동) |
+
+## 데이터 보관 기간
+
+센서 값은 정상값까지 전부 1분 추이(`sensor_trend`, 평균·최소·최대)로 저장해서 하루치 그래프를 그릴 수 있고,
+**시연 시계 기준 7일**(`argos.retention.days`)이 지나면 하루 단위로 지웁니다 (오늘 0시 - 7일 이전) (`RetentionService`, 시작 1분 뒤부터 1시간마다).
+
+| 데이터 | 보관 |
+| --- | --- |
+| `sensor_trend` (그래프용 1분 추이) | 7일 뒤 삭제 |
+| `sensor_event_sample` (경보 구간 원본 샘플) | 7일 뒤 삭제 |
+| `alarm`, `sensor_event` (경보·이벤트 이력) | 계속 보관 (통계·이력 최대 1년, 월간 보고서) |
+| `file_asset` (경보 시작 이미지, VMS 연동 후) | 경보와 함께 계속 보관 |
+
+- 실제 시각이 아니라 시연 시계 기준이라, 7일치 시연 데이터(11/09 09:00 ~)는 지워지지 않습니다.
+- 5초 원본 값은 DB 에 저장하지 않고 메모리에 최근 1시간만 둡니다 (설비 상세 '최근 1시간' 그래프).
 
 ## 연계 서버 전용 API (`/api/v1/internal/**`)
 

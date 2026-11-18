@@ -2,6 +2,7 @@
   상단 메뉴 (화면설계안 js/shell.js buildHeader 의 nav)
   - 탭 4개 + '관리' 펼침(사용자 관리, 공장 관리)
   - 선택 표시: 지금 화면의 meta.nav 와 같은 탭에 파란 글자 + 아래 밑줄
+  - '관리' 펼침은 바깥을 누르거나 Esc 를 누르면 닫힘 (utils/useOutsideClose.js), 열고 닫힐 때 menu-drop 움직임 (motion.css)
   - 메뉴 목록은 router/menus.js 한 곳에서 관리
 -->
 <script setup>
@@ -9,6 +10,7 @@ import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import AppIcon from './AppIcon.vue'
 import { NAV_ADMIN, NAV_TABS } from '@/router/menus'
+import { useOutsideClose } from '@/utils/useOutsideClose'
 
 const route = useRoute()
 
@@ -19,6 +21,8 @@ const currentNav = computed(() => route.meta.nav)
 // '관리' 펼침 열림 여부 (다른 화면으로 가면 닫음)
 const adminOpen = ref(false)
 watch(() => route.fullPath, () => (adminOpen.value = false))
+const adminRoot = ref(null)
+useOutsideClose(adminRoot, adminOpen)
 </script>
 
 <template>
@@ -33,7 +37,7 @@ watch(() => route.fullPath, () => (adminOpen.value = false))
       <AppIcon :name="tab.icon" />{{ tab.label }}
     </RouterLink>
 
-    <div class="admin">
+    <div ref="adminRoot" class="admin">
       <button
         type="button"
         class="tab"
@@ -44,22 +48,24 @@ watch(() => route.fullPath, () => (adminOpen.value = false))
         <AppIcon name="gear" />관리<AppIcon name="cd" :size="14" class="chev" />
       </button>
 
-      <div v-if="adminOpen" class="menu" role="menu">
-        <RouterLink
-          v-for="item in NAV_ADMIN"
-          :key="item.name"
-          :to="{ name: item.name, params: { siteId } }"
-          class="menu-item"
-          role="menuitem"
-          @click="adminOpen = false"
-        >
-          <AppIcon :name="item.icon" :size="16" />
-          <span>
-            <b>{{ item.label }}</b>
-            <small>{{ item.sub }}</small>
-          </span>
-        </RouterLink>
-      </div>
+      <Transition name="menu-drop">
+        <div v-if="adminOpen" class="menu" role="menu">
+          <RouterLink
+            v-for="item in NAV_ADMIN"
+            :key="item.name"
+            :to="{ name: item.name, params: { siteId } }"
+            class="menu-item"
+            role="menuitem"
+            @click="adminOpen = false"
+          >
+            <AppIcon :name="item.icon" :size="16" />
+            <span>
+              <b>{{ item.label }}</b>
+              <small>{{ item.sub }}</small>
+            </span>
+          </RouterLink>
+        </div>
+      </Transition>
     </div>
   </nav>
 </template>
@@ -138,7 +144,6 @@ watch(() => route.fullPath, () => (adminOpen.value = false))
   border: 1px solid var(--color-border-card);
   border-radius: var(--radius-md);
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
-  animation: pop-in var(--m-pop-in) both; /* motion.css */
 }
 
 .menu-item {

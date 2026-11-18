@@ -17,6 +17,7 @@ import com.gte.argos.gateway.checklist.ChecklistRepository.Action;
 import com.gte.argos.gateway.checklist.ChecklistRepository.Checklist;
 import com.gte.argos.gateway.checklist.ChecklistRepository.Template;
 import com.gte.argos.gateway.common.api.ApiException;
+import com.gte.argos.gateway.thermal.ThermalService;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -40,14 +41,16 @@ public class AlarmService {
     private final CurrentUser currentUser;
     private final SimTime time;
     private final ChecklistRepository checklists;
+    private final ThermalService thermal;
 
     public AlarmService(CentralClient central, MasterCache masterCache, CurrentUser currentUser, SimTime time,
-                        ChecklistRepository checklists) {
+                        ChecklistRepository checklists, ThermalService thermal) {
         this.central = central;
         this.masterCache = masterCache;
         this.currentUser = currentUser;
         this.time = time;
         this.checklists = checklists;
+        this.thermal = thermal;
     }
 
     /**
@@ -133,11 +136,12 @@ public class AlarmService {
         }
         boolean hasAck = steps.stream().anyMatch(s -> "ACK".equals(s.get("step")));
         if (!hasAck && a.ackedAt() != null) {
-            steps.add(1, step("ACKED", a.ackedAt(), names.get(a.ackedBy()), null, null));
+            // 셧다운처럼 확인 단추 없이 조치에 들어간 경우. 단계 이름은 조치 이력과 같게 (화면은 ACK·CLOSE 를 봄)
+            steps.add(1, step("ACK", a.ackedAt(), names.get(a.ackedBy()), null, null));
         }
         boolean hasClose = steps.stream().anyMatch(s -> "CLOSE".equals(s.get("step")) || "CONFIRM".equals(s.get("step")));
         if (!hasClose && a.closedAt() != null) {
-            steps.add(step("CLOSED", a.closedAt(), names.get(a.closedBy()), null, null));
+            steps.add(step("CLOSE", a.closedAt(), names.get(a.closedBy()), null, null));
         }
         Checklist c = checklists.latestForAlarm(alarmId);
         Event e = a.mainEvent();
@@ -177,17 +181,25 @@ public class AlarmService {
         }
         Map<String, Object> rule = null;
         Map<String, Object> trend = null;
+        Double usual = null;
         String cause = AlarmViews.title(a);
         Equipment eq = null;
         if (e != null) {
             CentralDto.Sensor def = m.sensor(e.sensorId());
             int hold = def == null || def.threshold() == null ? 0
                     : (e.stage() >= 3 ? def.threshold().alarmSamples() : def.threshold().warnSamples()) * def.sampleSec();
+            Double ruleWarn = e.lowSide() ? e.lowWarn() : e.warn();
+            Double ruleAlarm = e.lowSide() ? e.lowAlarm() : e.alarm();
             rule = new LinkedHashMap<>();
             rule.put("sensorTag", e.tag());
-            rule.put("warn", e.lowSide() ? e.lowWarn() : e.warn());
-            rule.put("alarm", e.lowSide() ? e.lowAlarm() : e.alarm());
+            rule.put("warn", ruleWarn);
+            rule.put("alarm", ruleAlarm);
             rule.put("holdSec", hold);
+            // 기준 띠 끝 = 설비 상세 게이지와 같은 값 (경보 기준 × 1.3)
+            rule.put("max", ruleAlarm == null ? null : Math.round(ruleAlarm * 1.3 * 10) / 10.0);
+            // 평소 값 = 알림 직전 7일 평균 (10분 평균의 평균)
+            usual = ThermalService.mean(central.series(List.of(e.sensorId()),
+                    a.raisedAt().minusDays(7), a.raisedAt(), "10m"));
             eq = m.equipment(e.equipmentId());
             cause = (eq == null ? "" : eq.name() + " ") + Codes.sensorName(e.type()) + "이(가) "
                     + Codes.stageName(e.stage()) + " 기준(" + num(e.threshold()) + " " + nz(e.unit()) + ")을 "
@@ -203,6 +215,10 @@ public class AlarmService {
             }
             trend = new LinkedHashMap<>();
             trend.put("sensorId", e.sensorId());
+            trend.put("tag", e.tag());
+            trend.put("unit", e.unit());
+            trend.put("warn", ruleWarn);
+            trend.put("alarm", ruleAlarm);
             trend.put("points", points);
         }
         Template template = e == null ? null
@@ -216,9 +232,11 @@ public class AlarmService {
         out.put("location", sitePrefix(a, m) + AlarmViews.location(a, m));
         out.put("raisedAt", a.raisedAt());
         out.put("cause", cause);
+        out.put("usual", usual != null ? usual : (e == null ? null : e.peak()));
         out.put("rule", rule);
         out.put("sensors", sensors);
-        out.put("thermal", null); // 열화상 그림은 아직 없음 (VMS 연동 후)
+        // 열화상 그림(VMS)은 아직 없어서 IR 센서 값으로 요약 (imageUrl 은 null → 화면이 단계별 예시 그림 사용)
+        out.put("thermal", thermal.forAlarm(a.processId(), eq == null ? null : eq.id(), status, time.now()));
         out.put("trend", trend);
         out.put("causeCandidates", template == null ? List.of() : List.of(template.cause()));
         out.put("templateId", template == null ? null : template.id());
@@ -260,10 +278,15 @@ public class AlarmService {
             equipment.add(row);
         }
         List<String> reasons = new ArrayList<>();
+        List<String> details = new ArrayList<>();
+        Set<Long> detailed = new HashSet<>();
         List<Map<String, Object>> logs = new ArrayList<>();
         for (Event e : a.events()) {
             String side = e.lowSide() ? "미달" : "초과";
             reasons.add(e.tag() + " " + num(e.peak()) + " " + nz(e.unit()) + "(" + Codes.stageName(e.stage()) + " " + num(e.threshold()) + ")");
+            if (detailed.add(e.sensorId())) {
+                details.add(reasonDetail(e, a.raisedAt()));
+            }
             Map<String, Object> l = new LinkedHashMap<>();
             l.put("at", e.startedAt());
             l.put("text", e.tag() + " " + Codes.stageName(e.stage()) + " 기준 " + side + " (" + num(e.peak()) + " " + nz(e.unit()) + ")");
@@ -275,13 +298,15 @@ public class AlarmService {
                 logs.add(end);
             }
         }
-        for (Action act : checklists.actions(alarmId)) {
+        List<Action> actions = checklists.actions(alarmId);
+        for (Action act : actions) {
             Map<String, Object> l = new LinkedHashMap<>();
             l.put("at", act.doneAt());
             l.put("text", ChecklistRepository.actionText(act) + (act.userName() == null ? "" : " (" + act.userName() + ")"));
             logs.add(l);
         }
         logs.sort((x, y) -> ((OffsetDateTime) y.get("at")).compareTo((OffsetDateTime) x.get("at")));
+        Equipment mainEq = a.mainEvent() == null ? null : m.equipment(a.mainEvent().equipmentId());
 
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("id", a.alarmId());
@@ -290,9 +315,14 @@ public class AlarmService {
         out.put("hazard", a.hazard());
         out.put("fireId", null);
         out.put("title", a.unitName() + "에서 " + Codes.stageName(a.stage()) + "가 발생했습니다");
+        out.put("location", sitePrefix(a, m) + AlarmViews.location(a, m));
         out.put("raisedAt", a.raisedAt());
         out.put("reason", String.join(", ", reasons));
+        out.put("reasonDetail", String.join(" · ", details));
         out.put("cameraId", cameraId);
+        // 열화상 그림(VMS)은 아직 없어서 IR 센서 값으로 요약 (imageUrl 은 null → 화면이 단계별 예시 그림 사용)
+        out.put("thermal", thermal.forAlarm(a.processId(), mainEq == null ? null : mainEq.id(), status, time.now()));
+        out.put("shutdown", shutdownView(actions, m.equipmentOf(a.processId()), eqStatus));
         out.put("sensors", sensors);
         out.put("equipment", equipment);
         out.put("logs", logs);
@@ -469,6 +499,73 @@ public class AlarmService {
         s.put("target", target);
         s.put("result", detail);
         return s;
+    }
+
+    /** 사유 아래 한 줄: 'TE-305 163.9 ℃ (평소의 117%)'. 평소 = 경보 직전 7일 평균 */
+    private String reasonDetail(Event e, OffsetDateTime raisedAt) {
+        Double usual = ThermalService.mean(central.series(List.of(e.sensorId()), raisedAt.minusDays(7), raisedAt, "10m"));
+        String text = e.tag() + " " + num(e.peak()) + " " + nz(e.unit());
+        if (usual != null && usual > 0 && e.peak() != null) {
+            text += " (평소의 " + Math.round(e.peak() / usual * 100) + "%)";
+        }
+        return text;
+    }
+
+    /** 셧다운 단계 이름 (설비 응답이 단계별로 오지 않아 시작 시각 기준으로 보여 줌) */
+    private static final List<String> SHUTDOWN_STEPS = List.of("버너 연료 차단", "컨베이어 정지", "배기팬 정지");
+
+    /**
+     * 경보 창 셧다운 진행: { equipmentIds, startedAt, steps: [{ label, at }], done, auto }. 셧다운 전이면 null.
+     * <pre>
+     * - 대상 = 이 경보로 셧다운 명령을 보낸 설비 (조치 이력 SHUTDOWN)
+     * - done = 대상 설비가 모두 정지(STOPPED)
+     * - 단계 시각: 1단계 = 명령 시각, 2단계 = +1초, 3단계 = 모두 정지된 뒤 (+3초, 중앙 시뮬레이션 완료 시점)
+     * </pre>
+     */
+    private Map<String, Object> shutdownView(List<Action> actions, List<Equipment> processEquipment,
+                                             Map<Long, CentralDto.EquipmentStatus> eqStatus) {
+        OffsetDateTime started = null;
+        Set<Long> ids = new java.util.LinkedHashSet<>();
+        for (Action act : actions) {
+            if (!"SHUTDOWN".equals(act.action())) {
+                continue;
+            }
+            for (Equipment eq : processEquipment) {
+                if (eq.name().equals(act.target())) {
+                    ids.add(eq.id());
+                }
+            }
+            if (started == null || act.doneAt().isBefore(started)) {
+                started = act.doneAt();
+            }
+        }
+        if (started == null) {
+            return null;
+        }
+        boolean done = !ids.isEmpty() && ids.stream().allMatch(id -> {
+            CentralDto.EquipmentStatus st = eqStatus.get(id);
+            return st != null && "STOPPED".equals(st.runState());
+        });
+        OffsetDateTime now = time.now();
+        List<Map<String, Object>> steps = new ArrayList<>();
+        for (int i = 0; i < SHUTDOWN_STEPS.size(); i++) {
+            OffsetDateTime at = i == SHUTDOWN_STEPS.size() - 1 ? (done ? started.plusSeconds(3) : null)
+                    : started.plusSeconds(i);
+            if (at != null && at.isAfter(now) && !done) {
+                at = null;
+            }
+            Map<String, Object> step = new LinkedHashMap<>();
+            step.put("label", SHUTDOWN_STEPS.get(i));
+            step.put("at", at);
+            steps.add(step);
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("equipmentIds", List.copyOf(ids));
+        out.put("startedAt", started);
+        out.put("steps", steps);
+        out.put("done", done);
+        out.put("auto", false);
+        return out;
     }
 
     private static String sitePrefix(Alarm a, MasterCache.Snapshot m) {

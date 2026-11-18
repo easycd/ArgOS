@@ -20,7 +20,7 @@ import ThermalCard from '@/features/equipment/ThermalCard.vue'
 import TrendCard from '@/features/equipment/TrendCard.vue'
 import { useLiveValues } from '@/features/equipment/useLiveValues'
 import { svgKeyOf } from '@/features/process/paintLayout'
-import { buildProcessEquipment } from '@/features/process/processEquipment'
+import { buildProcessEquipment, layoutPlacement } from '@/features/process/processEquipment'
 import { useLiveReload } from '@/utils/useLiveReload'
 
 const route = useRoute()
@@ -30,6 +30,7 @@ const equipment = ref(null)
 const events = ref([])
 const thermal = ref(null)
 const processEquipment = ref([])
+const placement = ref({ positions: {}, inactive: [] })
 const loading = ref(true)
 const errorMessage = ref('')
 
@@ -46,10 +47,12 @@ async function load({ silent = false } = {}) {
       getProcessStatus(processId),
     ])
     // 주소의 공정과 설비의 공정이 다르면 (주소를 직접 고친 경우) 열지 않음
-    if (eq.processId !== Number(processId)) throw new Error('이 공정의 설비가 아닙니다.')
+    // - 응답에 processId 가 있을 때만 비교 (지금 백엔드 GET /equipment/{id} 응답에는 없음 → backend-notes 8장)
+    if (eq.processId != null && eq.processId !== Number(processId)) throw new Error('이 공정의 설비가 아닙니다.')
     equipment.value = eq
     events.value = ev
     processEquipment.value = buildProcessEquipment(layout, status)
+    placement.value = layoutPlacement(layout) // 공장 관리에서 옮긴 자리·사용 안 함
     thermal.value = eq.cameraId ? await getThermalLatest(eq.cameraId, eq.id) : null
     await loadSeries()
   } catch (error) {
@@ -143,11 +146,13 @@ function onSelectEquipment(eq) {
         class="location"
         :equipment="processEquipment"
         :focus-key="svgKeyOf(equipment.code)"
+        :positions="placement.positions"
+        :inactive="placement.inactive"
         :sub="locationSub"
         @select="onSelectEquipment"
       />
       <SensorGaugeCard class="gauges" :sensors="equipment.sensors" :live-values="liveValues" />
-      <ThermalCard v-if="thermal" class="thermal" :thermal="thermal" :level="equipment.level" :elapsed-sec="elapsedSec" />
+      <ThermalCard v-if="thermal" class="thermal" :thermal="thermal" :process-name="equipment.path?.[2] ?? ''" :level="equipment.level" :elapsed-sec="elapsedSec" />
 
       <TrendCard
         class="trend"

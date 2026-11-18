@@ -1,7 +1,9 @@
 <!--
   경보 창 아래 '설비 셧다운' (화면설계안 mAlarm() #sd · shutdownSeq(), 화면설계서 C4 ⑦⑧)
-  - 고르기: 경보가 난 설비(기본) / 같은 공정의 다른 설비 / '도장 공정 전체'
+  - 고르기: 경보가 난 설비(기본) / 같은 공정의 다른 설비 / '(공정 이름) 전체'
+  - 기본 선택: 응답 equipment 중 단계가 정상이 아닌 첫 설비, 없으면 첫 설비 (설비 번호를 고정하지 않음)
   - 2초 길게 누르기 → 셧다운 명령. 공정 전체는 한 번 더 확인
+    확인을 취소하거나 요청이 실패하면 길게 누르기 단추를 처음 상태로 되돌려 다시 누를 수 있게 함
     POST /equipment/{id}/shutdown 또는 POST /processes/{id}/shutdown (접수만, 진행은 SSE command.result)
   - 진행: 진행 막대 + 3단계(버너 연료 차단 → 컨베이어 정지 → 배기팬 추가 가동 후 정지)가 차례로 채워짐
   - 끝나면 '셧다운 완료' → 조치 결과 한 줄 + '경보 종료' (모든 센서가 경보 기준 아래일 때만 켜짐)
@@ -19,16 +21,21 @@ const props = defineProps({
   /** GET /alarms/{id}/response */
   response: { type: Object, required: true },
   canAct: { type: Boolean, default: false },
+  /** 이 알림의 공정 (응답에 없어서 창이 알림 목록 줄에서 꺼내 줌) */
+  processId: { type: [Number, String], default: null },
+  processName: { type: String, default: '' },
 })
 
 const emit = defineEmits(['call', 'map', 'closed'])
 
 const ALL = 'ALL'
 const equipment = computed(() => props.response.equipment)
-// 경보가 난 설비(상도 건조로)를 맨 앞에
+// 경보가 난 설비(단계가 정상이 아닌 설비)를 맨 앞에
 const ordered = computed(() => [...equipment.value].sort((a, b) => (b.level !== 'NORMAL') - (a.level !== 'NORMAL')))
-const target = ref(31)
-const targetName = computed(() => (target.value === ALL ? '도장 공정 전체' : (equipment.value.find((e) => e.id === target.value)?.name ?? '')))
+// 기본 선택: 정상이 아닌 첫 설비 → 없으면 첫 설비 (창을 열 때 한 번만 정함, 다시 불러와도 고른 것은 그대로)
+const target = ref(equipment.value.find((e) => e.level !== 'NORMAL')?.id ?? equipment.value[0]?.id ?? ALL)
+const allLabel = computed(() => `${props.processName || '공정'} 전체`)
+const targetName = computed(() => (target.value === ALL ? allLabel.value : (equipment.value.find((e) => e.id === target.value)?.name ?? '')))
 
 const sd = computed(() => props.response.shutdown)
 const running = computed(() => sd.value && !sd.value.auto)
@@ -38,6 +45,18 @@ const pct = computed(() => Math.round((doneCount.value / 3) * 100))
 const heldMs = ref(0)
 const confirmAll = ref(false)
 const sending = ref(false)
+const hold = ref(null) // 길게 누르기 단추 (reset() 을 부르려고)
+
+/** 길게 누르기 단추를 처음 상태로 (다시 누를 수 있게) */
+function resetHold() {
+  hold.value?.reset()
+}
+
+/** 공정 전체 확인에서 '취소' */
+function cancelAll() {
+  confirmAll.value = false
+  resetHold()
+}
 
 /** 2초 다 누르면: 설비 하나는 바로, 공정 전체는 확인 한 번 더 */
 function onHoldDone() {
@@ -50,10 +69,11 @@ async function send() {
   sending.value = true
   try {
     const body = { alarmId: props.response.id, reason: props.response.reason }
-    if (target.value === ALL) await shutdownProcess(12, { ...body, equipmentIds: [] })
+    if (target.value === ALL) await shutdownProcess(props.processId, { ...body, equipmentIds: [] })
     else await shutdownEquipment(target.value, body)
   } catch (error) {
     toast(error.message, { type: 'err' })
+    resetHold() // 실패하면 다시 누를 수 있게
   } finally {
     sending.value = false
   }
@@ -94,7 +114,7 @@ const hm = (iso) => iso?.slice(11, 19) ?? ''
             {{ e.name }}<small v-if="e.runState !== 'RUNNING'">정지됨</small>
           </label>
           <label :class="{ on: target === ALL, all: true }">
-            <input v-model="target" type="radio" :value="ALL" :disabled="!canAct" />도장 공정 전체
+            <input v-model="target" type="radio" :value="ALL" :disabled="!canAct || !processId" />{{ allLabel }}
           </label>
         </div>
         <div class="m-actions links">
@@ -108,12 +128,12 @@ const hm = (iso) => iso?.slice(11, 19) ?? ''
           <b>{{ targetName }} 셧다운</b>
           <span class="mono">{{ heldMs > 0 ? `${(heldMs / 1000).toFixed(1)} / 2.0초` : '버튼을 2초간 길게 누르세요' }}</span>
         </div>
-        <HoldButton :size="132" color="#DC2626" label="셧다운" icon="power" :disabled="sending" @progress="heldMs = $event" @done="onHoldDone" />
+        <HoldButton ref="hold" :size="132" color="#DC2626" label="셧다운" icon="power" :disabled="sending" @progress="heldMs = $event" @done="onHoldDone" />
         <!-- 공정 전체: 한 번 더 확인 (화면설계서 C4) -->
         <div v-if="confirmAll" class="confirm pop-in">
-          도장 공정 설비 {{ equipment.length }}대가 모두 정지됩니다.
+          {{ processName || '이 공정' }} 설비 {{ equipment.length }}대가 모두 정지됩니다.
           <div class="m-actions">
-            <button type="button" class="btn" @click="confirmAll = false">취소</button>
+            <button type="button" class="btn" @click="cancelAll">취소</button>
             <button type="button" class="btn danger" @click="send">셧다운</button>
           </div>
         </div>

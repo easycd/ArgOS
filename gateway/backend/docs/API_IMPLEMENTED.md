@@ -42,8 +42,8 @@ API 명세서 기준으로 구현한 것과, 명세서와 다르게 한 점입�
 | B1 | `GET /alarms?siteId·factoryId·processId&date=&from=&to=&status=&minLevel=&page=&size=` | 전체 | 줄마다 `checklist`(진행), `assignee`, `actionMinutes`, `valueStillOver` 추가 |
 | B1 | `GET /alarms/hourly?siteId·factoryId&date=` | 본사·공장 | |
 | B1 | `GET /alarms/{id}` | 전체 | 조치 내역 timeline |
-| C1 | `GET /alarms/{id}/detail` | 전체 | `thermal` 은 null (열화상 그림 없음), `templateId` 추가 |
-| C4 | `GET /alarms/{id}/response` | 전체 | `fireId` 는 null (화재 판정 전) |
+| C1 | `GET /alarms/{id}/detail` | 전체 | `templateId`, `usual`(주 센서 직전 7일 평균), `rule.max`(경보 × 1.3), `trend.unit·warn·alarm` 추가. `thermal` 은 IR 센서 값 요약 (아래 '열화상') |
+| C4 | `GET /alarms/{id}/response` | 전체 | `fireId` 는 null (화재 판정 전). `location`, `reasonDetail`('TE-305 163.9 ℃ (평소의 117%)', 평소 = 직전 7일 평균), `thermal`(주의 상세와 같은 IR 요약), `shutdown` 추가 (아래 '경보 셧다운 진행') |
 | C0 | `POST /alarms/{id}/ack` | 공장 | 409 `ALARM_ALREADY_ACKED` (`error.ackedBy`) |
 | C4 | `POST /alarms/{id}/close` `{ result, followUp }` | 공장 | 409 `VALUE_STILL_OVER` (`error.sensors`) |
 | I1 | `GET /notifications/summary` | 전체 | 채팅·화재는 아직 0 / null |
@@ -51,7 +51,7 @@ API 명세서 기준으로 구현한 것과, 명세서와 다르게 한 점입�
 | C1 | `GET /processes/{id}/workers` | 본사·공장 | `onDuty` 는 항상 true (근무조 정보 없음) |
 | C1 | `POST /checklists` | 공장 | 푸시 실패해도 201, `push: "FAILED"` (명세서는 502) |
 | I1 | `GET /checklists?status=&factoryId=` | 본사·공장 | |
-| C2 | `GET /checklists/{id}` | 전체 | 공정 담당자는 자기 것만 |
+| C2 | `GET /checklists/{id}` | 전체 | 공정 담당자는 자기 것만. `serverTime`(시연 시계 지금) 추가 → 화면 경과 시간용 |
 | C2 | `POST /checklists/{id}/remind` | 공장 | 30초 잠금, 429 `REMIND_COOLDOWN` |
 | C2 | `PATCH /checklists/{id}/assignee` | 공장 | |
 | C2 | `POST /checklists/{id}/confirm` | 공장 | 값이 아직 기준 위면 체크리스트는 확인, 알림은 열린 채 409 `VALUE_STILL_OVER` |
@@ -110,7 +110,53 @@ API 명세서 기준으로 구현한 것과, 명세서와 다르게 한 점입�
 - 월간 보고서 PDF (`/reports/monthly`) 는 아직 없습니다.
 - 계산은 연계 서버에서 합니다: 기간 경보를 중앙에서 500건씩 받아 거른 뒤 셉니다 (시연 데이터 규모 기준).
 
+### 열화상 · 오늘 점검 (시연용 최소 구현)
+
+| 화면 | API | 권한 | 비고 |
+| --- | --- | --- | --- |
+| B4 | `GET /thermal/{cameraId}/latest?equipmentId=` | 전체 | `cameraId` = IR 센서 id. 실제 그림(VMS)이 없어 `imageUrl` 은 null, `level` 로 화면이 예시 그림을 고름. `max` = IR 지금 값, `min`·`avg` 는 null. 카메라가 보는 설비(IR 센서가 든 관제 단위의 설비)가 아니면 값·`zone` 없이 줌 |
+| B3 | `GET /inspections/today?processId=` | 전체 | 점검 기능 전이라 `{ doneCount: 0, totalCount: 0, items: [] }` |
+
+- 알림 상세(`/alarms/{id}/detail`)의 `thermal`: `{ cameraId, cameraTag, imageUrl(null), level, max, avg, usualAtMax, maxPoint, scale, zoneName }`.
+  `avg` = IR 최근 1시간 평균, `usualAtMax` = IR 지난 7일 평균. 공정에 IR 센서가 없으면 null.
+- 없는 주소는 500 이 아니라 404 `NOT_FOUND`.
+
+### 경보 셧다운 진행 (`/alarms/{id}/response` 의 `shutdown`)
+
+`{ equipmentIds, startedAt, steps: [{ label, at }], done, auto: false }`. 셧다운 전이면 null.
+- 대상 = 이 경보로 셧다운 명령을 보낸 설비 (조치 이력 `SHUTDOWN`), `done` = 대상 설비가 모두 정지(STOPPED)
+- 단계: 버너 연료 차단(명령 시각) → 컨베이어 정지(+1초) → 배기팬 정지(모두 정지된 뒤). 설비가 단계별로 응답하지 않아 시각은 명령 기준으로 보여 줍니다
+- 화면은 SSE `command.result` 가 오면 다시 불러오면 됨
+- 알림 타임라인(`/alarms/{id}`)에서 확인 단추 없이 셧다운으로 조치에 들어간 경우 단계 이름은 `ACK`, 종료는 `CLOSE` (전에는 `ACKED`·`CLOSED`)
+
+### 주의 알림 자동 종료
+
+값이 기준 위일 때 조치 확인을 하면(409 `VALUE_STILL_OVER`) 체크리스트만 확인되고 알림은 열려 있습니다.
+주의 창에는 종료 단추가 없으므로, 연계 서버가 실시간 피드에서 그 알림의 값이 기준 아래로 돌아온 것(`valueStillOver: false`)을 보면
+체크리스트를 확인한 사람 이름으로 알림을 닫습니다 (조치 이력 `CLOSE` "값이 기준 아래로 돌아와 자동 종료"). 경보(3단계)는 대상이 아닙니다 (셧다운 뒤 '경보 종료').
+
+### 사용자 관리 (G1) · 내 정보 수정 (A1)
+
+| 화면 | API | 권한 | 비고 |
+| --- | --- | --- | --- |
+| G1 | `GET /users?role=&factoryId=&active=&q=&page=&size=` | 본사·공장 | `{ counts, inactiveCount, items, page, size, total }`. `counts`·`inactiveCount` 는 내가 볼 수 있는 사람 전체 기준(검색 조건과 상관없음). 줄마다 `scopeText`, `factoryId` 추가. 한 쪽 15행이 기본 |
+| G1 | `GET /users/{id}` | 본사·공장 | `scope`, `scopeText`, `createdAt`, `lastLoginAt`, `pushReady`(앱 푸시 토큰 등록됨), `history[{ at, by, text }]` (최근 50건) |
+| G1 | `GET /users/check-login-id?loginId=` | 본사·공장 | `{ available }`. 규칙(영문 소문자·숫자·밑줄 4~20자)에 안 맞거나 삭제한 사용자 아이디도 false |
+| G1 | `POST /users` `{ name, loginId, phone, role, scope: { factoryIds, processIds } }` | 본사·공장 | `{ id, tempPassword }`. 임시 비밀번호는 이때 한 번만. 첫 로그인 때 비밀번호 변경(`pwResetRequired`) |
+| G1 | `PUT /users/{id}` `{ name, phone, role, scope }` | 본사·공장 | `{ id, role, scopeText }` |
+| G1 | `PATCH /users/{id}/status` `{ active }` | 본사·공장 | `{ id, active }`. 정지하면 바로 로그인·API 사용 불가 (403 `USER_INACTIVE`) |
+| G1 | `DELETE /users/{id}` | 본사·공장 | 행은 남김(`deleted_at`, V3). 목록·로그인에서 빠지고 아이디는 다시 못 씀 |
+| G1 | `POST /users/{id}/reset-password` | 본사·공장 | `{ tempPassword }`, 다음 로그인 때 비밀번호 변경 |
+| A1 | `PUT /me` `{ name, phone }` | 로그인 | `{ id, name, phone }` (공정 담당자 앱도 사용) |
+
+- 담당 범위: 본사 관리자는 범위 없음 / 공장 담당자는 `factoryIds` 1개 이상 / 공정 담당자는 `processIds` 1개 이상 (공장은 공정에서 정함, `factoryIds` 는 무시). 한 사업장 안에서만
+- 권한 범위 (화면설계서 G1): 본사 관리자는 전부. 공장 담당자는 담당 공장의 공장 담당자·공정 담당자만 보고 고침 (본사 관리자는 안 보임, 본사 관리자 권한은 못 줌). 공정 담당자는 403
+- 오류: 400 `VALIDATION_FAILED`·`SCOPE_REQUIRED`, 403 `ROLE_NOT_ALLOWED`(줄 수 없는 권한, 내 권한 변경)·`OUT_OF_SCOPE`, 404 `NOT_FOUND`,
+  409 `LOGIN_ID_TAKEN`·`CANNOT_DISABLE_SELF`·`CANNOT_DELETE_SELF`·`LAST_PLANT_ADMIN`(그 공장의 마지막 공장 담당자를 정지·삭제·권한 변경)·`HAS_ACTIVE_CHECKLIST`(끝나지 않은 체크리스트가 있는 사람을 정지·삭제하거나 공정을 뺌)
+- 변경은 이용 로그(`activity_log`, 유형 `USER`)에 "이름(아이디) · 내용"으로 남고, 상세의 `history` 는 그중 "내용"만 보여 줌. 기록 시각은 시연 시계 기준
+- `PUT /me/password` 에서 지금 비밀번호가 틀릴 때 401 → 화면이 로그아웃되는 문제(프론트 backend-notes 14장 1번)는 로그인 코드라 아직 그대로
+
 ## 아직 없는 것
 
-화재(fire_incident), 월간 보고서 PDF, xlsx 내보내기, 점검·OCR(`/inspections/*`),
-사용자 관리(`/users/*`), 이용 로그(`/logs`), 채팅, 공장 관리(배치 저장), 실제 FCM 전송.
+화재(fire_incident), 월간 보고서 PDF, xlsx 내보내기, 점검·OCR(`/inspections/*`, 오늘 점검은 빈 목록만),
+이용 로그(`/logs`), 채팅, 공장 관리(배치 저장), 실제 FCM 전송.

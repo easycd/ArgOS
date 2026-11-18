@@ -7,7 +7,7 @@
  *   나머지 공장·공정은 늘 정상
  */
 import { maxLevel, sensorsNow } from './processData'
-import { activeChecklist, scenario, workerName } from './scenario'
+import { activeChecklist, designAt, scenario, workerName } from './scenario'
 import { LEVEL, ROLE } from '@/types/codes'
 
 const { NORMAL } = LEVEL
@@ -233,6 +233,8 @@ const alarm = (id, factoryId, status, title, location, sensorTag, sensorType, va
   siteId: 1, factoryId, processId: factoryId === 5 ? 12 : null, id, level: LEVEL.WARN, status, title, location,
   equipmentId: id - 1000, sensorId: id - 900, sensorTag, sensorType, value, unit, threshold, raisedAt: todayAt(time),
   ackedBy: null, ackedAt: null, closedAt: null, checklist: null, assignee: null,
+  // 설비 이름 (백엔드 AlarmViews unitName) — 위치 마지막 칸에서 부품 이름을 뺀 것
+  unitName: location.split(' · ').at(-1).replace(/ (배기팬|버너실|순환펌프)$/, ''),
 })
 
 /** 이미 끝난 오늘 알림 (상황과 상관없음) */
@@ -255,7 +257,7 @@ function topOvenAlarm() {
   const a = scenario.alarm
   if (!a) return null
   const title = a.status === 'CLOSED' ? '전류 주의 해제' : '전류 주의 기준 초과'
-  const row = alarm(1042, 5, a.status, title, '5공장 · 도장 공정 · 상도 건조로 배기팬', 'CT-17', 'CURRENT', 22.4, 'A', 21.6, a.raisedAt)
+  const row = { ...alarm(1042, 5, a.status, title, '5공장 · 도장 공정 · 상도 건조로 배기팬', 'CT-17', 'CURRENT', 22.4, 'A', 21.6, a.raisedAt), equipmentId: 31 }
   const c = scenario.checklist
   return {
     ...row,
@@ -283,12 +285,13 @@ function emergencyAlarms() {
   const row = (id, level, title, place, tag, type, value, unit, threshold, time) => ({
     ...alarm(id, 5, status, closed ? title.replace('기준 초과', '해제').replace('감지', '해제') : title, place, tag, type, value, unit, threshold, time),
     level,
+    equipmentId: 31, // 상도 건조로
     closedAt: closed ? todayAt(inc.closedAt) : null,
   })
   const list = [
-    row(1051, LEVEL.ALARM, 'CO 경보 기준 초과', `${loc} 버너실`, 'CO-13', 'CO', 34, 'ppm', 30, '16:52:08'),
-    row(1049, LEVEL.WARN, '온도 주의 기준 초과', loc, 'TE-15', 'TEMP', 164, '℃', 160, '16:50:12'),
-    row(1050, LEVEL.ALARM, '전류 경보 기준 초과', `${loc} 배기팬`, 'CT-17', 'CURRENT', 27.5, 'A', 27, '16:47:36'),
+    row(1051, LEVEL.ALARM, 'CO 경보 기준 초과', `${loc} 버너실`, 'CO-13', 'CO', 34, 'ppm', 30, designAt('16:52:08')), // 설계안 시각 → 지금 상황 기준 (scenario.js anchorAt)
+    row(1049, LEVEL.WARN, '온도 주의 기준 초과', loc, 'TE-15', 'TEMP', 164, '℃', 160, designAt('16:50:12')),
+    row(1050, LEVEL.ALARM, '전류 경보 기준 초과', `${loc} 배기팬`, 'CT-17', 'CURRENT', 27.5, 'A', 27, designAt('16:47:36')),
   ]
   const f = scenario.fire
   if (f) {

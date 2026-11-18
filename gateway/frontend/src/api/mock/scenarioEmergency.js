@@ -7,9 +7,10 @@
  *   실제 서버에서는 명령 접수(202) 뒤 SSE command.result 로 단계가 옴 → 여기서는 타이머로 흉내
  * - 경보 종료: 모든 센서가 경보 기준 아래일 때만 (셧다운 뒤)
  * - 화재: 16:58:04 감지 → 경고 방송 → 상도 건조로 자동 셧다운 → 본사 통보. 해제는 비밀번호 다시 입력(5회 틀리면 잠김)
+ * - 위 시각은 설계안 시각표. 상황을 바꾸는 순간이 경보 발생(16:52:08) · 화재 감지(16:58:04)가 되도록 전체를 옮김 (scenario.js anchorAt)
  */
 import { emitLive } from '../live'
-import { DEFAULT_ITEMS, NO_EMERGENCY, replace, scenario, scenarioNow } from './scenario'
+import { DEFAULT_ITEMS, NO_EMERGENCY, anchorAt, replace, scenario, scenarioNow } from './scenario'
 import { LEVEL } from '@/types/codes'
 
 /** 경보 직전까지의 주의(1042): 확인 → 전송 → 5개 모두 완료 (설계안 raise('dng') 의 S.ck) */
@@ -35,24 +36,24 @@ function warnDone() {
   }
 }
 
-/** 경보 발생 (16:52:08) */
+/** 경보 발생 (설계안 16:52:08 → 지금) */
 export function raiseAlarm() {
   replace(
-    {
+    anchorAt('16:52:08', {
       state: LEVEL.ALARM,
       ...warnDone(),
       ...NO_EMERGENCY(),
       incident: { id: 1051, status: 'OPEN', raisedAt: '16:52:08', closedAt: null, result: null },
       clock: { base: '16:52:08', at: Date.now() },
-    },
+    }),
     'alarm.created',
   )
 }
 
-/** 화재 발생 (16:58:04) — 경보 중 상황 위에, 상도 건조로는 자동 셧다운 */
+/** 화재 발생 (설계안 16:58:04 → 지금) — 경보 중 상황 위에, 상도 건조로는 자동 셧다운 */
 export function raiseFire() {
   replace(
-    {
+    anchorAt('16:58:04', {
       state: LEVEL.FIRE,
       ...warnDone(),
       incident: { id: 1051, status: 'OPEN', raisedAt: '16:52:08', closedAt: null, result: null },
@@ -60,7 +61,7 @@ export function raiseFire() {
       shutdown: { equipmentIds: [31], startedAt: '16:58:06', steps: ['16:58:06', '16:58:06', '16:58:06'], auto: true },
       shut: true,
       clock: { base: '16:58:04', at: Date.now() },
-    },
+    }),
     'fire.started',
   )
 }

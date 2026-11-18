@@ -2,7 +2,7 @@
  * 앱 시작점
  * - 글꼴·전역 스타일 → Pinia → 라우터 → ECharts 순서로 등록
  */
-import { createApp } from 'vue'
+import { createApp, watch } from 'vue'
 import { createPinia } from 'pinia'
 
 // 글꼴 (npm 패키지로 포함 → 외부 인터넷이 막힌 공장망에서도 표시됨)
@@ -22,6 +22,9 @@ import App from './App.vue'
 import router from './router'
 import VChart from '@/utils/echarts'
 import { setAuthHandlers } from '@/api/http'
+import { syncServerClock } from '@/api/clock'
+import { startLive, stopLive } from '@/api/live'
+import { USE_MOCK } from '@/api/mock'
 import { useAuthStore } from '@/stores/auth'
 
 const app = createApp(App)
@@ -42,5 +45,21 @@ setAuthHandlers({
     router.push({ name: 'login' })
   },
 })
+
+// 실제 서버 모드: 로그인 중이면 시연 시계를 맞추고 실시간(SSE) 연결, 로그아웃하면 끊음
+if (!USE_MOCK) {
+  watch(
+    () => auth.accessToken,
+    (token) => {
+      if (token) {
+        syncServerClock()
+        startLive(() => auth.accessToken)
+      } else {
+        stopLive()
+      }
+    },
+    { immediate: true },
+  )
+}
 
 app.mount('#app')

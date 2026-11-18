@@ -118,6 +118,29 @@ public class FeedPoller {
 
     // ---------------------------------------------------------------
 
+    /**
+     * 주의 알림: 값이 기준 위일 때 조치 확인을 눌러 열린 채 남은 알림은, 값이 기준 아래로 돌아오면 자동으로 닫는다.
+     * (주의 창에는 종료 단추가 없으므로. 경보는 셧다운 뒤 '경보 종료'로 직접 닫는다)
+     * 닫는 사람 = 체크리스트를 확인한 사람.
+     */
+    private void closeIfConfirmed(CentralDto.Alarm a) {
+        if (a.valueStillOver() || a.closedAt() != null || a.stage() >= 3) {
+            return;
+        }
+        ChecklistRepository.Checklist c = checklists.latestForAlarm(a.alarmId());
+        if (c == null || !"CONFIRMED".equals(c.status())) {
+            return;
+        }
+        try {
+            central.closeAlarm(a.alarmId(), c.confirmedBy());
+            checklists.addAction(a.alarmId(), "CLOSE", null, "OK", "값이 기준 아래로 돌아와 자동 종료",
+                    c.confirmedBy(), time.now());
+            log.info("주의 알림 {} 자동 종료 (체크리스트 {} 확인 뒤 값 회복)", a.alarmId(), c.id());
+        } catch (RuntimeException e) {
+            log.warn("주의 알림 {} 자동 종료 실패: {}", a.alarmId(), e.getMessage());
+        }
+    }
+
     @SuppressWarnings("unchecked")
     private void handle(FeedItem item) {
         Map<String, Object> d = item.data() == null ? Map.of() : item.data();
@@ -144,6 +167,7 @@ public class FeedPoller {
                 }
                 view.put("at", item.at());
                 hub.publish("alarm.updated", id, view, s -> s.scope().canProcess(a.processId(), masterCache.get()));
+                closeIfConfirmed(a);
             }
             case "COMMAND_RESULT" -> {
                 long equipmentId = num(d.get("equipmentId"));

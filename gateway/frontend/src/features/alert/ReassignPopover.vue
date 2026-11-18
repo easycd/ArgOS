@@ -10,6 +10,7 @@ import WorkerPicker from './WorkerPicker.vue'
 
 const props = defineProps({
   workers: { type: Array, required: true },
+  processName: { type: String, default: '' },
   currentId: { type: Number, required: true },
   busy: { type: Boolean, default: false },
 })
@@ -24,7 +25,7 @@ const reason = ref(REASONS[0])
 <template>
   <div class="pop pop-in" role="dialog" aria-label="담당자 변경">
     <b class="title">담당자 변경</b>
-    <WorkerPicker v-model="assigneeId" :workers="workers" :except="currentId" />
+    <WorkerPicker v-model="assigneeId" :workers="workers" :except="currentId" :process-name="processName" />
     <div class="reasons" role="radiogroup" aria-label="변경 사유">
       <label v-for="r in REASONS" :key="r" :class="{ on: reason === r }">
         <input v-model="reason" type="radio" :value="r" name="reason" />{{ r }}

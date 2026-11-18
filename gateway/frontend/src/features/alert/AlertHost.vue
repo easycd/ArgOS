@@ -15,6 +15,7 @@
 import { computed, onBeforeUnmount, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import AlarmResponseModal from './AlarmResponseModal.vue'
+import { placeOf, siteNameOf } from './alarmPlace'
 import ChecklistProgressModal from './ChecklistProgressModal.vue'
 import ThermalCheckModal from './ThermalCheckModal.vue'
 import WarnDetailModal from './WarnDetailModal.vue'
@@ -39,25 +40,31 @@ let known = null // 지난번 받은 { 알림 id: 상태 } (처음 한 번은 '�
 let reportedIds = new Set()
 
 const isEmergency = (a) => a.level === LEVEL.ALARM || a.level === LEVEL.FIRE
-const where = (a) => `울산공장 ${a.location.split(' · ').slice(0, 2).join(' ')}`
+/** '울산공장 5공장 도장 공정' (사업장 이름은 siteId 로 받음 — 알림 location 은 공장부터) */
+async function where(a) {
+  const p = placeOf(a)
+  return [await siteNameOf(a.siteId), p.factoryName, p.processName].filter(Boolean).join(' ')
+}
 const goProcess = (a) => router.push({ name: 'process', params: { siteId: a.siteId, factoryId: a.factoryId, processId: a.processId } })
 
 /** 화재 알림 띠 닫기 함수 (화재가 해제되면 같이 닫음) */
 let closeFireToast = null
 
 /** 본사 관리자 알림 띠 (설계안 onState() hq: 주의 · 경보 · 화재) */
-function notifyHq(a) {
+async function notifyHq(a) {
+  const at = await where(a)
   if (a.level === LEVEL.FIRE) {
-    closeFireToast = toast(`${where(a).split(' ').slice(0, 2).join(' ')}에서 화재가 감지되었습니다.`, {
+    const site = [await siteNameOf(a.siteId), placeOf(a).factoryName].filter(Boolean).join(' ')
+    closeFireToast = toast(`${site}에서 화재가 감지되었습니다.`, {
       type: 'err',
       ms: 0, // 화재는 직접 닫을 때까지
       action: '화재 현황 보기',
       onAction: () => router.push({ name: 'site-select' }),
     })
   } else if (a.level === LEVEL.ALARM) {
-    toast(`${where(a)} 상도 건조로에서 경보가 발생했습니다.`, { type: 'err', ms: 6000, action: '위치 보기', onAction: () => goProcess(a) })
+    toast(`${at} ${placeOf(a).equipmentName}에서 경보가 발생했습니다.`, { type: 'err', ms: 6000, action: '위치 보기', onAction: () => goProcess(a) })
   } else {
-    toast(`${where(a)}에서 주의가 발생했습니다.`, { type: 'warn', action: '위치 보기', onAction: () => goProcess(a) })
+    toast(`${at}에서 주의가 발생했습니다.`, { type: 'warn', action: '위치 보기', onAction: () => goProcess(a) })
   }
 }
 

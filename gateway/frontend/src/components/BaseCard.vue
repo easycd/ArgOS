@@ -1,6 +1,6 @@
 <!--
   카드 틀 (화면설계안 css/base.css 의 .card / .ch 모양)
-  - 제목줄: 제목(title) + 회색 설명(sub) + 오른쪽 끝 영역(actions 슬롯)
+  - 제목줄: 제목(title 또는 title 슬롯) + 회색 설명(sub) + 오른쪽 끝 영역(actions 슬롯)
   - 화면에 나타날 때 아래에서 올라오며 차례로 나타남 (화면설계서 R2, motion.css 의 .rise)
   - 사용 예:
     <BaseCard title="사업장 목록" sub="3곳">
@@ -35,8 +35,9 @@ onMounted(() => {
 
 <template>
   <section ref="el" class="base-card rise">
-    <header v-if="title" class="card-head">
-      <h3>{{ title }}</h3>
+    <header v-if="title || $slots.title" class="card-head">
+      <!-- 제목: 글자만이면 title, 경로(CardCrumb) 등이 필요하면 title 슬롯 -->
+      <h3><slot name="title">{{ title }}</slot></h3>
       <!-- 설명: 글자만이면 sub, 링크 등이 필요하면 sub 슬롯 -->
       <span v-if="sub || $slots.sub" class="sub"><slot name="sub">{{ sub }}</slot></span>
       <div v-if="$slots.actions" class="actions"><slot name="actions" /></div>

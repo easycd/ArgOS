@@ -1,5 +1,6 @@
 <!--
-  구역 현황 카드: 울산공장 지도 + 공장을 누르면 말풍선
+  사업장 현황 지도 카드: 울산공장 지도 + 공장을 누르면 말풍선
+  - 제목: 단계 경로 '사업장 › 울산공장' (CardCrumb, 2026-11-18 '구역 현황'에서 바꿈)
   - 처음 열 때 정상이 아닌 공장이 있으면 그 공장 말풍선을 바로 띄움 (설계안과 같음)
   - 말풍선의 '공정 배치도 보기' → enter-factory 이벤트
 -->
@@ -9,6 +10,7 @@ import UlsanMap from './UlsanMap.vue'
 import ZonePopover from './ZonePopover.vue'
 import AppIcon from '@/components/AppIcon.vue'
 import BaseCard from '@/components/BaseCard.vue'
+import CardCrumb from '@/components/CardCrumb.vue'
 import { STAGES } from '@/features/site/stages'
 import { LEVEL } from '@/types/codes'
 
@@ -48,7 +50,8 @@ onMounted(async () => {
 </script>
 
 <template>
-  <BaseCard title="구역 현황" :sub="siteName">
+  <BaseCard>
+    <template #title><CardCrumb :items="[{ label: siteName }]" /></template>
     <template #actions>
       <span v-for="s in STAGES" :key="s.level" class="legend">
         <i :style="{ borderColor: s.color }" />{{ s.label }}

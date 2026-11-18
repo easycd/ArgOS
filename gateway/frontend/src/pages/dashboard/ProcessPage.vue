@@ -100,7 +100,7 @@ const crumbs = computed(() => {
   return [
     { label: names.value.site, to: { name: 'site-dashboard', params: { siteId } } },
     { label: names.value.factory, to: { name: 'dashboard', params: { siteId, factoryId } } },
-    { label: `${layout.value?.name ?? ''} 3D 설비 배치도` },
+    { label: layout.value?.name ?? '' }, // 공정 이름만 (2026-11-18 '… 3D 설비 배치도' 꼬리 뺌)
   ]
 })
 

@@ -1,5 +1,6 @@
 <!--
-  공장 '구역 현황' 카드: 경로(울산공장 › 5공장 공정 배치도) + 범례 + 공정 배치도
+  공장 지도 카드: 단계 경로(사업장 › 울산공장 › 5공장) + 범례 + 공정 배치도
+  - 2026-11-18 제목 '구역 현황' + '5공장 공정 배치도' 경로 → 단계 경로 하나로 (CardCrumb)
   - 공정을 누르면 select-process 이벤트 (페이지가 3D 배치도로 이동 또는 안내)
   - 경로의 사업장 이름을 누르면 사업장 현황으로
 -->
@@ -7,6 +8,7 @@
 import PlantMap from './PlantMap.vue'
 import AppIcon from '@/components/AppIcon.vue'
 import BaseCard from '@/components/BaseCard.vue'
+import CardCrumb from '@/components/CardCrumb.vue'
 import { STAGES } from '@/features/site/stages'
 
 defineProps({
@@ -22,13 +24,9 @@ const emit = defineEmits(['select-process'])
 </script>
 
 <template>
-  <BaseCard title="구역 현황">
-    <template #sub>
-      <span class="crumb">
-        <RouterLink :to="siteRoute" class="link">{{ siteName }}</RouterLink>
-        <AppIcon name="cr" :size="14" />
-        <b>{{ factoryName }} 공정 배치도</b>
-      </span>
+  <BaseCard>
+    <template #title>
+      <CardCrumb :items="[{ label: siteName, to: siteRoute }, { label: factoryName }]" />
     </template>
 
     <template #actions>
@@ -46,34 +44,6 @@ const emit = defineEmits(['select-process'])
 </template>
 
 <style scoped>
-/* 경로: 울산공장 › 5공장 공정 배치도 */
-.crumb {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 14px;
-  color: var(--color-text-sub);
-}
-
-.crumb .app-icon {
-  color: var(--color-text-weak);
-}
-
-.crumb b {
-  color: var(--color-text);
-}
-
-.link {
-  color: var(--color-primary);
-  font-weight: 500;
-  text-decoration: none;
-}
-
-.link:hover {
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-
 .legend {
   display: flex;
   align-items: center;

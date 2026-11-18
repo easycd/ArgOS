@@ -1,34 +1,39 @@
 <!--
-  전체 공장 상태 카드 안의 공장 하나
-  - 이름 + 상태 배지, 전류·온도·CO 작은 도넛 3개, 아래 줄에 센서 수·오늘 알림
+  전체 공장 상태 카드 안의 공장 하나 (2026-11-18 시안 B v3 기준)
+  - 이름 + 상태 배지, 전류·온도·CO 칸 3개
+  - 칸에는 '지금 알림이 난 센서 수'만 표시 (전체 센서 수는 보여 주지 않음)
+    · 알림 없음: 초록 체크
+    · 주의만: 주황 숫자 + '주의' / 경보만: 빨간 숫자 + '경보'
+    · 둘 다: '경보 수 | 주의 수' 를 나눠 적고 아래에 '경보 · 주의'
+  - 카드 테두리·배경은 공장 단계(가장 높은 단계) 색
   - 누르면 select 이벤트 (들어갈 수 있는 공장이면 이동, 아니면 지도 말풍선)
 -->
 <script setup>
+import { computed } from 'vue'
+import AppIcon from '@/components/AppIcon.vue'
 import LevelBadge from '@/components/LevelBadge.vue'
-import SensorDonut from '@/features/site/SensorDonut.vue'
 import { keyOf } from '@/features/site/stages'
 import { LEVEL, SENSOR_TYPES } from '@/types/codes'
 
-defineProps({
-  /** 사업장 현황의 공장 하나 */
+const props = defineProps({
+  /** 사업장 현황의 공장 하나 (levelsByType: { CURRENT: { NORMAL, WARN, ALARM }, TEMP, CO }) */
   factory: { type: Object, required: true },
 })
 
 const emit = defineEmits(['select'])
 
-/** 도넛 아래 이름: 경보·주의가 있으면 개수도 같이 (예: '전류 주의 1') */
-function typeLabel(label, counts) {
-  if (counts[LEVEL.ALARM]) return `${label} 경보 ${counts[LEVEL.ALARM]}`
-  if (counts[LEVEL.WARN]) return `${label} 주의 ${counts[LEVEL.WARN]}`
-  return label
+/** 칸 하나의 표시 값: 경보 수·주의 수와 칸 색 이름 */
+function cellOf(counts = {}) {
+  const warn = counts[LEVEL.WARN] ?? 0
+  const alarm = (counts[LEVEL.ALARM] ?? 0) + (counts[LEVEL.FIRE] ?? 0) // 화재는 경보 칸에 셈
+  const kind = alarm ? 'alarm' : warn ? 'warn' : 'none'
+  return { warn, alarm, kind }
 }
 
-/** 도넛 아래 이름 색 */
-function typeClass(counts) {
-  if (counts[LEVEL.ALARM]) return 'is-alarm'
-  if (counts[LEVEL.WARN]) return 'is-warn'
-  return ''
-}
+// 전류·온도·CO 칸 3개 (이름 + 표시 값)
+const cells = computed(() =>
+  SENSOR_TYPES.map((t) => ({ type: t.type, label: t.label, ...cellOf(props.factory.levelsByType?.[t.type]) })),
+)
 </script>
 
 <template>
@@ -38,18 +43,25 @@ function typeClass(counts) {
       <LevelBadge :level="factory.level" />
     </span>
 
-    <span class="donuts">
-      <span v-for="t in SENSOR_TYPES" :key="t.type" class="donut">
-        <SensorDonut :counts="factory.levelsByType[t.type]" :size="54" :stroke="7" />
-        <small :class="typeClass(factory.levelsByType[t.type])">
-          {{ typeLabel(t.label, factory.levelsByType[t.type]) }}
-        </small>
-      </span>
-    </span>
+    <span class="cells">
+      <span v-for="c in cells" :key="c.type" class="cell" :class="`is-${c.kind}`">
+        <span class="label">{{ c.label }}</span>
 
-    <span class="foot">
-      <span>센서 <b class="mono">{{ factory.sensorCount }}</b></span>
-      <span>오늘 알림 <b class="mono alarms">{{ factory.todayAlarmCount }}</b></span>
+        <!-- 알림 없음: 초록 체크만 -->
+        <AppIcon v-if="c.kind === 'none'" name="check" :size="36" class="ok-icon" />
+
+        <!-- 경보·주의 둘 다: 경보 수 | 주의 수 -->
+        <template v-else-if="c.alarm && c.warn">
+          <span class="num two mono"><em>{{ c.alarm }}</em><i class="sep" /><em class="w">{{ c.warn }}</em></span>
+          <span class="cap small">경보 · <span class="w">주의</span></span>
+        </template>
+
+        <!-- 한 가지만 -->
+        <template v-else>
+          <span class="num mono">{{ c.alarm || c.warn }}</span>
+          <span class="cap">{{ c.alarm ? '경보' : '주의' }}</span>
+        </template>
+      </span>
     </span>
   </button>
 </template>
@@ -60,7 +72,7 @@ function typeClass(counts) {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  padding: 14px 12px 13px;
+  padding: 14px 11px 12px;
   border: 1.5px solid var(--color-border);
   border-radius: var(--radius-sm);
   background: #fff;
@@ -98,55 +110,93 @@ function typeClass(counts) {
   white-space: nowrap;
 }
 
-.donuts {
-  display: flex;
-  justify-content: space-between;
-  margin: auto 0;
-  padding: 12px 0;
+.cells {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 7px;
+  margin-top: 12px;
 }
 
-.donut {
+/* 칸: 이름은 위에 고정, 체크·숫자는 남은 공간 가운데 */
+.cell {
+  --c: var(--color-text-sub);
+  min-height: 112px;
   display: flex;
   flex-direction: column;
   align-items: center;
+  gap: 2px;
+  padding: 11px 0 10px;
+  border: 1px solid #eef2f6;
+  border-radius: 6px;
+  background: #fff;
 }
 
-.donut small {
-  margin-top: 5px;
-  font-size: 12px;
+.cell.is-warn {
+  --c: var(--color-level-warn);
+  border: 1.5px solid var(--color-level-warn);
+}
+
+.cell.is-alarm {
+  --c: var(--color-level-alarm);
+  border: 1.5px solid var(--color-level-alarm);
+}
+
+.label {
+  font-size: 14px;
   font-weight: 600;
-  color: var(--color-text-sub);
-  white-space: nowrap;
+  color: var(--c);
 }
 
-.donut small.is-warn {
-  color: var(--color-level-warn-text);
-}
-
-.donut small.is-alarm {
-  color: var(--color-level-alarm-text);
-}
-
-.foot {
-  display: flex;
-  justify-content: space-between;
-  padding-top: 12px;
-  border-top: 1px dashed var(--color-border);
-  font-size: 12px;
+.cell.is-none .label {
   color: #64748b;
-  white-space: nowrap;
 }
 
-.foot b {
-  color: var(--color-text);
+.ok-icon {
+  margin: auto 0;
+  color: var(--color-level-normal);
 }
 
-.factory-item.is-warn .foot .alarms {
-  color: var(--color-level-warn-text);
+.num {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 48px;
+  margin-top: auto;
+  font-size: 44px;
+  font-weight: 600;
+  line-height: 48px;
+  color: var(--c);
 }
 
-.factory-item.is-alarm .foot .alarms,
-.factory-item.is-fire .foot .alarms {
-  color: var(--color-level-alarm-text);
+.num.two {
+  font-size: 30px;
+}
+
+.num em {
+  font-style: normal;
+}
+
+.num .sep {
+  width: 1px;
+  height: 24px;
+  background: #f3c1b0;
+}
+
+.cap {
+  margin-bottom: auto;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--c);
+}
+
+.cap.small {
+  font-size: 11.5px;
+  letter-spacing: -0.3px;
+}
+
+/* 경보·주의가 같이 있을 때 주의 쪽 숫자·글자는 주황 */
+.w {
+  color: var(--color-level-warn);
 }
 </style>

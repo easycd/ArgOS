@@ -1,5 +1,6 @@
 <!--
-  시간대별 알림 카드: 주간(07~19시) · 야간(19~07시) 두 줄 (GET /alarms/hourly)
+  전일 시간대별 알림 카드: 어제 주간(07~19시) · 야간(19~07시) 두 줄 (GET /alarms/hourly?date=어제)
+  - 2026-11-18: 제목 '시간대별 알림' → '전일 시간대별 알림', 부제(주간 · 야간) 삭제, 줄 높이 140 → 106px
   - 줄마다 왼쪽에 이름·시간·알림/조치 건수, 오른쪽에 차트(HourlyChart)
 -->
 <script setup>
@@ -27,7 +28,7 @@ const LEGEND = [
 </script>
 
 <template>
-  <BaseCard title="시간대별 알림" sub="주간 · 야간">
+  <BaseCard title="전일 시간대별 알림">
     <template #actions>
       <span v-for="l in LEGEND" :key="l.label" class="legend"><i :style="{ background: l.color }" />{{ l.label }}</span>
     </template>
@@ -68,7 +69,7 @@ const LEGEND = [
 .shift {
   display: flex;
   align-items: flex-start;
-  height: 140px;
+  height: 106px;
 }
 
 .label {
@@ -77,7 +78,7 @@ const LEGEND = [
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 14px 0 0 8px;
+  padding: 8px 0 0 8px;
 }
 
 .label > b {

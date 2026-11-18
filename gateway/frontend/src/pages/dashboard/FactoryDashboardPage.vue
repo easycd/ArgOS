@@ -1,7 +1,7 @@
 <!--
   공장 대시보드 화면 (예: 5공장 공정 배치도 — 화면설계안 js/v-dash.js vPlant() 기준)
   - 왼쪽: 구역 현황(공정 배치도, PlantMapCard)
-  - 오른쪽: 실시간 알림, 전일 시간대별 알림 (사업장 현황과 같은 카드를 공장 범위로)
+  - 오른쪽: 전일 시간대별 알림, 실시간 알림 (사업장 현황과 같은 순서·카드를 공장 범위로, 2026-11-18 순서 바꿈)
   - 아래: 공정별 설비 상태(ProcessStatusCard)를 화면 끝까지 (2026-11-18 센서별 단계 현황 삭제)
   - 이 파일은 데이터 불러오기와 화면 이동만 담당, 모양은 features 의 카드가 담당
   - 데이터 (지금은 예시 데이터): GET /factories/{factoryId}/overview, GET /alarms?factoryId=, GET /alarms/hourly?factoryId=
@@ -93,8 +93,8 @@ function onSelectProcess(process) {
     />
 
     <div class="right">
-      <AlarmListCard class="fill" :alarms="alarms" />
       <HourlyAlarmCard :hourly="hourly" />
+      <AlarmListCard class="fill" :alarms="alarms" />
     </div>
 
     <ProcessStatusCard

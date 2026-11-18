@@ -3,6 +3,7 @@
   - 주의 기준에 가까운 순서로 5개. 값이 바뀌면 순위가 바뀌고 줄이 미끄러지듯 자리를 옮김(TransitionGroup)
   - 줄마다: 순위 · 센서 + 설비 이름 · 센서 종류 칩 · 막대(지금 값, 주의·경보 기준선) · 값과 '주의 기준 몇 %'
   - 막대·값 색 = 단계 색 (정상 초록 / 주의 주황 / 경보 빨강)
+  - 주의·경보 줄은 바탕이 단계 색으로 천천히 반짝임 (2026-11-18 재원님 요청)
   - 줄을 누르면 select 이벤트 (페이지가 그 설비 상세로 이동)
 -->
 <script setup>
@@ -123,6 +124,50 @@ const fmt = (row) => row.value.toFixed(sensorTypeOf(row.type)?.dec ?? 1)
 
 .row:hover {
   background: var(--color-surface-sub);
+}
+
+/*
+ * 주의·경보 줄: 줄 바탕이 단계 색(옅은 색)으로 천천히 밝아졌다 사라지기를 반복
+ * - 바탕 층(::before)을 따로 두고 투명도만 바꿈 → 마우스 올림 바탕·글자는 그대로
+ * - 경보는 주의보다 조금 빠르게 (주의 2.4초, 경보 1.6초 한 번)
+ */
+.row.warn,
+.row.alarm {
+  position: relative;
+  isolation: isolate; /* ::before 를 줄 바탕 위, 글자 아래에 둠 */
+}
+
+.row.warn::before,
+.row.alarm::before {
+  content: '';
+  position: absolute;
+  inset: 3px -8px;
+  z-index: -1;
+  border-radius: var(--radius-xs);
+  background: var(--soft);
+  box-shadow: inset 3px 0 0 var(--c); /* 왼쪽 단계 색 띠 */
+  animation: near-blink 2.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* 반짝일 때 가장 진한 바탕 = 단계 색 20% (tokens 의 -soft 색은 너무 옅어 반짝임이 잘 안 보임) */
+.row.warn,
+.row.alarm {
+  --soft: color-mix(in srgb, var(--c) 20%, #fff);
+}
+
+.row.alarm::before {
+  animation-duration: 1.6s;
+}
+
+@keyframes near-blink {
+  0%,
+  100% {
+    opacity: 0.1;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 
 .rank {
@@ -259,6 +304,13 @@ const fmt = (row) => row.value.toFixed(sensorTypeOf(row.type)?.dec ?? 1)
   .rank-leave-active,
   .fill {
     transition: none;
+  }
+
+  /* 움직임 줄이기 설정이면 반짝이지 않고 옅은 단계 색 바탕만 */
+  .row.warn::before,
+  .row.alarm::before {
+    animation: none;
+    opacity: 0.7;
   }
 }
 </style>

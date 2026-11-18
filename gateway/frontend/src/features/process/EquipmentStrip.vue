@@ -1,12 +1,17 @@
 <!--
   배치도 아래 설비 줄 (설계안 vProcess() 의 #eqs): 공정 흐름 순서대로 설비 카드
-  - 1~7번: 번호, 이름, 상태 배지 (작은 카드)
-  - 마지막 번호 설비(상도 건조로): 넓은 카드에 센서 3개 값과 원형 게이지, '설비 상세'
+  - 카드마다 번호, 이름, 상태 배지
+  - 펼친 카드 1장: 넓어지면서 센서 값과 원형 게이지, '설비 상세'가 보임
+    · 마우스를 올린(또는 키보드로 고른) 카드가 펼쳐짐
+    · 아무 카드에도 올리지 않았을 때는 기본 카드가 펼쳐짐
+      = 단계가 가장 높은 설비(주의·경보 중인 설비), 모두 정상이면 마지막 순서 설비
     · 체크리스트가 진행 중이면 '체크리스트 2/5' 칩 → 누르면 체크리스트 진행 창 (카드 이동은 안 함)
   - 누르면 select 이벤트
+  - 펼친 카드는 오른쪽 끝이 그대로이거나 왼쪽 끝이 그대로인 채로 넓어지므로
+    마우스 아래 카드가 바뀌어 흔들리는 일이 없음
 -->
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import SensorRing from './SensorRing.vue'
 import AppIcon from '@/components/AppIcon.vue'
 import LevelBadge from '@/components/LevelBadge.vue'
@@ -23,20 +28,37 @@ const emit = defineEmits(['select'])
 
 // 순서 번호가 있는 설비만, 번호 순서대로
 const line = computed(() => props.equipment.filter((e) => e.seq).sort((a, b) => a.seq - b.seq))
-const small = computed(() => line.value.slice(0, -1))
-const last = computed(() => line.value.at(-1))
 
-// 넓은 카드의 센서: 전류·온도·CO 순서
-const lastSensors = computed(() =>
-  SENSOR_TYPES.map((t) => last.value?.sensors.find((s) => s.type === t.type)).filter(Boolean),
-)
+// 단계 높낮이 (정상 0 → 화재 3)
+const LEVEL_RANK = Object.values(LEVEL)
+const rank = (level) => LEVEL_RANK.indexOf(level)
+
+// 기본으로 펼칠 카드: 단계가 가장 높은 설비, 모두 정상이면 마지막 순서
+const defaultId = computed(() => {
+  const list = line.value
+  if (!list.length) return null
+  const worst = list.reduce((a, b) => (rank(b.level) > rank(a.level) ? b : a), list[0])
+  return worst.level !== LEVEL.NORMAL ? worst.id : list.at(-1).id
+})
+
+// 마우스를 올린(키보드로 고른) 카드. 줄 밖으로 나가면 null → 기본 카드
+const hoverId = ref(null)
+const openId = computed(() => hoverId.value ?? defaultId.value)
+
+// 키보드 초점이 줄 밖으로 나갈 때만 기본 카드로 (카드 안 체크리스트 칩으로 옮길 때는 그대로)
+function onFocusOut(e) {
+  if (!e.currentTarget.contains(e.relatedTarget)) hoverId.value = null
+}
+
+// 펼친 카드의 센서: 전류·온도·CO 순서
+const sensorsOf = (eq) => SENSOR_TYPES.map((t) => eq.sensors.find((s) => s.type === t.type)).filter(Boolean)
 const typeLabel = (type) => SENSOR_TYPES.find((t) => t.type === type)?.label ?? type
 
 // 진행 중 체크리스트 칩 (상단 바 체크리스트와 같은 건)
 const alert = useAlertStore()
 // 경보·화재 중에는 숨김 (상단 바 체크리스트 버튼과 같은 규칙)
 const emergency = computed(() => ['ALARM', 'FIRE'].includes(alert.primary?.level))
-const checklist = computed(() => (last.value && !emergency.value ? alert.checklistOfEquipment(last.value.id) : null))
+const checklist = computed(() => (openId.value && !emergency.value ? alert.checklistOfEquipment(openId.value) : null))
 const checklistText = computed(() => {
   const c = checklist.value
   if (!c) return ''
@@ -49,34 +71,41 @@ function openChecklist() {
 </script>
 
 <template>
-  <div class="strip">
-    <button v-for="eq in small" :key="eq.id" type="button" class="item" @click="emit('select', eq)">
-      <span class="no mono">{{ eq.seq }}</span>
-      <b>{{ eq.name }}</b>
-      <LevelBadge :level="eq.level" />
-    </button>
-
-    <button v-if="last" type="button" class="item wide" :class="`is-${keyOf(last.level)}`" @click="emit('select', last)">
-      <span class="wide-head">
-        <span class="no mono">{{ last.seq }}</span>
-        <b>{{ last.name }}</b>
-        <LevelBadge :level="last.level" />
-        <!-- 버튼 안 버튼을 피하려고 span + role. 눌러도 카드의 설비 상세 이동은 막음(.stop) -->
-        <span
-          v-if="checklist"
-          class="ck-chip"
-          :class="{ done: checklist.status === 'REPORTED' }"
-          role="button"
-          tabindex="0"
-          @click.stop="openChecklist"
-          @keydown.enter.stop.prevent="openChecklist"
-        >
-          <AppIcon name="clip" :size="13" />{{ checklistText }}
-        </span>
-        <span class="go">설비 상세 <AppIcon name="cr" :size="16" /></span>
+  <div class="strip" @mouseleave="hoverId = null" @focusout="onFocusOut">
+    <button
+      v-for="eq in line"
+      :key="eq.id"
+      type="button"
+      class="item"
+      :class="[`is-${keyOf(eq.level)}`, { open: eq.id === openId }]"
+      @mouseenter="hoverId = eq.id"
+      @focus="hoverId = eq.id"
+      @click="emit('select', eq)"
+    >
+      <span class="head">
+        <span class="no mono">{{ eq.seq }}</span>
+        <b>{{ eq.name }}</b>
+        <LevelBadge :level="eq.level" />
+        <template v-if="eq.id === openId">
+          <!-- 버튼 안 버튼을 피하려고 span + role. 눌러도 카드의 설비 상세 이동은 막음(.stop) -->
+          <span
+            v-if="checklist"
+            class="ck-chip"
+            :class="{ done: checklist.status === 'REPORTED' }"
+            role="button"
+            tabindex="0"
+            @click.stop="openChecklist"
+            @keydown.enter.stop.prevent="openChecklist"
+          >
+            <AppIcon name="clip" :size="13" />{{ checklistText }}
+          </span>
+          <span class="go">설비 상세 <AppIcon name="cr" :size="16" /></span>
+        </template>
       </span>
-      <span class="sensors">
-        <span v-for="s in lastSensors" :key="s.tag" class="sensor">
+
+      <!-- 펼친 카드에만: 센서 값 + 원형 게이지 -->
+      <span v-if="eq.id === openId" class="sensors">
+        <span v-for="s in sensorsOf(eq)" :key="s.tag" class="sensor">
           <SensorRing :sensor="s" :size="44" />
           <span>
             <small>{{ typeLabel(s.type) }} <span class="mono">{{ s.tag }}</span></small>
@@ -85,6 +114,7 @@ function openChecklist() {
             </b>
           </span>
         </span>
+        <span v-if="!eq.sensors.length" class="empty">연결된 센서 없음</span>
       </span>
     </button>
   </div>
@@ -97,8 +127,9 @@ function openChecklist() {
   padding: 0 20px 18px;
 }
 
+/* 접힌 카드: 남는 폭을 똑같이 나눠 가짐 */
 .item {
-  flex: 1;
+  flex: 1 1 0;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -110,23 +141,67 @@ function openChecklist() {
   background: #fff;
   text-align: left;
   cursor: pointer;
+  overflow: hidden;
+  /* 넓어지고 좁아지는 움직임 (tokens.css --m-panel) */
   transition:
-    border-color 0.15s,
-    box-shadow 0.15s;
+    flex-grow var(--m-panel),
+    min-width var(--m-panel),
+    border-color var(--m-hover),
+    background-color var(--m-hover),
+    box-shadow var(--m-hover);
 }
 
-.item:hover {
+.item:hover,
+.item:focus-visible {
   border-color: #93c5fd;
   box-shadow: 0 2px 10px rgba(37, 99, 235, 0.12);
 }
 
-.item > b {
+/* 펼친 카드: 센서 3개(게이지 44px + 값)가 다 들어가는 폭(372px)보다 줄어들지 않게 */
+.item.open {
+  flex-grow: 3.4;
+  min-width: 372px;
+  padding: 11px 14px;
+}
+
+/* 펼친 카드가 주의·경보면 테두리와 바탕을 단계 색으로 */
+.item.open.is-warn {
+  border-color: var(--color-level-warn);
+  background: rgba(255, 237, 213, 0.4);
+}
+
+.item.open.is-alarm,
+.item.open.is-fire {
+  border-color: var(--color-level-alarm);
+  background: rgba(254, 226, 226, 0.4);
+}
+
+/* 접힌 카드: 이름 아래 배지 / 펼친 카드: 한 줄에 번호·이름·배지·칩·설비 상세 */
+.head {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+
+.item.open .head {
+  flex-direction: row;
+  align-items: center;
+}
+
+.head b {
+  max-width: 100%;
   font-size: 14px;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* 파란 동그라미 번호 */
 .no {
+  flex: none;
   width: 18px;
   height: 18px;
   display: grid;
@@ -165,38 +240,6 @@ function openChecklist() {
   color: var(--color-level-normal-text);
 }
 
-/* 넓은 카드 (마지막 설비) */
-.wide {
-  /* 센서 3개(게이지 44px + 값)가 다 들어가는 폭(372px)보다 줄어들지 않게. 작은 카드들도 글자 폭만큼은 지키므로 */
-  flex: 3.4;
-  min-width: 372px;
-  border-width: 1.5px;
-  padding: 11px 14px;
-}
-
-.wide.is-warn {
-  border-color: var(--color-level-warn);
-  background: rgba(255, 237, 213, 0.4);
-}
-
-.wide.is-alarm,
-.wide.is-fire {
-  border-color: var(--color-level-alarm);
-  background: rgba(254, 226, 226, 0.4);
-}
-
-.wide-head {
-  align-self: stretch;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.wide-head b {
-  font-size: 14px;
-  white-space: nowrap;
-}
-
 .go {
   margin-left: auto;
   display: flex;
@@ -204,11 +247,14 @@ function openChecklist() {
   color: var(--color-primary);
   font-size: 12px;
   font-weight: 700;
+  white-space: nowrap;
 }
 
+/* 센서 줄: 펼쳐질 때 살짝 늦게 나타남 (카드가 넓어진 뒤) */
 .sensors {
   display: flex;
   gap: 12px;
+  animation: pop-in var(--m-panel) 80ms both; /* motion.css */
 }
 
 .sensor {
@@ -241,5 +287,24 @@ function openChecklist() {
 .sensor b.is-alarm,
 .sensor b.is-fire {
   color: var(--color-level-alarm-text);
+}
+
+.empty {
+  height: 44px;
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+  color: var(--color-text-weak);
+}
+
+/* 움직임 줄이기 설정이면 넓어지는 움직임 없이 바로 바뀜 */
+@media (prefers-reduced-motion: reduce) {
+  .item {
+    transition: none;
+  }
+
+  .sensors {
+    animation: none;
+  }
 }
 </style>

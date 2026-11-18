@@ -168,7 +168,7 @@ async function onFanApply(eq, { power, rpm }) {
 
     <div class="right">
       <NearThresholdCard :rows="nearRows" @select="onSelectNear" />
-      <AlarmListCard :alarms="alarms" />
+      <AlarmListCard class="fill" :alarms="alarms" />
       <InspectionTodayCard :process-name="layout.name" :inspections="inspections" :inspection-route="inspectionRoute" />
     </div>
   </div>
@@ -177,12 +177,16 @@ async function onFanApply(eq, { power, rpm }) {
 </template>
 
 <style scoped>
-/* 배치: 사업장·공장 화면과 같음 (왼쪽 넓은 열 + 오른쪽 628px 열) */
+/*
+ * 배치: 사업장·공장 화면과 같음 (왼쪽 넓은 열 + 오른쪽 628px 열)
+ * - 오른쪽 열 높이를 왼쪽 배치도 카드에 맞춤(stretch)
+ * - 실시간 알림이 남는 높이를 채워 오른쪽 아래 빈칸이 생기지 않게 함
+ */
 .process-page {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 628px;
   gap: 16px;
-  align-items: start;
+  align-items: stretch;
 }
 
 @media (max-width: 1400px) {
@@ -197,6 +201,19 @@ async function onFanApply(eq, { power, rpm }) {
   flex-direction: column;
   gap: 16px;
   min-width: 0;
+}
+
+/* 실시간 알림: 남는 높이를 채우고 목록만 스크롤 (AlarmListCard 의 .list, 구역 현황과 같은 방식) */
+.fill {
+  flex: 1 1 0;
+  min-height: 240px;
+  display: flex;
+  flex-direction: column;
+}
+
+.fill :deep(.list) {
+  flex: 1 1 0;
+  max-height: none;
 }
 
 .state {

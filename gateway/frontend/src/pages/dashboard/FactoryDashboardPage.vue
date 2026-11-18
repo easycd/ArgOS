@@ -101,7 +101,6 @@ function onSelectProcess(process) {
       class="wide"
       :factory-name="overview.factory.name"
       :processes="overview.processes"
-      :cameras="overview.cameras"
       @select="onSelectProcess"
     />
   </div>

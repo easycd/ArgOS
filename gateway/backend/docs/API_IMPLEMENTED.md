@@ -74,7 +74,8 @@ API 명세서 기준으로 구현한 것과, 명세서와 다르게 한 점입�
 - `threshold.changed` `{ equipmentId, processId, season, at }`: 명세서에 없던 이벤트. 기준값이 바뀌면 B3·B4 게이지 기준을 다시 불러오면 됨
 - `reset`: 시연 리셋·중앙 재시작 때. 화면은 전부 다시 불러오면 됨
 - `Last-Event-ID` 로 놓친 이벤트 다시 받기는 아직 없음
-- `thermal.frame`, `fire.*`, `chat.message` 는 아직 없음
+- `fire.started` · `fire.updated` · `fire.cleared` · `chat.message` 추가 (아래 화재·채팅 참고)
+- `thermal.frame` 은 아직 없음
 
 ### 기준값 관리 (D2)
 
@@ -156,7 +157,45 @@ API 명세서 기준으로 구현한 것과, 명세서와 다르게 한 점입�
 - 변경은 이용 로그(`activity_log`, 유형 `USER`)에 "이름(아이디) · 내용"으로 남고, 상세의 `history` 는 그중 "내용"만 보여 줌. 기록 시각은 시연 시계 기준
 - `PUT /me/password` 에서 지금 비밀번호가 틀릴 때 401 → 화면이 로그아웃되는 문제(프론트 backend-notes 14장 1번)는 로그인 코드라 아직 그대로
 
+### 이용 로그 (G2)
+
+권한: 본사·공장 관리자 (공장 관리자는 자기 사업장·담당 공정 범위만).
+
+| API | 비고 |
+| --- | --- |
+| `GET /logs?from=&to=&factoryId=&processId=&userId=&type=&q=&page=&size=` | `items[{ id, at, loginId, name, role, scopeText, type, message, before, after }]`, `countsByType`, `byHour`(0~23시 24칸), `topUsers`(많이 쓴 4명, 명세서에 없음), `page`, `size`, `total` |
+| `GET /logs/export` | 같은 조건 CSV (UTF-8 BOM). 내려받은 것도 `EXPORT` 로 남음 |
+
+- `activity_log` 와 로그인 성공 기록(`login_history`)을 합쳐 보여 줌. 로그인 줄은 유형 `LOGIN`, id 는 음수(-이력 id)
+- `type` 은 `LOGIN,LOGOUT` 처럼 쉼표로 여러 개. `countsByType` 은 유형 조건을 빼고 셈 (화면에서 다른 유형 칸으로 바꿀 수 있게)
+- 로그인 기록 시각은 실제 시각, 다른 작업 로그는 시연 시계 시각
+
+### 채팅 (I2)
+
+권한: 본사·공장 관리자 (공정 담당자는 403 `CHAT_NOT_ALLOWED`). 대화방 = 사업장, `roomId` = 사업장 id.
+
+| API | 비고 |
+| --- | --- |
+| `GET /chat/rooms` | 본사는 사업장 전부, 공장 담당자는 자기 사업장 방 하나. `peer`(상대 대표 1명, `online` = SSE 접속 중), `lastMessage`, `unreadCount` |
+| `GET /chat/rooms/{roomId}/messages?before=&size=` | 오래된 것 → 최근 순, 기본 30개, `hasMore`. 내 글의 `read` 는 상대가 읽었는지 |
+| `POST /chat/rooms/{roomId}/messages` `{ body, alarmId }` | 1~1,000자 (400 `VALIDATION_FAILED`). 보내면 SSE `chat.message` `{ roomId, id, senderId, senderName, body, alarmId, sentAt }` |
+| `POST /chat/rooms/{roomId}/read` `{ lastReadMessageId }` | `{ unreadCount }` |
+
+### 화재 대응 (C4F · C5)
+
+| API | 권한 | 비고 |
+| --- | --- | --- |
+| `GET /fires?status=ACTIVE|CLEARED&siteId=` | 전체 (담당 범위만) | 진행 중 화재 목록 (지도 위치 `lat`·`lng` 는 사업장 좌표) |
+| `GET /fires/{fireId}` | 전체 (담당 범위만) | 위치, 판정 근거, 열화상 최고 온도, 방송 상태, `unlock`, `actions`(DETECTED · BROADCAST · SHUTDOWN · EVACUATED) |
+| `POST /fires/{fireId}/clear` `{ password, memo }` | 공장 담당자 | 로그인한 사람 비밀번호 재확인. 401 `FIRE_PASSWORD_MISMATCH`(`remaining`), 5회 틀리면 423 `FIRE_UNLOCK_LOCKED`, 본사는 403 `ACTION_NOT_ALLOWED`. 해제하면 방송 종료, 경보 종료, 이용 로그 `FIRE_CLEAR`, SSE `fire.cleared` |
+| `POST /fires/{fireId}/approve-unlock` | 본사 관리자 | 실패 횟수 0으로. SSE `fire.updated` |
+
+- **화재 판정 (가정)**: 위험 종류 화재(FIRE) 경보가 3단계이고 근거에 열화상(IR) 센서 이벤트가 있으면 화재. 중앙 경보 피드를 보다가 그 순간 `fire_incident` 를 만들고 SSE `fire.started` 를 보냄. 판정 기준이 바뀌면 `FireService.isFire` 한 곳만 고치면 됨
+- 경고 방송은 방송 시스템 API 가 정해지기 전까지 로그만 남김 (`BroadcastSender`). 조치 이력에는 `BROADCAST` 로 남음
+- 열화상 `min`·`avg` 와 대피 확인(EVACUATED) 입력 API 는 아직 없음. 대피 수는 조치 이력의 `EVACUATED` 를 셈
+- 테이블: `V4__gateway_chat_fire.sql` (`chat_message`, `chat_read`, `fire_incident`, 테이블 명세서 v5 기준)
+
 ## 아직 없는 것
 
-화재(fire_incident), 월간 보고서 PDF, xlsx 내보내기, 점검·OCR(`/inspections/*`, 오늘 점검은 빈 목록만),
-이용 로그(`/logs`), 채팅, 공장 관리(배치 저장), 실제 FCM 전송.
+월간 보고서 PDF, xlsx 내보내기, 점검·OCR(`/inspections/*`, 오늘 점검은 빈 목록만), 공장 관리(배치 저장),
+대피 확인 입력, 실제 FCM 전송·방송 시스템 연동, `thermal.frame`.

@@ -1,5 +1,7 @@
 package com.gte.argos.gateway.stream;
 
+import com.gte.argos.gateway.fire.FireService;
+
 import com.gte.argos.gateway.alarm.AlarmService;
 import com.gte.argos.gateway.central.CentralClient;
 import com.gte.argos.gateway.central.CentralDto;
@@ -49,6 +51,7 @@ public class FeedPoller {
     private final AlarmService alarms;
     private final ChecklistRepository checklists;
     private final SimTime time;
+    private final FireService fires;
     private final boolean enabled;
 
     private String bootId;
@@ -57,7 +60,7 @@ public class FeedPoller {
     private boolean warned;
 
     public FeedPoller(CentralClient central, MasterCache masterCache, StreamHub hub, AlarmService alarms,
-                      ChecklistRepository checklists, SimTime time,
+                      ChecklistRepository checklists, SimTime time, FireService fires,
                       @Value("${argos.central.feed-enabled:true}") boolean enabled) {
         this.central = central;
         this.masterCache = masterCache;
@@ -65,6 +68,7 @@ public class FeedPoller {
         this.alarms = alarms;
         this.checklists = checklists;
         this.time = time;
+        this.fires = fires;
         this.enabled = enabled;
     }
 
@@ -151,6 +155,7 @@ public class FeedPoller {
                 CentralDto.Alarm a = central.alarm(num(d.get("alarmId")));
                 Map<String, Object> view = alarms.items(List.of(a), masterCache.get()).get(0);
                 hub.publish("alarm.created", id, view, s -> s.scope().canProcess(a.processId(), masterCache.get()));
+                fireCheck(a);
             }
             case "ALARM_UPDATED", "ALARM_CLEARED", "ALARM_STATUS" -> {
                 long alarmId = num(d.get("alarmId"));
@@ -168,6 +173,7 @@ public class FeedPoller {
                 view.put("at", item.at());
                 hub.publish("alarm.updated", id, view, s -> s.scope().canProcess(a.processId(), masterCache.get()));
                 closeIfConfirmed(a);
+                fireCheck(a);
             }
             case "COMMAND_RESULT" -> {
                 long equipmentId = num(d.get("equipmentId"));
@@ -286,6 +292,15 @@ public class FeedPoller {
             st.sensors().forEach(x -> s.put(x.sensorId(), x.stage()));
             st.equipment().forEach(x -> e.put(x.equipmentId(), x.stage()));
             return new Levels(s, e);
+        }
+    }
+
+    /** 화재 판정 실패가 피드 처리를 멈추지 않게 */
+    private void fireCheck(CentralDto.Alarm a) {
+        try {
+            fires.onAlarm(a);
+        } catch (RuntimeException e) {
+            log.warn("화재 판정 처리 실패 alarm={}: {}", a.alarmId(), e.getMessage());
         }
     }
 }

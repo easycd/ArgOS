@@ -2,12 +2,14 @@
  * 대시보드 API (설계 자료 API 명세서 B1 '울산공장 현황' 기준)
  * - GET /sites/{siteId}/overview : 지도·공장 카드·센서 종류별 도넛
  * - GET /alarms                  : 실시간 알림 목록 (오늘, 최근 순)
- * - GET /alarms/hourly           : 시간대별 알림 (주간·야간)
+ * - GET /alarms/hourly           : 전일 시간대별 알림 (주간·야간, date=어제)
  */
+import { serverNow } from './clock'
 import http from './http'
 import { USE_MOCK, mockFail, mockOk } from './mock'
 import { mockAlarms, mockSiteTrees, mockSites } from './mock/data'
 import { factoryLevels, sumLevels } from '@/features/site/siteStats'
+import { formatYmd } from '@/utils/format'
 
 const SENSOR_TYPES = ['CURRENT', 'TEMP', 'CO']
 
@@ -111,11 +113,15 @@ function mockHourlyOf(alarms) {
 }
 
 /**
- * 시간대별 알림 (주간 07~19시, 야간 19~07시)
+ * 전일 시간대별 알림 (주간 07~19시, 야간 19~07시)
+ * - 2026-11-18 화면 제목이 '전일 시간대별 알림'으로 바뀌어 date 를 오늘 → 어제(서버 시연 시계 기준)로 보냄
+ * - 예시 데이터 모드: 어제 예시가 따로 없어 오늘 예시 알림으로 그대로 그림
  * @param {{ siteId?: number, factoryId?: number }} params
  * @returns {Promise<{ day: { alarmCount, actionCount, hours }, night: { ... } }>}
  */
 export function getHourlyAlarms({ siteId, factoryId }) {
   if (USE_MOCK) return mockOk(mockHourlyOf(mockAlarmsOf({ siteId, factoryId })))
-  return http.get('/alarms/hourly', { params: { ...scopeParams({ siteId, factoryId }), date: 'today' } })
+  const yesterday = serverNow()
+  yesterday.setDate(yesterday.getDate() - 1)
+  return http.get('/alarms/hourly', { params: { ...scopeParams({ siteId, factoryId }), date: formatYmd(yesterday) } })
 }

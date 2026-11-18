@@ -3,7 +3,8 @@
   - 카드마다 번호, 이름, 상태 배지
   - 펼친 카드 1장: 넓어지면서 센서 값과 원형 게이지, '설비 상세'가 보임
     · 마우스를 올린(또는 키보드로 고른) 카드가 펼쳐짐
-    · 아무 카드에도 올리지 않았을 때는 기본 카드가 펼쳐짐
+    · 마우스를 빼도 마지막으로 올린 카드가 펼쳐진 채로 남음 (2026-11-18 재원님 요청)
+    · 화면에 처음 들어왔을 때(아직 아무 카드에도 올리지 않았을 때)만 기본 카드
       = 단계가 가장 높은 설비(주의·경보 중인 설비), 모두 정상이면 마지막 순서 설비
     · 체크리스트가 진행 중이면 '체크리스트 2/5' 칩 → 누르면 체크리스트 진행 창 (카드 이동은 안 함)
   - 누르면 select 이벤트
@@ -41,14 +42,10 @@ const defaultId = computed(() => {
   return worst.level !== LEVEL.NORMAL ? worst.id : list.at(-1).id
 })
 
-// 마우스를 올린(키보드로 고른) 카드. 줄 밖으로 나가면 null → 기본 카드
-const hoverId = ref(null)
-const openId = computed(() => hoverId.value ?? defaultId.value)
-
-// 키보드 초점이 줄 밖으로 나갈 때만 기본 카드로 (카드 안 체크리스트 칩으로 옮길 때는 그대로)
-function onFocusOut(e) {
-  if (!e.currentTarget.contains(e.relatedTarget)) hoverId.value = null
-}
+// 마지막으로 마우스를 올린(키보드로 고른) 카드. 마우스를 빼도 지우지 않음
+// 아직 고른 적이 없으면(null) 기본 카드
+const pickedId = ref(null)
+const openId = computed(() => pickedId.value ?? defaultId.value)
 
 // 펼친 카드의 센서: 전류·온도·CO 순서
 const sensorsOf = (eq) => SENSOR_TYPES.map((t) => eq.sensors.find((s) => s.type === t.type)).filter(Boolean)
@@ -71,15 +68,15 @@ function openChecklist() {
 </script>
 
 <template>
-  <div class="strip" @mouseleave="hoverId = null" @focusout="onFocusOut">
+  <div class="strip">
     <button
       v-for="eq in line"
       :key="eq.id"
       type="button"
       class="item"
       :class="[`is-${keyOf(eq.level)}`, { open: eq.id === openId }]"
-      @mouseenter="hoverId = eq.id"
-      @focus="hoverId = eq.id"
+      @mouseenter="pickedId = eq.id"
+      @focus="pickedId = eq.id"
       @click="emit('select', eq)"
     >
       <span class="head">

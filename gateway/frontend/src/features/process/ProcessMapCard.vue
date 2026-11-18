@@ -1,6 +1,7 @@
 <!--
-  공정 '구역 현황' 카드: 경로 + 안내·범례 + 3D 설비 배치도 + 배기팬 창 + 아래 설비 줄
-  - 경로: 울산공장 › 5공장 › 도장 공정 3D 설비 배치도 (앞의 둘은 누르면 이동)
+  공정 지도 카드: 단계 경로 + 안내·범례 + 3D 설비 배치도 + 배기팬 창 + 아래 설비 줄
+  - 경로: 사업장 › 울산공장 › 5공장 › 도장 공정 (앞 단계는 누르면 이동, CardCrumb)
+    · 2026-11-18 제목 '구역 현황' + '도장 공정 3D 설비 배치도' 경로 → 단계 경로 하나로
   - 설비를 누르면 select-equipment, 배기팬 창의 '적용'은 fan-apply 이벤트로 페이지에 넘김
 -->
 <script setup>
@@ -8,12 +9,12 @@ import { ref } from 'vue'
 import EquipmentStrip from './EquipmentStrip.vue'
 import FanPopover from './FanPopover.vue'
 import PaintMap from './PaintMap.vue'
-import AppIcon from '@/components/AppIcon.vue'
 import BaseCard from '@/components/BaseCard.vue'
+import CardCrumb from '@/components/CardCrumb.vue'
 import { STAGES } from '@/features/site/stages'
 
 const props = defineProps({
-  /** 경로: [{ label, to }] — to 가 있으면 링크 */
+  /** 경로('사업장' 다음부터): [{ label, to }] — to 가 있으면 링크 */
   crumbs: { type: Array, required: true },
   /** 화면용 설비 목록 */
   equipment: { type: Array, required: true },
@@ -40,16 +41,8 @@ defineExpose({ closeFan: () => (fan.value = null) })
 </script>
 
 <template>
-  <BaseCard title="구역 현황">
-    <template #sub>
-      <span class="crumb">
-        <template v-for="(c, i) in crumbs" :key="c.label">
-          <AppIcon v-if="i > 0" name="cr" :size="14" />
-          <RouterLink v-if="c.to" :to="c.to" class="link">{{ c.label }}</RouterLink>
-          <b v-else>{{ c.label }}</b>
-        </template>
-      </span>
-    </template>
+  <BaseCard>
+    <template #title><CardCrumb :items="crumbs" /></template>
 
     <template #actions>
       <span class="hint-text">배기팬을 누르면 회전수 · 켜기/끄기</span>
@@ -74,33 +67,6 @@ defineExpose({ closeFan: () => (fan.value = null) })
 </template>
 
 <style scoped>
-.crumb {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 14px;
-  color: var(--color-text-sub);
-}
-
-.crumb .app-icon {
-  color: var(--color-text-weak);
-}
-
-.crumb b {
-  color: var(--color-text);
-}
-
-.link {
-  color: var(--color-primary);
-  font-weight: 500;
-  text-decoration: none;
-}
-
-.link:hover {
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-
 .hint-text {
   color: var(--color-text-weak);
 }

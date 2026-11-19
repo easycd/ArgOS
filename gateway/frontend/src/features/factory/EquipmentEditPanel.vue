@@ -6,6 +6,7 @@
     (사용 상태는 배치도 카드 위쪽 ON/OFF 로도 바꿀 수 있음 — 그쪽은 '저장'으로 배치와 함께 저장)
   - 담당자 · 연결된 센서(지금 값·단계) — 보기만
   - '설비 기준값 관리' 단추 → thresholds 이벤트 → 화면이 기준값 관리 창을 엶 (예전 '설비 기준값 관리' 메뉴를 여기로 옮김)
+    카드 아래쪽에 고정된 파란 단추 (2026-11-19 재원님 요청: 잘 보이게, 내용이 길어 스크롤해도 늘 보임)
   - 이 설비의 변경 내용 (저장 전)
   - 고른 설비가 없으면 '선택한 설비가 없습니다'
   - 바꾼 값은 change(필드, 값) 로 화면에 알림 → 화면이 저장 전 변경에 모음
@@ -106,10 +107,6 @@ const typeOptions = computed(() => {
         </div>
       </div>
       <p v-else class="weak">연결된 센서가 없습니다</p>
-      <!-- 기준값 관리 창 열기 (센서별 주의·경보 기준, 계절, 변경 이력) -->
-      <button type="button" class="btn th-btn" @click="emit('thresholds')">
-        <AppIcon name="slider" :size="16" />설비 기준값 관리
-      </button>
 
       <div class="fl">변경 내용</div>
       <TransitionGroup v-if="changes.length" tag="div" name="chg" class="chgs">
@@ -119,6 +116,13 @@ const typeOptions = computed(() => {
         </div>
       </TransitionGroup>
       <p v-else class="weak">바꾼 내용이 없습니다.</p>
+    </div>
+
+    <!-- 기준값 관리 창 열기 (센서별 주의·경보 기준, 계절, 변경 이력, 사용 상태 · 배기팬 자동 제어) -->
+    <div v-if="eq" class="act">
+      <button type="button" class="btn btn-primary th-btn" @click="emit('thresholds')">
+        <AppIcon name="slider" :size="17" />설비 기준값 관리
+      </button>
     </div>
 
     <footer class="bt">
@@ -181,6 +185,7 @@ const typeOptions = computed(() => {
 .pn {
   flex: 1;
   min-height: 0;
+  overflow-x: hidden;
   overflow-y: auto;
   padding: 18px 20px;
   animation: pn-in var(--m-panel) both;
@@ -223,13 +228,15 @@ const typeOptions = computed(() => {
   color: var(--color-text);
 }
 
+/* 위치 X · Y: 두 칸이 카드 너비를 반씩 나눔 (min-width 0 → 숫자 칸이 기본 너비로 버티며 옆으로 넘치지 않게) */
 .pos {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 
 .pos label {
-  flex: 1;
+  min-width: 0;
   height: 38px;
   display: flex;
   align-items: center;
@@ -255,6 +262,7 @@ const typeOptions = computed(() => {
 
 .pos input {
   flex: 1;
+  width: 0;
   min-width: 0;
   border: none;
   background: none;
@@ -374,6 +382,19 @@ const typeOptions = computed(() => {
   margin: 0;
   font-size: 13px;
   color: var(--color-text-weak);
+}
+
+/* 설비 기준값 관리 단추: 카드 아래 고정, 가로 가득, 파란색 */
+.act {
+  flex: none;
+  padding: 14px 20px;
+  border-top: 1px solid var(--color-border);
+}
+
+.th-btn {
+  width: 100%;
+  height: 44px;
+  font-size: 14.5px;
 }
 
 .bt {

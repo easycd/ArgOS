@@ -1,8 +1,9 @@
 <!--
   '센서 추이' 카드 (설계안 vEquip() #ct)
   - 센서마다 한 줄씩 (전류 · 온도 · CO 순서), 세 그래프는 한 묶음이라 확대·이동·마우스 세로선이 같이 움직임
-  - 제목줄: '전날 같이 보기' 스위치, 확대 단추(− / 전체 / +), 범례(전날 · 주의 기준 · 경보 기준)
-  - 범위를 바꾸면 페이지가 다시 불러오고, 그동안 카드가 흐려짐(loading)
+  - 제목줄: 범위(1시간 / 6시간 / 오늘), '전날 같이 보기' 스위치, 확대 단추(− / 전체 / +), 범례(전날 · 주의 기준 · 경보 기준)
+    (범위 버튼은 2026-11-19 설비 상세 제목 줄에서 이 카드로 옮김)
+  - 범위를 바꾸면(v-model:pick) 페이지가 다시 불러오고, 그동안 카드가 흐려짐(loading)
 -->
 <script setup>
 import { connect } from 'echarts/core'
@@ -10,6 +11,7 @@ import { computed, ref, watch } from 'vue'
 import TrendRow from './TrendRow.vue'
 import AppIcon from '@/components/AppIcon.vue'
 import BaseCard from '@/components/BaseCard.vue'
+import SegButtons from '@/components/SegButtons.vue'
 import { SENSOR_TYPES } from '@/types/codes'
 
 const props = defineProps({
@@ -17,10 +19,20 @@ const props = defineProps({
   sensors: { type: Array, required: true },
   /** GET /sensors/series 응답 (불러오기 전이면 null) */
   data: { type: Object, default: null },
+  /** 지금 그려진 값의 범위 (새 값이 올 때까지 이전 범위) */
   range: { type: String, required: true },
   loading: { type: Boolean, default: false },
   liveValues: { type: Object, default: () => ({}) },
 })
+
+/** 고른 범위 ('1h' | '6h' | 'today') — 버튼은 바로 바뀌고, 그림은 새 값이 오면 바뀜(range) */
+const pick = defineModel('pick', { type: String, required: true })
+
+const RANGES = [
+  { value: '1h', label: '1시간' },
+  { value: '6h', label: '6시간' },
+  { value: 'today', label: '오늘' },
+]
 
 const RANGE_LABEL = { '1h': '최근 1시간', '6h': '최근 6시간', today: '오늘 00시부터' }
 
@@ -63,6 +75,7 @@ const missing = computed(() =>
 <template>
   <BaseCard title="센서 추이" :sub="RANGE_LABEL[range]">
     <template #actions>
+      <SegButtons v-model="pick" :options="RANGES" small />
       <button type="button" class="switch" role="switch" :aria-checked="showPrev" @click="showPrev = !showPrev">
         전날 같이 보기<span class="tg" :class="{ on: showPrev }" />
       </button>

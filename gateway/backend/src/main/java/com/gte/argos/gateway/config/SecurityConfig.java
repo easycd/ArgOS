@@ -31,6 +31,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/actuator/health", "/api/v1/system/info",
                                 "/api/v1/auth/login", "/api/v1/auth/refresh").permitAll()
+                        // API 명세서 (Swagger UI · OpenAPI JSON)
+                        .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
                         .requestMatchers("/api/v1/me", "/api/v1/me/password",
                                 "/api/v1/auth/logout", "/api/v1/auth/extend").authenticated()
                         .anyRequest().access((authentication, context) -> new AuthorizationDecision(

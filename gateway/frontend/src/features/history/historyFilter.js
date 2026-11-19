@@ -67,6 +67,9 @@ export function rangeOf(period, now = new Date()) {
   return { from: dayFrom(now, -29), to }
 }
 
+/** 한 번에 조회할 수 있는 최대 일수 (양 끝 포함, 백엔드 RANGE_TOO_LARGE 와 같은 값 — 2026-11-19 1년 → 30일) */
+export const MAX_RANGE_DAYS = 30
+
 /** 두 날짜 사이 일수 (양 끝 포함) */
 export function daysBetween(from, to) {
   return Math.round((new Date(`${to}T00:00:00`) - new Date(`${from}T00:00:00`)) / 86400000) + 1

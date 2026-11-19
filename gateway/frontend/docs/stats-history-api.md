@@ -5,6 +5,7 @@ DB 쪽은 `stats-history-db.md` 에 따로 정리했습니다.
 
 | # | 구분 | API | 할 일 |
 |---|------|-----|-------|
+| 0 | 변경 | 통계 API 전부 (`/stats/*`) | 조회 기간 최대 **30일** (넘으면 400 `RANGE_TOO_LARGE`, 전에는 366일) |
 | 1 | 변경 | `GET /api/v1/stats/alarms` | 조건 `hazard` 추가 |
 | 2 | **신규** | `GET /api/v1/stats/alarms/{alarmId}` | 알림 상세 패널 한 번에 |
 | 3 | 변경 | `GET /api/v1/stats/export` | 조건 `hazard` 추가, CSV 열 변경 |
@@ -13,6 +14,14 @@ DB 쪽은 `stats-history-db.md` 에 따로 정리했습니다.
 센서값 CSV(상세 패널의 '센서값 내보내기')는 2번 응답의 `series` 로 프론트가 직접 만듭니다. 따로 API는 필요 없습니다.
 
 ---
+
+## 0. 조회 기간 최대 30일 (2026-11-19 변경)
+
+- `from ~ to` 가 30일을 넘으면 (양 끝 포함) `400 RANGE_TOO_LARGE` "한 번에 30일까지 조회할 수 있습니다."
+- 대상: `/stats/summary` `/stats/trend` `/stats/by-process` `/stats/alarms` `/stats/export` (모두 `StatsService.scope()` 한 곳에서 검사)
+- **백엔드 할 일**: `gateway/backend/.../stats/StatsService.java` `scope()` 의 `c.days() > 366` 을 `> 30` 으로, 메시지도 30일로. 그 줄 위에 `TODO(백엔드, 2026-11-19)` 주석을 달아 둠 (코드는 안 고침)
+- 프론트도 '직접 선택' 달력에서 30일을 넘기면 미리 막습니다. 빠른 선택은 오늘 / 7일 / 30일.
+- 일별 추이는 30일 이하라 언제나 일별(`DAY`)이고, 오늘만 고르면 시간별(`HOUR`)입니다. 주별(`WEEK`)은 더 나오지 않습니다.
 
 ## 1. `GET /api/v1/stats/alarms` — 조건 `hazard` 추가
 

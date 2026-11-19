@@ -7,7 +7,8 @@
  *   - 공장 담당자(PLANT_ADMIN): 담당 사업장 현황(/sites/1) 으로 바로 (가정, home.js 참고)
  *   - 공정 담당자(WORKER): 모바일 앱 사용 (웹 진입 불가)
  *  사업장 현황 → 공장 대시보드(/sites/1/factories/5) → (다음 작업) 공정 → 설비
- *  상단 메뉴: 대시보드 / 통계·이력 / 점검 / 설비 기준값 + 관리(사용자·공장)
+ *  상단 메뉴: 대시보드 / 통계·이력 / 점검 + 관리(사용자·공장·이용 로그)
+ *  (설비 기준값 관리는 2026-11-19 부터 공장 관리 안의 창)
  */
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'

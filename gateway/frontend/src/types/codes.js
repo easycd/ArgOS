@@ -61,3 +61,12 @@ export const ROLE_LABEL = Object.freeze({
 
 /** PC 웹에 들어올 수 있는 권한 (WORKER 는 모바일 앱 사용) */
 export const WEB_ROLES = Object.freeze([ROLE.HQ_ADMIN, ROLE.PLANT_ADMIN])
+
+/**
+ * 가스(CO) 알림 때 배기팬 자동 제어 (2026-11-19 재원님 결정)
+ * - 설비 배기팬이 '자동'일 때만: 주의 75%, 경보 100%
+ * - %는 배기팬 최고 회전수(1,800 rpm) 기준 → 75% = 1,350 rpm, 100% = 1,800 rpm
+ * - 실제로 팬을 돌리는 건 서버(알림이 생길 때). 화면은 알림 응답의 fanAuto 를 보여 주기만 함
+ */
+export const FAN_AUTO_PERCENT = Object.freeze({ WARN: 75, ALARM: 100 })
+export const FAN_MAX_RPM = 1800

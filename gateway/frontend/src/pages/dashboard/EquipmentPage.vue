@@ -112,8 +112,13 @@ const backTo = computed(() => {
   return { name: 'process', params: { siteId, factoryId, processId } }
 })
 
-// 기준값 관리·통계 화면에 이 설비를 골라 둔 채로 이동 (그 화면들은 아직 자리만 있음)
-const thresholdTo = computed(() => ({ name: 'threshold', params: { siteId: route.params.siteId }, query: { equipmentId: equipment.value?.id } }))
+// 기준값 관리·통계 화면에 이 설비를 골라 둔 채로 이동
+// 기준값 관리는 2026-11-19 부터 공장 관리 안의 창 → 공장 관리로 가서 이 설비를 고르고 창을 엶 (FactoryPage applyQuery)
+const thresholdTo = computed(() => ({
+  name: 'factory',
+  params: { siteId: route.params.siteId },
+  query: { processId: route.params.processId, equipmentId: equipment.value?.id, open: 'thresholds' },
+}))
 const historyTo = computed(() => ({ name: 'history', params: { siteId: route.params.siteId }, query: { equipmentId: equipment.value?.id } }))
 
 const locationSub = computed(() => {

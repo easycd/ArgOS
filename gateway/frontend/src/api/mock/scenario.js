@@ -32,6 +32,16 @@ export const TOP_OVEN_VALUES = {
   [LEVEL.FIRE]: { 117: 0.0, 215: 212, 313: 120 },
 }
 
+/**
+ * 가스 주의 상황 값 (2026-11-19 추가 — 배기팬 자동 제어 시연용)
+ * - 상도 건조로 버너실 CO-13 이 주의 기준(20 ppm)을 넘음, 전류·온도는 평소 근처
+ * - 주의 알림이 가스면 scenario.alarm.kind = 'GAS' (없으면 그동안의 전류 주의)
+ */
+export const GAS_WARN_VALUES = { 117: 18.1, 215: 146, 313: 24 }
+
+/** 지금 주의가 가스(CO) 주의인지 */
+export const isGasWarn = () => scenario.state === LEVEL.WARN && scenario.alarm?.kind === 'GAS'
+
 /** 셧다운으로 상도 건조로를 멈춘 뒤 값 (설계안 curVal() S.shut: 전류 0, 온도 96 ℃, CO 8 ppm) */
 export const SHUT_VALUES = { 117: 0.0, 215: 96, 313: 8 }
 
@@ -189,7 +199,7 @@ export const secondsBetween = (from, to) => toSec(to) - toSec(from)
 export function topOvenValue(sensorId) {
   if (!(sensorId in SHUT_VALUES)) return undefined
   if (scenario.state === LEVEL.NORMAL && scenario.shut) return SHUT_VALUES[sensorId]
-  const v = { ...TOP_OVEN_VALUES[scenario.state] }
+  const v = { ...(isGasWarn() ? GAS_WARN_VALUES : TOP_OVEN_VALUES[scenario.state]) }
   if (scenario.state === LEVEL.ALARM && scenario.shutdown) {
     const done = scenario.shutdown.steps.filter(Boolean).length
     if (done >= 1) v[313] = 26
@@ -234,6 +244,20 @@ export function raiseWarn() {
     anchorAt('16:38:20', {
       state: LEVEL.WARN,
       alarm: { id: 1042, status: 'OPEN', raisedAt: '16:38:20', ackedAt: null, ackedBy: null, closedAt: null },
+      checklist: null,
+      ...NO_EMERGENCY(),
+      clock: { base: '16:38:20', at: Date.now() },
+    }),
+    'alarm.created',
+  )
+}
+
+/** 가스 주의 발생 (CO-13 24 ppm, 아직 아무도 확인 안 함) — 배기팬이 자동이면 75% 로 올라간 상태 */
+export function raiseGasWarn() {
+  replace(
+    anchorAt('16:38:20', {
+      state: LEVEL.WARN,
+      alarm: { id: 1042, kind: 'GAS', status: 'OPEN', raisedAt: '16:38:20', ackedAt: null, ackedBy: null, closedAt: null },
       checklist: null,
       ...NO_EMERGENCY(),
       clock: { base: '16:38:20', at: Date.now() },

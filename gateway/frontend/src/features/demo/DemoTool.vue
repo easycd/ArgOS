@@ -1,14 +1,14 @@
 <!--
   상황 바꾸기 도구 (화면설계안 '시연 도구'와 같은 역할) — 개발 모드 + 예시 데이터일 때만 보임
   - 왼쪽 아래 작은 버튼 → 펼치면 상황 버튼
-    · 정상 / 주의 발생 / 경보 발생 / 화재 발생 / 처음 상황(주의 · 조치 중 2/5)
+    · 정상 / 주의 발생(전류) / 가스 주의 발생(CO, 배기팬 자동 75%) / 경보 발생(CO 경보, 배기팬 자동 100%) / 화재 발생 / 처음 상황(주의 · 조치 중 2/5)
     · 담당자 앱 흉내: 항목 +1, 모두 완료 (체크리스트가 진행 중일 때)
   - 누르면 api/mock/scenario.js 의 상황이 바뀌고, 열린 화면이 모두 같이 바뀜
   - 실제 서버에 붙이면(VITE_USE_MOCK=false) 나오지 않음. 배포 빌드에도 나오지 않음 (MainLayout 에서 import.meta.env.DEV 로 거름)
 -->
 <script setup>
 import { computed, ref } from 'vue'
-import { activeChecklist, raiseWarn, resetScenario, scenario, setNormal, tickChecklist } from '@/api/mock/scenario'
+import { activeChecklist, raiseGasWarn, raiseWarn, resetScenario, scenario, setNormal, tickChecklist } from '@/api/mock/scenario'
 import { raiseAlarm, raiseFire } from '@/api/mock/scenarioEmergency'
 import AppIcon from '@/components/AppIcon.vue'
 import { LEVEL_META } from '@/types/codes'
@@ -46,7 +46,9 @@ const checklist = computed(() => activeChecklist())
       <div class="group">
         <span class="label">상황</span>
         <button type="button" :class="{ on: scenario.state === 'NORMAL' && !scenario.alarm }" @click="setNormal">정상</button>
-        <button type="button" :class="{ on: scenario.alarm?.status === 'OPEN' }" @click="raiseWarn">주의 발생</button>
+        <button type="button" :class="{ on: scenario.alarm?.status === 'OPEN' && scenario.alarm?.kind !== 'GAS' }" @click="raiseWarn">주의 발생</button>
+        <!-- 가스(CO) 주의: 배기팬 자동 제어(75%) 시연용 (2026-11-19) -->
+        <button type="button" :class="{ on: scenario.alarm?.status === 'OPEN' && scenario.alarm?.kind === 'GAS' }" @click="raiseGasWarn">가스 주의 발생</button>
         <button type="button" :class="{ on: scenario.state === 'ALARM' }" @click="raiseAlarm">경보 발생</button>
         <button type="button" :class="{ on: scenario.state === 'FIRE' }" @click="raiseFire">화재 발생</button>
         <button type="button" @click="resetScenario">처음 상황</button>
@@ -58,7 +60,7 @@ const checklist = computed(() => activeChecklist())
         <button type="button" :disabled="!checklist || checklist.status === 'REPORTED'" @click="tickChecklist(99)">모두 완료</button>
       </div>
 
-      <p class="hint">처음 상황 = 주의 · 김도현 2/5 진행 중. 전송하면 5.2초마다 한 항목씩 자동 진행. 화재 해제 비밀번호 = 로그인 비밀번호</p>
+      <p class="hint">처음 상황 = 주의 · 김도현 2/5 진행 중. 가스 주의·경보 때 배기팬 자동/수동은 공장 관리 › 설비 정보 스위치를 따름. 전송하면 5.2초마다 한 항목씩 자동 진행. 화재 해제 비밀번호 = 로그인 비밀번호</p>
     </div>
 
     <button type="button" class="toggle" :aria-expanded="open" @click="open = !open">

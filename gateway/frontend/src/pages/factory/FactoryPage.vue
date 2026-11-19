@@ -6,6 +6,10 @@
   - 바꾼 값은 저장 전까지 draft 에만 있음 → '저장'을 누르면 PUT /processes/{id}/layout 한 번
   - 저장하지 않은 변경이 있는데 다른 화면·범위로 가면 확인 창
   - 배치도가 있는 공정은 지금 5공장 도장 공정뿐 (다른 공정은 '등록된 배치도가 없습니다')
+  - 2026-11-19 추가 (재원님 요청)
+    · 설비 정보에 '배기팬 자동 제어' 스위치 (배기팬 있는 설비만) — 다른 값처럼 '저장'으로 PUT layout 에 같이 보냄
+    · 설비 정보의 '설비 기준값 관리' 단추 → 기준값 관리 창 (예전 '설비 기준값 관리' 메뉴·화면을 이 창으로 옮김)
+    · 설비 상세의 '기준값 관리에서 보기'로 오면 ?processId=&equipmentId=&open=thresholds → 그 설비를 고르고 창을 엶
 -->
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
@@ -21,6 +25,7 @@ import SegButtons from '@/components/SegButtons.vue'
 import EquipmentEditPanel from '@/features/factory/EquipmentEditPanel.vue'
 import EquipmentListCard from '@/features/factory/EquipmentListCard.vue'
 import LayoutMapCard from '@/features/factory/LayoutMapCard.vue'
+import ThresholdModal from '@/features/threshold/ThresholdModal.vue'
 import { bodyOf, changesOf, currentOf, placeOf } from '@/features/factory/layoutDraft'
 import { buildProcessEquipment } from '@/features/process/processEquipment'
 
@@ -37,7 +42,7 @@ const isHq = computed(() => auth.role === ROLE.HQ_ADMIN)
 const sites = ref([])
 const tree = ref(null) // GET /sites/{id}/tree
 const pick = reactive({ siteId: '', factoryId: '', processId: '' }) // 고르는 중
-const scope = reactive({ processId: null, name: '' }) // 조회한 범위
+const scope = reactive({ processId: null, factoryId: null, name: '', path: '' }) // 조회한 범위 (path: '5공장 · 도장 공정')
 
 const factories = computed(() => {
   const all = tree.value?.factories ?? []
@@ -48,9 +53,13 @@ const processes = computed(() => factories.value.find((f) => String(f.id) === St
 
 async function loadTree(siteId) {
   tree.value = await getSiteTree(siteId)
-  const f = factories.value.find((x) => x.name === DEFAULT_FACTORY) ?? factories.value[0]
+  // 주소에 공정이 있으면(설비 상세에서 '기준값 관리에서 보기') 그 공정, 없으면 기본 범위
+  const wantProcess = Number(route.query.processId)
+  const byQuery = factories.value.find((x) => x.processes.some((p) => p.id === wantProcess))
+  const f = byQuery ?? factories.value.find((x) => x.name === DEFAULT_FACTORY) ?? factories.value[0]
   pick.factoryId = f ? String(f.id) : ''
   pickFirstProcess()
+  if (byQuery) pick.processId = String(wantProcess)
 }
 function pickFirstProcess() {
   const p = processes.value.find((x) => x.name.includes(DEFAULT_PROCESS)) ?? processes.value[0]
@@ -106,7 +115,9 @@ function query() {
     }
     const f = factories.value.find((x) => String(x.id) === String(pick.factoryId))
     scope.processId = p.id
+    scope.factoryId = f?.id ?? null
     scope.name = `${f?.name ?? ''} ${p.name}`
+    scope.path = `${f?.name ?? ''} · ${p.name}`
     load()
   })
 }
@@ -117,7 +128,8 @@ const saved = computed(() => {
   const built = buildProcessEquipment(layout.value, status.value)
   return (layout.value?.equipment ?? []).map((e) => {
     const b = built.find((x) => x.id === e.id)
-    return { ...e, key: b.key, level: b.level, sensors: b.sensors }
+    // fanAuto: 배기팬이 있는 설비만 값(없으면 자동), 배기팬이 없으면 null → 스위치 안 보임
+    return { ...e, key: b.key, level: b.level, sensors: b.sensors, fanAuto: b.fan ? (e.fanAuto ?? true) : null }
   })
 })
 // 지금 화면에 보이는 값 (고친 값 반영)
@@ -148,6 +160,18 @@ const onMapSelect = (key) => (selectedId.value = idOf(key) ?? selectedId.value)
 const onMove = (key, pos) => setField(idOf(key), 'pos', pos)
 const onUse = (on) => selected.value && setField(selected.value.id, 'active', on)
 const onPanel = (field, value) => setField(selectedId.value, field, value)
+
+/* ───────── 설비 기준값 관리 창 ───────── */
+const thresholdOpen = ref(false)
+
+/** 설비 상세에서 왔으면(?equipmentId=&open=thresholds) 그 설비를 고르고 창을 엶 — 처음 한 번만 */
+function applyQuery() {
+  const want = Number(route.query.equipmentId)
+  if (!want || !saved.value.some((e) => e.id === want)) return
+  selectedId.value = want
+  if (route.query.open === 'thresholds') thresholdOpen.value = true
+  // 주소의 값은 그대로 둠 (주소를 바꾸면 화면이 새로 그려져 고른 설비·창이 사라짐)
+}
 
 /** 되돌리기: 저장 전 변경을 모두 버림 */
 function undo() {
@@ -227,6 +251,12 @@ watch(
       toast(error.message, { type: 'err' })
     }
     query()
+    // 처음 불러오기가 끝나면 주소의 설비를 고름
+    const stop = watch(loading, (v) => {
+      if (v) return
+      stop()
+      applyQuery()
+    })
   },
   { immediate: true },
 )
@@ -292,8 +322,18 @@ watch(
         :place="selected ? placeOf(selected.pos, selected.key, defaults) : null"
         :changes="changes.filter((c) => c.id === selectedId)"
         @change="onPanel"
+        @thresholds="thresholdOpen = true"
       />
     </div>
+
+    <!-- 설비 기준값 관리 창 (고른 설비 하나) -->
+    <ThresholdModal
+      v-if="thresholdOpen && selected"
+      :equipment-id="selected.id"
+      :factory-id="scope.factoryId ?? 5"
+      :path="scope.path"
+      @close="thresholdOpen = false"
+    />
 
     <ConfirmModal :open="!!pending" title="저장하지 않은 변경이 있습니다" ok-text="저장하지 않고 나가기" @ok="confirmLeave" @cancel="pending = null">
       저장하지 않고 나가면 바꾼 배치가 사라집니다.

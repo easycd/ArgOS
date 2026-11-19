@@ -1,6 +1,7 @@
 <!--
   경보 · 화재 대응 창 (화면설계안 js/v-modals.js mAlarm() · mFire(), 화면설계서 C4 '한 창이 경보·화재 두 모양')
   - 경보: 빨간 머리 / 열화상 + 경보 사유 | 센서 데이터(게이지 3) | 문제 로그 / 설비 셧다운(ShutdownPanel)
+    가스(CO) 경보면 경보 사유 아래 '배기팬 자동 가동 100%' 줄 (응답 fanAuto, FanAutoNotice) — 2026-11-19
   - 화재: 진한 빨간 머리 + 경과 / 경고 방송 띠 / 열화상 | 감지 근거 숫자 3칸 + 자동 조치 / 경보 해제(FireRelease)
   - 꼭 처리해야 하는 창이라 바깥 누르기·Esc 로 안 닫힘 (흔들림). '설비 배치도에서 보기'로 접으면 상단 바 빨간 띠로 다시 열 수 있음
   - 데이터: GET /alarms/{id}/response (+ 화재면 GET /fires/{fireId}). 바뀌면(SSE, 지금은 예시 상황) 다시 불러옴
@@ -14,6 +15,7 @@ import AlarmHead from './AlarmHead.vue'
 import { placeOf } from './alarmPlace'
 import BroadcastBand from './BroadcastBand.vue'
 import EmergencySensors from './EmergencySensors.vue'
+import FanAutoNotice from './FanAutoNotice.vue'
 import FireRelease from './FireRelease.vue'
 import ProblemLog from './ProblemLog.vue'
 import ShutdownPanel from './ShutdownPanel.vue'
@@ -209,6 +211,8 @@ function shake() {
               <b>{{ response.reason }}</b>
               <small>{{ response.reasonDetail }}</small>
             </div>
+            <!-- 가스 경보: 배기팬 자동 제어 결과 (자동이면 100%로 올림, 수동이면 안내만) -->
+            <FanAutoNotice v-if="response.fanAuto" :fan="response.fanAuto" tone="alarm" class="gap" />
           </section>
           <section>
             <div class="m-sect"><AppIcon name="chart" :size="15" />센서 데이터</div>

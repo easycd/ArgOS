@@ -85,7 +85,7 @@ public class StatsController {
                 sort, Math.max(0, page), Math.max(1, Math.min(500, size))));
     }
 
-    /** CSV 파일. format=xlsx 도 지금은 CSV 로 준다 (엑셀에서 바로 열림) */
+    /** CSV (기본) 또는 format=xlsx 엑셀 파일 */
     @GetMapping("/stats/export")
     public ResponseEntity<byte[]> export(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
@@ -98,7 +98,7 @@ public class StatsController {
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
                         .filename(file.fileName(), java.nio.charset.StandardCharsets.UTF_8).build().toString())
-                .contentType(new MediaType("text", "csv", java.nio.charset.StandardCharsets.UTF_8))
+                .contentType(MediaType.parseMediaType(file.contentType()))
                 .body(file.body());
     }
 }

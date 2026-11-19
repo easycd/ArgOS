@@ -60,6 +60,16 @@ public class StreamHub {
         }
     }
 
+    /** 이 사용자가 지금 SSE 로 붙어 있는지 (채팅 상대 '접속 중' 표시) */
+    public boolean online(long userId) {
+        for (Subscriber s : subscribers) {
+            if (s.scope().userId() == userId) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public int size() {
         return subscribers.size();
     }

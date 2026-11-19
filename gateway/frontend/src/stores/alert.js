@@ -1,7 +1,7 @@
 /**
  * 알림 대응 상태 (Pinia)
  * - 지금 대응 중인 알림·진행 중 체크리스트 (상단 바 상태 띠, 체크리스트 진행, 공정 화면 칩이 같이 씀)
- * - 지금 열린 알림 창 (주의 알림 / 주의 상세 / 센서·열화상 확인 / 체크리스트 진행)
+ * - 지금 열린 알림 창 (주의 알림 / 주의 상세 / 체크리스트 진행)
  * - 불러오기: AlertHost 가 처음 한 번 + 데이터가 바뀔 때마다(useLiveReload) refresh()
  * - 권한: 주의 확인·전송·조치 확인은 공장 담당자만. 본사 관리자는 상태 띠·알림 띠로 보고, 체크리스트 진행 창은 열람만
  *   (화면설계서 C1 '본사 관리자는 알림 띠로만', C3 '본사 관리자는 열람')
@@ -24,7 +24,7 @@ export const useAlertStore = defineStore('alert', () => {
   const activeAlarms = ref([])
   /** 진행 중 체크리스트 (GET /checklists?status=ACTIVE) */
   const checklists = ref([])
-  /** 열린 창: { type: 'warn'|'detail'|'thermal'|'checklist'|'alarm', alarmId, checklistId } 또는 null */
+  /** 열린 창: { type: 'warn'|'detail'|'checklist'|'alarm', alarmId, checklistId } 또는 null */
   const modal = ref(null)
 
   /** 주의 확인·전송·조치 확인을 할 수 있는 사람 (공장 담당자) */

@@ -719,3 +719,9 @@
 - 사용 상태 · 배기팬 자동 제어 스위치를 기준값 관리 창으로 옮김 → **새 `PATCH /equipment/{id}/settings`** `{ active?, fanAuto? }`, `GET /equipment/{id}/thresholds` 에 `active` · `fanAuto`, SSE `equipment.updated`.
 - DB 변경 없음. 자세한 내용: **`docs/equipment-settings-api.md`**.
 
+## 22. 주의·경보 창 유형 문구 · 주의 상세 창 합치기 (2026-11-19, 재원님 요청)
+
+- 주의·경보 창에 유형 문구: `hazard` GAS → '가스 주의/경보', FIRE → '화재 주의/경보' (없으면 센서 종류로).
+- '센서 데이터 · 열화상 확인' 창을 주의 상세 창에 합침 (`GET /alarms/{id}/detail` 한 번으로 그림). 새 API·DB 없음.
+- 요청 1개: `GET /alarms/{id}/response` 의 `title` 에 유형 넣기. 자세한 내용: 저장소 **`docs/api/alarm-modal-hazard.md`**.
+

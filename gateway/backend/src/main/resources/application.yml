@@ -65,3 +65,13 @@ argos:
   # 방송 시스템 REST API 주소. 비우면 로그만
   broadcast:
     url: ${BROADCAST_API_URL:}
+
+# API 명세서. 운영에서 숨기려면 ARGOS_API_DOCS=false
+springdoc:
+  api-docs:
+    enabled: ${ARGOS_API_DOCS:true}
+  swagger-ui:
+    enabled: ${ARGOS_API_DOCS:true}
+    tags-sorter: alpha
+    operations-sorter: alpha
+    persist-authorization: true

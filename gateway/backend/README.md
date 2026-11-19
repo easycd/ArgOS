@@ -56,3 +56,11 @@
 
 로그인 외에 구현한 API 목록과 명세서와 다른 점은 [docs/API_IMPLEMENTED.md](docs/API_IMPLEMENTED.md) 에 있습니다.
 중앙 서버(`factory/central-server`)가 켜져 있어야 화면 데이터가 나옵니다.
+
+
+## API 명세서 (Swagger · Postman)
+
+- 서버를 켜고 `http://localhost:8080/swagger-ui.html` 에서 화면별 API 목록을 보고 바로 호출해 볼 수 있다 (오른쪽 위 Authorize 에 accessToken).
+- 원본 OpenAPI JSON: `http://localhost:8080/v3/api-docs`
+- Postman 컬렉션: `docs/postman/` (불러오는 법은 그 폴더 README)
+- 운영에서 숨기려면 `ARGOS_API_DOCS=false`

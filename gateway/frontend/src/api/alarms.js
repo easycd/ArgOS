@@ -1,7 +1,7 @@
 /**
  * 알림 대응 API — 알림 (설계 자료 API 명세서 C1, 백엔드 gateway/backend .../alarm/AlarmController)
  * - GET  /alarms?status=OPEN,ACKED,ACTING : 지금 대응 중인 알림 (상단 바 상태 띠, 주의 창 자동 열기)
- * - GET  /alarms/{alarmId}                : 조치 내역 (실시간 알림 줄 펼치기)
+ * - GET  /alarms/{alarmId}                : 조치 내역 (오늘 알림 내역 줄 펼치기)
  * - GET  /alarms/{alarmId}/detail         : 주의 상세 (원인, 그때 센서값, 열화상 1장, 추이, 원인 후보)
  * - POST /alarms/{alarmId}/ack            : 주의 확인 (2초 길게 누르기)
  */

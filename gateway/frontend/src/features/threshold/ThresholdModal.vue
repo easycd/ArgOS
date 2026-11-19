@@ -1,20 +1,26 @@
 <!--
   설비 기준값 관리 창 (2026-11-19 재원님 요청: '설비 기준값 관리' 메뉴·화면을 없애고 공장 관리 안의 창으로 옮김)
-  - 여는 곳: 공장 관리 › 설비 정보 › '설비 기준값 관리' 단추 (고른 설비 하나로 열림)
+  - 여는 곳: 공장 관리 › 설비 정보 › '설비 기준값 관리' 단추, 설비 상세 제목 줄 '설비 기준값 관리' 단추·이벤트 '기준값 관리에서 보기'
+    (설비 상세에서는 화면 이동 없이 그 화면 위에 뜸)
+  - 위쪽 '설비 설정': 사용 상태 · 배기팬 자동 제어 스위치 (2026-11-19 공장 관리 설비 정보에서 옮김) — 누르면 바로 저장
+    PATCH /equipment/{id}/settings, 저장되면 settings 이벤트({ active, fanAuto })로 부모에 알림
   - 기능은 예전 화면(pages/threshold/ThresholdPage.vue, 화면설계서 F1)과 같음. 왼쪽 설비 트리만 빠짐 (설비는 공장 관리에서 고름)
     머리(저장·되돌리기·적용 범위) · 계절 · 센서별 카드 3개 · 변경 시뮬레이션 | 변경 이력
   - 데이터: GET /equipment/tree(설비 이름·단계, 건조로 3대 묶음), /equipment/{id}/thresholds, /thresholds/history,
-            /sensors/series(7일), POST /thresholds/simulate (입력이 멈추고 0.4초 뒤), PUT /equipment/{id}/thresholds
+            /sensors/series(7일), POST /thresholds/simulate (입력이 멈추고 0.4초 뒤), PUT /equipment/{id}/thresholds,
+            PATCH /equipment/{id}/settings (설비 설정)
   - 저장하지 않은 값이 있는데 닫거나 계절을 바꾸면 확인 창
   - 저장하면 예시 데이터에도 남아 공정·설비 상세의 단계·게이지 기준선이 같이 바뀜 (지금 계절일 때)
 -->
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { serverNow } from '@/api/clock'
+import { updateEquipmentSettings } from '@/api/equipment'
 import { getEquipmentTree, getSensorWeek, getThresholdHistory, getThresholds, simulateThreshold } from '@/api/thresholds'
 import AppIcon from '@/components/AppIcon.vue'
 import BaseModal from '@/components/BaseModal.vue'
 import ConfirmModal from '@/components/ConfirmModal.vue'
+import EquipmentSettingsCard from './EquipmentSettingsCard.vue'
 import HistoryCard from './HistoryCard.vue'
 import SaveSummary from './SaveSummary.vue'
 import SeasonTabs from './SeasonTabs.vue'
@@ -37,7 +43,7 @@ const props = defineProps({
   path: { type: String, default: '' },
 })
 
-const emit = defineEmits(['close'])
+const emit = defineEmits(['close', 'settings'])
 
 const auth = useAuthStore()
 
@@ -86,6 +92,31 @@ async function init() {
     errorMessage.value = error.message
   } finally {
     loading.value = false
+  }
+}
+
+/* ───────── 설비 설정 (사용 상태 · 배기팬 자동 제어) — 누르면 바로 저장 ───────── */
+/** 받침에 맞는 '을/를' ('상도 건조로를', '도료 혼합실을') */
+const eulReul = (word) => {
+  const code = word.charCodeAt(word.length - 1) - 0xac00
+  return code >= 0 && code <= 11171 && code % 28 ? '을' : '를'
+}
+
+const settingBusy = ref('') // 저장 중인 필드
+
+async function onToggle(field, value) {
+  settingBusy.value = field
+  try {
+    const saved = await updateEquipmentSettings(props.equipmentId, { [field]: value })
+    thresholds.value = { ...thresholds.value, active: saved.active, fanAuto: saved.fanAuto }
+    emit('settings', { active: saved.active, fanAuto: saved.fanAuto })
+    const name = equipmentRow.value?.name ?? '설비'
+    if (field === 'active') toast(`${name}${eulReul(name)} ${value ? '사용 중' : '사용 안 함'}으로 바꿨습니다.`)
+    else toast(`${name} 배기팬을 ${value ? '자동' : '수동'}으로 바꿨습니다.`)
+  } catch (error) {
+    toast(error.message, { type: 'err' })
+  } finally {
+    settingBusy.value = ''
   }
 }
 
@@ -278,6 +309,14 @@ init()
               :can-save="canSave"
               @undo="undo"
               @save="openConfirm"
+            />
+
+            <!-- 설비 설정: 사용 상태 · 배기팬 자동 제어 (바로 저장) -->
+            <EquipmentSettingsCard
+              :active="thresholds.active !== false"
+              :fan-auto="thresholds.fanAuto ?? null"
+              :busy="settingBusy"
+              @toggle="onToggle"
             />
 
             <SeasonTabs :season="season" :active-season="thresholds.activeSeason" @select="selectSeason" />

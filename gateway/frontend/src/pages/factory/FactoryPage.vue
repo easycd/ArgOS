@@ -7,9 +7,10 @@
   - 저장하지 않은 변경이 있는데 다른 화면·범위로 가면 확인 창
   - 배치도가 있는 공정은 지금 5공장 도장 공정뿐 (다른 공정은 '등록된 배치도가 없습니다')
   - 2026-11-19 추가 (재원님 요청)
-    · 설비 정보에 '배기팬 자동 제어' 스위치 (배기팬 있는 설비만) — 다른 값처럼 '저장'으로 PUT layout 에 같이 보냄
     · 설비 정보의 '설비 기준값 관리' 단추 → 기준값 관리 창 (예전 '설비 기준값 관리' 메뉴·화면을 이 창으로 옮김)
-    · 설비 상세의 '기준값 관리에서 보기'로 오면 ?processId=&equipmentId=&open=thresholds → 그 설비를 고르고 창을 엶
+    · (2차) 사용 상태 · 배기팬 자동 제어 스위치는 설비 정보 카드에서 빼고 기준값 관리 창 '설비 설정'으로 옮김
+      창에서 바꾸면 PATCH /equipment/{id}/settings 로 바로 저장 → onSettings 가 이 화면의 저장된 값만 맞춤
+    · (2차) 설비 상세는 이제 그 화면 위에 같은 창을 띄움 → 주소로 창을 여는 기능(?open=thresholds)은 뺌
 -->
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
@@ -53,13 +54,9 @@ const processes = computed(() => factories.value.find((f) => String(f.id) === St
 
 async function loadTree(siteId) {
   tree.value = await getSiteTree(siteId)
-  // 주소에 공정이 있으면(설비 상세에서 '기준값 관리에서 보기') 그 공정, 없으면 기본 범위
-  const wantProcess = Number(route.query.processId)
-  const byQuery = factories.value.find((x) => x.processes.some((p) => p.id === wantProcess))
-  const f = byQuery ?? factories.value.find((x) => x.name === DEFAULT_FACTORY) ?? factories.value[0]
+  const f = factories.value.find((x) => x.name === DEFAULT_FACTORY) ?? factories.value[0]
   pick.factoryId = f ? String(f.id) : ''
   pickFirstProcess()
-  if (byQuery) pick.processId = String(wantProcess)
 }
 function pickFirstProcess() {
   const p = processes.value.find((x) => x.name.includes(DEFAULT_PROCESS)) ?? processes.value[0]
@@ -128,8 +125,7 @@ const saved = computed(() => {
   const built = buildProcessEquipment(layout.value, status.value)
   return (layout.value?.equipment ?? []).map((e) => {
     const b = built.find((x) => x.id === e.id)
-    // fanAuto: 배기팬이 있는 설비만 값(없으면 자동), 배기팬이 없으면 null → 스위치 안 보임
-    return { ...e, key: b.key, level: b.level, sensors: b.sensors, fanAuto: b.fan ? (e.fanAuto ?? true) : null }
+    return { ...e, key: b.key, level: b.level, sensors: b.sensors }
   })
 })
 // 지금 화면에 보이는 값 (고친 값 반영)
@@ -164,13 +160,16 @@ const onPanel = (field, value) => setField(selectedId.value, field, value)
 /* ───────── 설비 기준값 관리 창 ───────── */
 const thresholdOpen = ref(false)
 
-/** 설비 상세에서 왔으면(?equipmentId=&open=thresholds) 그 설비를 고르고 창을 엶 — 처음 한 번만 */
-function applyQuery() {
-  const want = Number(route.query.equipmentId)
-  if (!want || !saved.value.some((e) => e.id === want)) return
-  selectedId.value = want
-  if (route.query.open === 'thresholds') thresholdOpen.value = true
-  // 주소의 값은 그대로 둠 (주소를 바꾸면 화면이 새로 그려져 고른 설비·창이 사라짐)
+/**
+ * 창에서 사용 상태를 바꾸면(바로 저장됨) 이 화면의 저장된 값만 맞춤
+ * - 다시 불러오지 않음: 저장 전 배치 변경(draft)을 지키려고
+ * - 배기팬 자동 제어는 이 화면에서 쓰지 않으므로 맞출 것 없음
+ */
+function onSettings({ active }) {
+  const row = layout.value?.equipment.find((e) => e.id === selectedId.value)
+  if (!row) return
+  row.active = active
+  if (draft[row.id] && 'active' in draft[row.id]) setField(row.id, 'active', draft[row.id].active) // 같아졌으면 변경 줄에서 빠짐
 }
 
 /** 되돌리기: 저장 전 변경을 모두 버림 */
@@ -251,12 +250,6 @@ watch(
       toast(error.message, { type: 'err' })
     }
     query()
-    // 처음 불러오기가 끝나면 주소의 설비를 고름
-    const stop = watch(loading, (v) => {
-      if (v) return
-      stop()
-      applyQuery()
-    })
   },
   { immediate: true },
 )
@@ -333,6 +326,7 @@ watch(
       :factory-id="scope.factoryId ?? 5"
       :path="scope.path"
       @close="thresholdOpen = false"
+      @settings="onSettings"
     />
 
     <ConfirmModal :open="!!pending" title="저장하지 않은 변경이 있습니다" ok-text="저장하지 않고 나가기" @ok="confirmLeave" @cancel="pending = null">

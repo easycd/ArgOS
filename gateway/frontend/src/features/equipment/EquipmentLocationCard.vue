@@ -25,8 +25,8 @@ const emit = defineEmits(['select'])
 <template>
   <BaseCard title="설비 위치" :sub="sub">
     <div class="map">
-      <!-- 배기팬을 눌러도 팬 창 대신 그 설비로 이동 (팬 조작은 공정 배치도에서) -->
-      <PaintMap :equipment="equipment" :focus="focusKey" :positions="positions" :inactive="inactive" @select="emit('select', $event)" @fan="(eq) => emit('select', eq)" />
+      <!-- 배기팬을 누르면 그 설비로 이동 (대시보드의 배기팬 조절 창은 2026-11-19 삭제) -->
+      <PaintMap :equipment="equipment" :focus="focusKey" :positions="positions" :inactive="inactive" @select="emit('select', $event)" />
     </div>
   </BaseCard>
 </template>

@@ -1,8 +1,9 @@
 <!--
   공정 3D 설비 배치도 화면 (예: 5공장 도장 공정 — 화면설계안 js/v-dash.js vProcess() 기준)
-  - 왼쪽: 구역 현황(3D 설비 배치도 + 배기팬 창 + 설비 줄, ProcessMapCard)
+  - 왼쪽: 구역 현황(3D 설비 배치도 + 설비 줄, ProcessMapCard)
   - 오른쪽: 기준값 근접 센서(이 공정, 2026-11-18 센서별 단계 현황 대신), 오늘 알림 내역(이 공정), 오늘 설비 점검
-  - 이 파일은 데이터 불러오기·합치기와 화면 이동, 배기팬 명령 보내기만 담당
+  - 이 파일은 데이터 불러오기·합치기와 화면 이동만 담당
+    (2026-11-19 재원님 요청: 배기팬을 눌러 회전수·켜기/끄기를 바꾸던 기능 삭제 — 배기팬은 가스 알림 때 서버 자동 제어)
   - 데이터 (지금은 예시 데이터): GET /processes/{id}/layout, /status, GET /alarms?processId=, GET /inspections/today
 -->
 <script setup>
@@ -11,9 +12,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { USE_MOCK } from '@/api/mock'
 import { getAlarms } from '@/api/dashboard'
 import { getFactoryOverview } from '@/api/factory'
-import { getProcessLayout, getProcessStatus, getTodayInspections, sendFanCommand } from '@/api/process'
+import { getProcessLayout, getProcessStatus, getTodayInspections } from '@/api/process'
 import { getSiteName } from '@/api/sites'
-import AppNotice from '@/components/AppNotice.vue'
 import AlarmListCard from '@/features/dashboard/AlarmListCard.vue'
 import NearThresholdCard from '@/features/process/NearThresholdCard.vue'
 import InspectionTodayCard from '@/features/process/InspectionTodayCard.vue'
@@ -22,7 +22,6 @@ import { nearThresholdRows } from '@/features/process/nearThreshold'
 import { buildProcessEquipment, layoutPlacement } from '@/features/process/processEquipment'
 import { useLiveValues } from '@/features/equipment/useLiveValues'
 import { useLiveReload } from '@/utils/useLiveReload'
-import { useNotice } from '@/utils/useNotice'
 
 const route = useRoute()
 const router = useRouter()
@@ -106,8 +105,6 @@ const crumbs = computed(() => {
 
 const inspectionRoute = computed(() => ({ name: 'inspection', params: { siteId: route.params.siteId } }))
 
-const { message: noticeMessage, show: showNotice } = useNotice()
-
 /** 설비 선택 → 설비 상세 화면 */
 function onSelectEquipment(eq) {
   router.push({ name: 'equipment', params: { ...route.params, equipmentId: eq.id } })
@@ -116,35 +113,6 @@ function onSelectEquipment(eq) {
 /** 기준값 근접 센서 줄 선택 → 그 센서가 붙은 설비 상세 화면 */
 function onSelectNear(row) {
   onSelectEquipment({ id: row.equipmentId })
-}
-
-/**
- * 배기팬 '적용'
- * - 켜기/끄기가 바뀌었으면 { power }, 켜진 상태에서 회전수가 바뀌었으면 { rpm } 를 보냄
- * - 명세서: 서버는 접수(202)만 하고 결과는 SSE command.result 로 옴 → TODO: SSE 연결 후 결과로 확정
- *   지금은 접수되면 화면 값을 바로 바꿈
- */
-const sendingFan = ref(false)
-const mapCard = ref(null)
-
-async function onFanApply(eq, { power, rpm }) {
-  sendingFan.value = true
-  try {
-    if (power !== eq.fan.power) await sendFanCommand(eq.id, { power })
-    if (power === 'ON' && rpm !== eq.fan.rpm) await sendFanCommand(eq.id, { rpm })
-    const target = status.value.equipment.find((x) => x.id === eq.id)
-    target.fan = { power, rpm, targetRpm: rpm }
-    mapCard.value?.closeFan()
-    showNotice(
-      USE_MOCK
-        ? `${eq.name} 배기팬 명령을 보냈습니다. (예시 데이터라 실제 설비는 움직이지 않습니다)`
-        : `${eq.name} 배기팬 명령을 보냈습니다.`,
-    )
-  } catch (error) {
-    showNotice(error.message)
-  } finally {
-    sendingFan.value = false
-  }
 }
 </script>
 
@@ -155,14 +123,11 @@ async function onFanApply(eq, { power, rpm }) {
   <div v-else class="process-page">
     <div class="left">
       <ProcessMapCard
-        ref="mapCard"
         :crumbs="crumbs"
         :equipment="equipment"
         :positions="placement.positions"
         :inactive="placement.inactive"
-        :sending-fan="sendingFan"
         @select-equipment="onSelectEquipment"
-        @fan-apply="onFanApply"
       />
     </div>
 
@@ -173,7 +138,6 @@ async function onFanApply(eq, { power, rpm }) {
     </div>
   </div>
 
-  <AppNotice :message="noticeMessage" />
 </template>
 
 <style scoped>

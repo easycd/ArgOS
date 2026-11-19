@@ -14,6 +14,8 @@ import { EQUIPMENT, SENSOR_DEFS, equipmentLevel, sensorsNow } from './processDat
 import { emitLive } from '../live'
 import { scenario, scenarioNow } from './scenario'
 import { ACTIVE_SEASON, HOLD_SEC, SEASONS, SEASON_START, seasonThreshold, storeThreshold } from './thresholdRules'
+import { fanAutoMode } from './fanAuto'
+import { editsOf } from './layoutData'
 import { LEVEL } from '@/types/codes'
 
 /* ───────── GET /equipment/tree?factoryId=5 ───────── */
@@ -55,6 +57,9 @@ export function equipmentThresholds(equipmentId) {
     equipmentId: e.id,
     equipmentName: e.name,
     equipmentType: e.type, // 명세서에 없음 (건조로 3대 함께 적용 단추)
+    // 설비 설정 (2026-11-19 추가, 창 위쪽 스위치 2개): 사용 상태 · 배기팬 자동/수동 (배기팬이 없으면 null)
+    active: editsOf(e.id).active ?? true,
+    fanAuto: fanAutoMode(e.id),
     activeSeason: ACTIVE_SEASON,
     version: version(e.id),
     sensors: SENSOR_DEFS.filter((d) => d.equipmentId === e.id).map((d) => {

@@ -4,12 +4,16 @@
  * - GET /equipment/{equipmentId}/events  : 오늘 이벤트 이력 (알람 · 조치 · 기준값 조정)
  * - GET /thermal/{cameraId}/latest       : 열화상 최신 장면 (최고·최저 온도)
  * - GET /sensors/series                  : 센서 추이 (전날 겹쳐 보기 compare=yesterday)
+ * - PATCH /equipment/{equipmentId}/settings : 설비 설정 바로 저장 (사용 상태 · 배기팬 자동/수동, 2026-11-19 추가)
  */
 import http from './http'
 import { USE_MOCK, mockFail, mockOk } from './mock'
 import { serverNow } from './clock'
 import { THERMAL_BY_STATE, TOP_OVEN_ID, mockEquipment, mockEquipmentEvents, thermalOf } from './mock/equipmentData'
 import { buildSeries } from './mock/equipmentSeries'
+import { saveSettings } from './mock/layoutData'
+import { fanAutoMode } from './mock/fanAuto'
+import { emitLive } from './live'
 import { scenario } from './mock/scenario'
 import { LEVEL } from '@/types/codes'
 
@@ -66,4 +70,20 @@ export function getSensorSeries({ equipment, range }) {
   }
   const ids = equipment.sensors.map((s) => s.id).join(',')
   return http.get('/sensors/series', { params: { ids, ...periodOf(range), compare: 'yesterday' } })
+}
+
+/**
+ * 설비 설정 바로 저장 (설비 기준값 관리 창 위쪽 스위치 2개)
+ * @param {number} equipmentId
+ * @param {{ active?: boolean, fanAuto?: boolean }} body 바꾼 값만
+ * @returns {Promise<{ equipmentId, active, fanAuto }>}
+ * - 실제 서버는 저장 뒤 SSE equipment.updated 를 보냄 → 열린 화면이 다시 불러옴. 예시 데이터는 여기서 같은 신호
+ */
+export async function updateEquipmentSettings(equipmentId, body) {
+  if (USE_MOCK) {
+    const data = await mockOk({ ...saveSettings(equipmentId, body), fanAuto: fanAutoMode(equipmentId) })
+    emitLive('equipment.updated')
+    return data
+  }
+  return http.patch(`/equipment/${equipmentId}/settings`, body)
 }

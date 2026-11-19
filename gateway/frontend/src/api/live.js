@@ -34,6 +34,7 @@ const RELOAD_EVENTS = new Set([
   'level.changed',
   'threshold.changed',
   'command.result',
+  'equipment.updated', // 설비 설정(사용 상태 · 배기팬 자동/수동)이 바뀜 — 2026-11-19 추가, 백엔드 StreamHub 에 추가 필요
   'chat.message', // 채팅 새 글 (상단 바 숫자 · 채팅 패널) — 백엔드 StreamHub 에는 아직 없음 (명세서 I2)
   'reset',
 ])

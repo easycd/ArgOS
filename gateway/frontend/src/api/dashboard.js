@@ -1,7 +1,7 @@
 /**
  * 대시보드 API (설계 자료 API 명세서 B1 '울산공장 현황' 기준)
  * - GET /sites/{siteId}/overview : 지도·공장 카드·센서 종류별 도넛
- * - GET /alarms                  : 실시간 알림 목록 (오늘, 최근 순)
+ * - GET /alarms                  : 오늘 알림 내역 (오늘 0시부터 누적 전부, 최근 순)
  * - GET /alarms/hourly           : 전일 시간대별 알림 (주간·야간, date=어제)
  */
 import { serverNow } from './clock'
@@ -75,10 +75,11 @@ const scopeParams = ({ siteId, factoryId, processId }) =>
 
 /**
  * 오늘 알림 목록 (최근 순)
+ * - 2026-11-19: 카드가 '오늘 알림 내역'(당일 하루 누적)으로 바뀌어 기본 개수를 20 → 500 (하루 치를 모두 받음)
  * @param {{ siteId?: number, factoryId?: number, processId?: number, size?: number }} params
  * @returns {Promise<{ items: Array, page: number, size: number, total: number }>}
  */
-export function getAlarms({ siteId, factoryId, processId, size = 20 }) {
+export function getAlarms({ siteId, factoryId, processId, size = 500 }) {
   if (USE_MOCK) {
     // 예시 데이터에만 있는 범위 값(siteId·factoryId·processId)은 빼고 응답 모양만 남김
     const all = mockAlarmsOf({ siteId, factoryId, processId }).map(

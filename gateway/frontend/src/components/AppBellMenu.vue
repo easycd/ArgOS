@@ -2,7 +2,7 @@
   상단 바 알림 종을 누르면 열리는 알림 목록 (화면설계안 js/shell.js #bell onclick · css/extra.css .menu.wide · css/base.css .al)
   - 머리: '알림' + 오른쪽 '오늘'
   - 줄 (최근 4건, 설계안 alertRows().slice(0, 4)): 센서 종류 아이콘 · 제목 · 위치 · 센서 값 / 진행 상태 칩 · 발생 시각
-    조치가 끝나지 않은 알림은 왼쪽 색 띠(깜빡임) + 옅은 배경 (실시간 알림 카드와 같은 규칙: features/alert/alarmView.js)
+    조치가 끝나지 않은 알림은 왼쪽 색 띠(깜빡임) + 옅은 배경 (오늘 알림 내역 카드와 같은 규칙: features/alert/alarmView.js)
   - 알림이 없으면 '새 알림이 없습니다'
   - 아래: '알림 이력 전체 보기 ›' → 통계·이력 화면
     사업장을 고르기 전(본사 관리자의 사업장 선택 화면)에는 갈 사업장이 없어 흐린 안내 글자로 바뀜 (설계안 .pgo.no 모양)
@@ -248,7 +248,7 @@ function goHistory() {
   color: var(--color-text-weak);
 }
 
-/* 진행 상태 칩 (실시간 알림 카드와 같은 색) */
+/* 진행 상태 칩 (오늘 알림 내역 카드와 같은 색) */
 .chip {
   display: inline-block;
   padding: 2px 8px;

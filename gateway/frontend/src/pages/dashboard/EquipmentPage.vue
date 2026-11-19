@@ -1,8 +1,8 @@
 <!--
   설비 상세 화면 (예: 상도 건조로 — 화면설계안 js/v-dash.js vEquip(), 화면설계서 B4)
-  - 제목 줄: 경로 + 상태 + 체크리스트 진행 + 추이 범위 + 설비 배치도로 (EquipmentTopBar)
+  - 제목 줄: 경로 + 상태 + 체크리스트 진행 + 설비 배치도로 (EquipmentTopBar)
   - 위 줄: 설비 위치 | 센서 현재값(게이지 3개) | 열화상 카메라
-  - 아래 줄: 센서 추이(전날 겹쳐 보기) | 이벤트 이력
+  - 아래 줄: 센서 추이(범위 1시간 / 6시간 / 오늘, 전날 겹쳐 보기) | 이벤트 이력
   - 이 파일은 데이터 불러오기와 화면 이동만 담당, 그리는 일은 features/equipment/ 의 카드들이 함
   - 데이터 (지금은 예시 데이터): GET /equipment/{id}, /equipment/{id}/events, /thermal/{cameraId}/latest,
     /sensors/series, 설비 위치 그림용 GET /processes/{id}/layout, /status
@@ -134,7 +134,6 @@ function onSelectEquipment(eq) {
 
   <div v-else class="equipment-page">
     <EquipmentTopBar
-      v-model:range="range"
       :crumbs="crumbs"
       :level="equipment.level"
       :checklist="equipment.activeChecklist"
@@ -155,6 +154,7 @@ function onSelectEquipment(eq) {
       <ThermalCard v-if="thermal" class="thermal" :thermal="thermal" :process-name="equipment.path?.[2] ?? ''" :level="equipment.level" :elapsed-sec="elapsedSec" />
 
       <TrendCard
+        v-model:pick="range"
         class="trend"
         :sensors="equipment.sensors"
         :data="series"

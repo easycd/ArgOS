@@ -1,7 +1,7 @@
 <!--
   공장 대시보드 화면 (예: 5공장 공정 배치도 — 화면설계안 js/v-dash.js vPlant() 기준)
   - 왼쪽: 구역 현황(공정 배치도, PlantMapCard)
-  - 오른쪽: 전일 시간대별 알림, 실시간 알림 (사업장 현황과 같은 순서·카드를 공장 범위로, 2026-11-18 순서 바꿈)
+  - 오른쪽: 전일 시간대별 알림, 오늘 알림 내역 (사업장 현황과 같은 순서·카드를 공장 범위로, 2026-11-18 순서 바꿈)
   - 아래: 공정별 설비 상태(ProcessStatusCard)를 화면 끝까지 (2026-11-18 센서별 단계 현황 삭제)
   - 이 파일은 데이터 불러오기와 화면 이동만 담당, 모양은 features 의 카드가 담당
   - 데이터 (지금은 예시 데이터): GET /factories/{factoryId}/overview, GET /alarms?factoryId=, GET /alarms/hourly?factoryId=
@@ -113,7 +113,7 @@ function onSelectProcess(process) {
  * 배치 (설계안 1920 화면 기준)
  * - 위 줄: 왼쪽 넓은 열(5공장 공정 배치도) + 오른쪽 628px 열
  * - 아래 줄: 공정별 설비 상태가 두 열을 모두 차지
- * - 위 줄 높이는 지도 카드가 정하고, 오른쪽 실시간 알림은 남는 높이를 채운 뒤 안에서 스크롤
+ * - 위 줄 높이는 지도 카드가 정하고, 오른쪽 오늘 알림 내역은 남는 높이를 채운 뒤 안에서 스크롤
  * - 좁은 화면에서는 위아래로
  */
 .factory-dashboard {
@@ -140,7 +140,7 @@ function onSelectProcess(process) {
   min-width: 0;
 }
 
-/* 실시간 알림: 남는 높이를 채우고 목록만 스크롤 (AlarmListCard 의 .list) */
+/* 오늘 알림 내역: 남는 높이를 채우고 목록만 스크롤 (AlarmListCard 의 .list) */
 .fill {
   flex: 1 1 0;
   min-height: 240px;

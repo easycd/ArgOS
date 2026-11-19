@@ -4,6 +4,8 @@
   - 배치 (설계안 1920): 조건 줄 / 요약 4칸 / 일별 추이 1180 | 공정별 684 / 알림 이력 1180 | 요일·시간대 684
   - 기간 단추·선택 상자를 바꾸면 바로 조회 (설계안), '조회' 단추는 같은 조건으로 다시 불러오기
   - 공장 담당자는 공장이 담당 공장으로 고정, 본사 관리자는 '전체 공장' 도 고를 수 있음 (처음은 5공장 — 설계안)
+  - 주소에 ?factoryId=&processId= 가 있으면 그 공장·공정을 골라 둔 채로 시작 (factoryId=all → 전체 공장)
+    (대시보드 '오늘 알림 내역' 카드의 '과거 알림' 단추, 2026-11-19)
   - 알림 상황이 바뀌면 조용히 다시 불러옴 (useLiveReload)
 -->
 <script setup>
@@ -125,6 +127,22 @@ const rangeText = computed(() => (filter.from === filter.to ? filter.from : `${f
 const exportOpen = ref(false)
 const reportOpen = ref(false)
 
+/**
+ * 주소로 받은 공장·공정 미리 고르기 (대시보드 '과거 알림' 단추)
+ * - 고를 수 있는 공장·공정일 때만 반영 (공장 담당자의 다른 공장 · 없는 공정은 무시하고 처음 값 그대로)
+ */
+function applyQuery() {
+  const { factoryId, processId } = route.query
+  if (factoryId === 'all') {
+    if (!lockFactory.value) filter.factoryId = ''
+    return
+  }
+  const factory = factories.value.find((f) => String(f.id) === String(factoryId))
+  if (!factory) return
+  filter.factoryId = String(factory.id)
+  if (factory.processes?.some((p) => String(p.id) === String(processId))) filter.processId = String(processId)
+}
+
 /* ───────── 처음 불러오기 ───────── */
 onMounted(async () => {
   try {
@@ -134,6 +152,7 @@ onMounted(async () => {
     // 공장 담당자: 담당 공장 / 본사 관리자: 5공장(설계안 처음 값), 없으면 전체 공장
     const first = lockFactory.value ? factories.value[0] : factories.value.find((f) => f.id === 5)
     filter.factoryId = first ? String(first.id) : ''
+    applyQuery()
   } catch (error) {
     toast(error.message, { type: 'err' })
   }

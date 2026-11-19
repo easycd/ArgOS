@@ -1,14 +1,14 @@
 <!--
   설비 상세 제목 줄 (설계안 vEquip() 의 .topbar, 카드 밖 한 줄)
   - 왼쪽: 경로 '울산공장 › 5공장 › 도장 공정 › 상도 건조로' + 상태 배지(크게) + 체크리스트 진행 배지(누르면 진행 현황 창)
-  - 오른쪽: 추이 범위(1시간 / 6시간 / 오늘) + '설비 배치도' 돌아가기 버튼
+  - 오른쪽: '설비 배치도' 돌아가기 버튼
+    (추이 범위 1시간 / 6시간 / 오늘 은 2026-11-19 센서 추이 카드 제목줄로 옮김 → TrendCard)
 -->
 <script setup>
 import { computed } from 'vue'
 import ChecklistBadge from './ChecklistBadge.vue'
 import AppIcon from '@/components/AppIcon.vue'
 import LevelBadge from '@/components/LevelBadge.vue'
-import SegButtons from '@/components/SegButtons.vue'
 import { useAlertStore } from '@/stores/alert'
 
 const alert = useAlertStore()
@@ -24,15 +24,6 @@ defineProps({
   /** 돌아갈 공정 배치도 라우트 */
   backTo: { type: Object, required: true },
 })
-
-/** 추이 범위 ('1h' | '6h' | 'today') */
-const range = defineModel('range', { type: String, required: true })
-
-const RANGES = [
-  { value: '1h', label: '1시간' },
-  { value: '6h', label: '6시간' },
-  { value: 'today', label: '오늘' },
-]
 </script>
 
 <template>
@@ -48,7 +39,6 @@ const RANGES = [
 
     <div class="right">
       <ChecklistBadge v-if="checklist && !emergency" :checklist="checklist" @click="alert.open('checklist', { checklistId: checklist.id })" />
-      <SegButtons v-model="range" :options="RANGES" />
       <RouterLink :to="backTo" class="btn back"><AppIcon name="cl" :size="16" />설비 배치도</RouterLink>
     </div>
   </div>

@@ -46,6 +46,10 @@
 
 환경변수 `GATEWAY_JWT_SECRET_BASE64`에 32바이트 이상 무작위 값의 Base64 인코딩을 넣어야 합니다. HTTPS 환경에서는 `GATEWAY_COOKIE_SECURE=true`로 설정합니다. 비어 있는 개발 DB에서만 최초 본사 관리자를 만들려면 `GATEWAY_BOOTSTRAP_ADMIN_LOGIN`과 `GATEWAY_BOOTSTRAP_ADMIN_PASSWORD`를 함께 설정합니다. 첫 로그인 후 비밀번호 변경이 필요합니다.
 
+> **2026-11-18 변경**: 웹은 refresh 쿠키(`argos_rt`)를 쓰지 않고 JWT(Bearer) 하나로 인증합니다. 토큰 유효 시간은 13시간(`access-seconds: 46800`)이고,
+> `POST /auth/extend` 는 세션을 1시간 늘리면서 새 `accessToken` 을 돌려줍니다. `POST /auth/refresh` 는 앱(본문 `refreshToken`) 전용입니다.
+> 위 설명 중 30분 토큰·웹 쿠키 부분은 이 변경 전 내용이고, `GATEWAY_COOKIE_SECURE`·`cookie-same-site` 설정은 이제 쓰지 않습니다.
+
 `src/main/resources/db/migration/V1__gateway_auth.sql`은 연계 DB의 인증 테이블을 만드는 초기 마이그레이션입니다. 다른 팀의 통합 DB 마이그레이션과 합칠 때 테이블 소유권과 적용 순서를 조정해야 합니다.
 
 ## 대시보드 · 알림 · 체크리스트 · SSE

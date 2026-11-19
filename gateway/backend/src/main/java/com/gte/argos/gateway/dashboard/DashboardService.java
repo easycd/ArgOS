@@ -18,6 +18,7 @@ import com.gte.argos.gateway.central.CentralDto.Sensor;
 import com.gte.argos.gateway.central.CentralDto.SensorSeries;
 import com.gte.argos.gateway.central.CentralDto.SensorStatus;
 import com.gte.argos.gateway.central.CentralDto.Status;
+import com.gte.argos.gateway.central.CentralDto.Threshold;
 import com.gte.argos.gateway.central.Codes;
 import com.gte.argos.gateway.central.MasterCache;
 import com.gte.argos.gateway.central.SimTime;
@@ -336,6 +337,8 @@ public class DashboardService {
                 sr.put("equipmentId", e.id());
                 sr.put("pos", xyz("x", e.posX(), "y", e.posY(), null, null));
                 sr.put("active", s.active());
+                Threshold th = s.threshold();
+                sr.put("limitType", th == null ? null : Codes.limitType(th.warn(), th.alarm(), th.lowWarn(), th.lowAlarm()));
                 sensors.add(sr);
             }
         }
@@ -389,6 +392,7 @@ public class DashboardService {
             row.put("alarm", s.alarm());
             row.put("lowWarn", s.lowWarn());
             row.put("lowAlarm", s.lowAlarm());
+            row.put("limitType", Codes.limitType(s.warn(), s.alarm(), s.lowWarn(), s.lowAlarm()));
             sensors.add(row);
         }
         Map<String, Object> out = new LinkedHashMap<>();
@@ -444,6 +448,7 @@ public class DashboardService {
             row.put("alarm", s.alarm());
             row.put("lowWarn", s.lowWarn());
             row.put("lowAlarm", s.lowAlarm());
+            row.put("limitType", Codes.limitType(s.warn(), s.alarm(), s.lowWarn(), s.lowAlarm()));
             row.put("season", def == null || def.threshold() == null ? null : def.threshold().season());
             sensors.add(row);
         }
@@ -552,6 +557,7 @@ public class DashboardService {
             row.put("alarm", s.alarm());
             row.put("lowWarn", s.lowWarn());
             row.put("lowAlarm", s.lowAlarm());
+            row.put("limitType", Codes.limitType(s.warn(), s.alarm(), s.lowWarn(), s.lowAlarm()));
             row.put("points", valuePoints(s.points()));
             if (before.containsKey(s.sensorId())) {
                 row.put("compare", before.get(s.sensorId()));

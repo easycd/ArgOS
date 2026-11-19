@@ -18,6 +18,7 @@ import com.gte.argos.gateway.checklist.ChecklistRepository.Checklist;
 import com.gte.argos.gateway.checklist.ChecklistRepository.Template;
 import com.gte.argos.gateway.common.api.ApiException;
 import com.gte.argos.gateway.thermal.ThermalService;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -92,11 +93,15 @@ public class AlarmService {
         return out;
     }
 
-    /** GET /alarms/hourly: 주간 07~19시, 야간 19~07시 시간별 주의·경보·조치 건수 */
+    /**
+     * GET /alarms/hourly?date= : 그날(기본 어제) 주간 07~19시, 야간 19시 ~ 다음 날 07시의 시간별 주의·경보·조치 건수.
+     * 집계 범위 = date 07:00 ~ date+1 07:00 (시연 시계 날짜 기준). 조치는 확인 시각이 범위 안인 것만 센다.
+     */
     public Map<String, Object> hourly(Long siteId, Long factoryId, String date) {
         UserScope scope = currentUser.require(UserScope.HQ_ADMIN, UserScope.PLANT_ADMIN);
         checkScope(scope, siteId, factoryId, null);
-        OffsetDateTime[] range = time.dayRange(date);
+        LocalDate day = hourlyDate(date, time.now().atZoneSameInstant(SimTime.ZONE).toLocalDate());
+        OffsetDateTime[] range = hourlyRange(day);
         List<Alarm> alarms = central.alarms(new AlarmQuery(range[0], range[1], null, null, null, null,
                 factoryId, siteId, 0, 500)).items();
 
@@ -109,17 +114,35 @@ public class AlarmService {
             } else {
                 c[0]++;
             }
-            if (a.ackedAt() != null) {
+            if (a.ackedAt() != null && !a.ackedAt().isBefore(range[0]) && a.ackedAt().isBefore(range[1])) {
                 int ah = a.ackedAt().atZoneSameInstant(SimTime.ZONE).getHour();
                 byHour.computeIfAbsent(ah, k -> new int[3])[2]++;
             }
         }
-        Map<String, Object> day = shift(byHour, 7, 19);
-        Map<String, Object> night = shift(byHour, 19, 31);
         Map<String, Object> out = new LinkedHashMap<>();
-        out.put("day", day);
-        out.put("night", night);
+        out.put("date", day.toString());
+        out.put("from", range[0]);
+        out.put("to", range[1]);
+        out.put("day", shift(byHour, 7, 19));
+        out.put("night", shift(byHour, 19, 31));
         return out;
+    }
+
+    /** date 를 비우면 어제 (대시보드 '전일 시간대별 알림') */
+    static LocalDate hourlyDate(String date, LocalDate today) {
+        if (date == null || date.isBlank() || "yesterday".equalsIgnoreCase(date)) {
+            return today.minusDays(1);
+        }
+        if ("today".equalsIgnoreCase(date)) {
+            return today;
+        }
+        return LocalDate.parse(date);
+    }
+
+    /** 주간 07시 ~ 다음 날 07시 (야간이 날짜를 넘어감) */
+    static OffsetDateTime[] hourlyRange(LocalDate day) {
+        OffsetDateTime start = day.atTime(7, 0).atZone(SimTime.ZONE).toOffsetDateTime();
+        return new OffsetDateTime[] {start, start.plusDays(1)};
     }
 
     /** GET /alarms/{alarmId}: 발생 → 확인 → 전송 → 조치 → 종료 */

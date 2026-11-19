@@ -26,6 +26,16 @@ API 명세서 기준으로 구현한 것과, 명세서와 다르게 한 점입�
 
 ## API
 
+### 로그인 (2026-11-18 변경)
+
+| API | 비고 |
+| --- | --- |
+| `POST /auth/login` | 웹은 refresh 쿠키(`argos_rt`)를 굽지 않음. JWT(Bearer, 13시간) 하나로 인증. 앱(`client: APP`)만 응답에 `refreshToken` |
+| `POST /auth/extend` | 세션 1시간 연장 + 새 `accessToken`·`expiresIn`·`sessionExpiresAt`. 새 토큰 만료 = min(지금 + 13시간, 늘어난 세션 만료). 쿠키 확인 없음 |
+| `POST /auth/refresh` | 앱 전용 (본문 `{ refreshToken }`). 웹은 쓰지 않음 |
+| `POST /auth/logout` | 쿠키 지우는 헤더 없음 |
+
+
 | 화면 | API | 권한 | 비고 |
 | --- | --- | --- | --- |
 | 공통 | `GET /system/clock` | 로그인 | 시연 시계. 화면의 "오늘"은 이 값 기준 |
@@ -35,12 +45,12 @@ API 명세서 기준으로 구현한 것과, 명세서와 다르게 한 점입�
 | H1 | `GET /factories?siteId=` · `GET /processes?factoryId=` | 본사·공장 | 담당 범위만 |
 | B2 | `GET /factories/{id}/overview` | 본사·공장 | `equipmentLevels`, `siteId`, `siteName` 추가 |
 | B3 | `GET /processes/{id}/layout` | 전체 | `version` 은 1 고정, `floorplan` 은 null (파일 없음) |
-| B3 | `GET /processes/{id}/status` | 전체 | 센서마다 `lowWarn`·`lowAlarm` 추가 (전류는 아래쪽 기준도 있음) |
+| B3 | `GET /processes/{id}/status` | 전체 | 센서마다 `lowWarn`·`lowAlarm` 추가 (전류는 아래쪽 기준도 있음). `limitType`: `UPPER`(상한만, 오를수록 위험) · `LOWER`(하한만, 내려갈수록 위험) · `BOTH`(둘 다, 전류) · 기준 없으면 null. `/layout` 의 `sensors[]`, 설비 상세·추이 센서에도 있음 |
 | B4 | `GET /equipment/{id}` | 전체 | 센서 게이지 `max` 는 경보 기준 × 1.3 |
 | B4 | `GET /equipment/{id}/events?date=&type=` | 전체 | ALARM(시작·해제), ACTION(조치 이력). THRESHOLD 는 아직 (변경 이력은 `/thresholds/history`) |
 | B4 | `GET /sensors/series?ids=&from=&to=&step=&compare=yesterday` | 전체 | 최근 1시간은 5초, 그 이상은 1분·10분 |
 | B1 | `GET /alarms?siteId·factoryId·processId&date=&from=&to=&status=&minLevel=&page=&size=` | 전체 | 줄마다 `checklist`(진행), `assignee`, `actionMinutes`, `valueStillOver` 추가 |
-| B1 | `GET /alarms/hourly?siteId·factoryId&date=` | 본사·공장 | |
+| B1 | `GET /alarms/hourly?siteId·factoryId&date=` | 본사·공장 | 전일 시간대별 알림. `date` 를 비우면 **어제**(`yesterday`·`today`·`2026-11-15` 도 됨). 집계 범위 = 그날 07:00 ~ 다음 날 07:00: 주간 07~19시, 야간 그날 19시 ~ 다음 날 07시. 응답에 `date`·`from`·`to` 추가. 조치 수는 확인 시각이 범위 안인 것만 |
 | B1 | `GET /alarms/{id}` | 전체 | 조치 내역 timeline |
 | C1 | `GET /alarms/{id}/detail` | 전체 | `templateId`, `usual`(주 센서 직전 7일 평균), `rule.max`(경보 × 1.3), `trend.unit·warn·alarm` 추가. `thermal` 은 IR 센서 값 요약 (아래 '열화상') |
 | C4 | `GET /alarms/{id}/response` | 전체 | `fireId` 는 null (화재 판정 전). `location`, `reasonDetail`('TE-305 163.9 ℃ (평소의 117%)', 평소 = 직전 7일 평균), `thermal`(주의 상세와 같은 IR 요약), `shutdown` 추가 (아래 '경보 셧다운 진행') |

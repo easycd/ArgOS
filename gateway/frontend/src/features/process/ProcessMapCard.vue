@@ -50,7 +50,7 @@ defineExpose({ closeFan: () => (fan.value = null) })
     </template>
 
     <div class="map-area" @click.self="fan = null">
-      <PaintMap :equipment="equipment" :positions="positions" :inactive="inactive" @select="emit('select-equipment', $event)" @fan="openFan" />
+      <PaintMap :equipment="equipment" :positions="positions" :inactive="inactive" fan-hint @select="emit('select-equipment', $event)" @fan="openFan" />
       <FanPopover
         v-if="fan && fanEquipment()"
         :equipment="fanEquipment()"

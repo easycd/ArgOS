@@ -4,7 +4,10 @@
     3D 엔진(Three.js 등)을 쓰지 않고 설계안처럼 비스듬히 그린 그림 위에 표시만 함
   - 설비 상태: 설비 둘레에 상태 색 테두리 (면은 칠하지 않음). 주의·경보 설비만 테두리 빛번짐
   - 센서 이름표: 주의·경보 센서는 이름표 테두리를 상태 색으로
-  - 마우스를 올리면 설비 이름·상태·센서 값 말풍선, 누르면 select(설비), 배기팬을 누르면 fan(설비, 위치)
+  - 마우스를 올리면 설비 묶음 전체 표시 + 이름 칩(PaintHoverChip), 누르면 select(설비), 배기팬을 누르면 fan(설비, 위치)
+    · 2026-11-19 재원님 시안 A: 설비 면 옅은 초록 + 4px 들어 올림 (건조로는 건물·배기팬·버너실을 한 덩어리로)
+    · fanHint 이면 배기팬 위에서 한 번 더 표시 (배기팬 확대 + 고리 + 칩에 '누르면 회전수 · 켜기/끄기 조절')
+    · 그리는 방법은 paintHover.js
   - 설비 위치 positions { 설비 이름: { x, y } }: 배치도 화면 좌표 = DB equipment.pos_x · pos_y (API layout 의 pos)
     · 이 그림의 좌표계(SVG viewBox 단위)에서 설비 가운데 점. 값이 없는 설비는 그림에 그려진 자리 그대로
     · 대시보드 · 설비 상세 · 공장 관리가 같은 값으로 그림
@@ -14,9 +17,11 @@
 -->
 <script setup>
 import { nextTick, onMounted, ref, watch } from 'vue'
+import PaintHoverChip from './PaintHoverChip.vue'
+import { addFanRings, buildOverlays, clearHover, fanCenter } from './paintHover'
 import { HALO_GROUPS, PAINT_EQUIPMENT, keyOfSvgId } from './paintLayout'
 import paintSvg from '@/assets/images/paint-map.svg?raw'
-import { LEVEL, LEVEL_META, SENSOR_TYPES } from '@/types/codes'
+import { LEVEL } from '@/types/codes'
 
 const props = defineProps({
   /** 화면용 설비 목록 [{ key, name, level, fan, sensors: [{ tag, type, value, unit, level }] }] (ProcessPage 에서 만듦) */
@@ -35,6 +40,8 @@ const props = defineProps({
   inactive: { type: Array, default: () => [] },
   /** 테두리를 더 얇게 (공장 관리) */
   thin: { type: Boolean, default: false },
+  /** 배기팬을 누르면 배기팬 조절 창이 열리는 화면 (공정 배치도) → 배기팬 위에서 한 번 더 표시 */
+  fanHint: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['select', 'fan', 'drag', 'dragend'])
@@ -194,15 +201,17 @@ function shiftOf(key) {
   return p && c && p.x != null && p.y != null ? [p.x - c[0], p.y - c[1]] : [0, 0]
 }
 const round1 = (v) => Math.round(v * 10) / 10
-/** 설비 하나에 속한 그림 요소 (건물·팬·버너 + 상태 테두리 + 센서 이름표) */
+/** 설비 하나에 속한 그림 요소 (건물·팬·버너 + 초록 면 덮개 + 상태 테두리 + 센서 이름표) */
 function partsOf(svg, key) {
   const ids = PAINT_EQUIPMENT[key]?.ids ?? []
   const els = ids.map((id) => svg.querySelector(`#${id}`)).filter(Boolean)
   const top = els.filter((el) => !els.some((o) => o !== el && o.contains(el)))
+  const overs = [...svg.querySelectorAll(`.over[data-eq="${key}"]`)]
   const halos = [...svg.querySelectorAll('.halo')].filter((h) => keyOfSvgId(h.getAttribute('data-halo')) === key)
-  const tags = (byKey(key)?.sensors ?? []).map((s) => svg.querySelector(`#tag-${s.tag}`)).filter(Boolean)
-  return [...top, ...halos, ...tags]
+  return [...top, ...overs, ...halos, ...tagsOf(svg, key)]
 }
+/** 설비에 붙은 센서 이름표 */
+const tagsOf = (svg, key) => (byKey(key)?.sensors ?? []).map((s) => svg.querySelector(`#tag-${s.tag}`)).filter(Boolean)
 
 function applyOffsets() {
   const svg = box.value?.querySelector('svg')
@@ -237,7 +246,7 @@ function onDown(event) {
   const from = props.positions[key]?.x != null ? { ...props.positions[key] } : { x: c[0], y: c[1] }
   drag = { key, start: [event.clientX, event.clientY], from, scale: m ? m.a : 1, moved: false }
   box.value.setPointerCapture(event.pointerId)
-  tip.value = null
+  onLeave() // 끄는 동안 칩 숨김
   emit('select', byKey(key) ?? { key })
 }
 function onDrag(event) {
@@ -261,6 +270,7 @@ onMounted(() => {
   const svg = box.value.querySelector('svg')
   buildHalos(svg)
   markEquipment(svg)
+  buildOverlays(svg, PAINT_EQUIPMENT) // 마우스 올림용 초록 면 덮개 (paintHover.js)
   measureCenters(svg) // 옮기기 전에 그려진 자리를 잼
   applyLevels()
   applyOffsets()
@@ -269,27 +279,73 @@ onMounted(() => {
 watch(() => props.equipment, () => nextTick(applyLevels), { deep: true })
 watch(() => [props.positions, props.selected, props.inactive], () => nextTick(applyOffsets), { deep: true })
 
-/* ───────── 마우스 올리면 말풍선 ───────── */
-const tip = ref(null) // { x, y, eq }
+/* ───────── 마우스 올림: 설비 묶음 표시 + 이름 칩 ───────── */
+// { key: 설비 이름, fan: 배기팬 그림 id 또는 null } — 아무것도 아니면 null
+const hover = ref(null)
+// 이름 칩 자리 (그림 상자 안 좌표, 설비 위쪽 가운데)
+const chipAt = ref({ x: 0, y: 0 })
+const LIFT = -4 // 들어 올리는 만큼 (CSS .hov 의 translate 와 같은 값)
+
+/** 마우스 아래 설비 (설비 그림 또는 그 설비의 센서 이름표) */
+function hoverOf(target) {
+  const eqEl = target.closest('.eqh')
+  if (eqEl) {
+    const key = eqEl.getAttribute('data-eq')
+    // 배기팬 위인지: 배기팬 조절 창이 있는 화면(fanHint)이고 그 설비에 팬 값이 있을 때만
+    const fan = props.fanHint && byKey(key)?.fan ? (target.closest('[id^="fan-"]')?.id ?? null) : null
+    return { key, fan }
+  }
+  const tag = target.closest('[id^="tag-"]')?.id.slice(4)
+  const eq = tag && props.equipment.find((e) => e.sensors.some((s) => s.tag === tag))
+  return eq ? { key: eq.key, fan: null } : null
+}
 
 function onMove(event) {
   if (drag) return
-  const key = event.target.closest('.eqh')?.getAttribute('data-eq')
-  const eq = key && byKey(key)
-  if (!eq) {
-    tip.value = null
-    return
-  }
-  const rect = box.value.getBoundingClientRect()
-  tip.value = { x: event.clientX - rect.left, y: event.clientY - rect.top, eq }
+  const next = hoverOf(event.target)
+  const now = hover.value
+  if (next?.key === now?.key && next?.fan === now?.fan) return // 같은 설비·같은 부품이면 그대로
+  hover.value = next && byKey(next.key) ? next : null
+  applyHover()
 }
 
-/** 말풍선 센서 값: '전류 22.4 A · 온도 146 ℃' */
-function tipValues(eq) {
-  if (!eq.sensors.length) return '연결된 센서 없음'
-  return eq.sensors
-    .map((s) => `${SENSOR_TYPES.find((t) => t.type === s.type)?.label ?? s.type} ${s.value} ${s.unit}`)
-    .join(' · ')
+function onLeave() {
+  hover.value = null
+  applyHover()
+}
+
+/** 그림에 표시 반영 (공장 관리 editable 에서는 칩만, 들어 올림·초록 면은 안 함 — 끌어 옮기기와 헷갈리지 않게) */
+function applyHover() {
+  const svg = box.value?.querySelector('svg')
+  if (!svg) return
+  clearHover(svg)
+  const h = hover.value
+  if (!h) return
+  if (!props.editable) {
+    partsOf(svg, h.key).forEach((el) => el.classList.add('hov'))
+    if (h.fan) {
+      const fan = svg.querySelector(`#${h.fan}`)
+      const [fx, fy] = fanCenter(fan)
+      fan.style.setProperty('--fx', `${fx}px`) // 배기팬 안쪽 부품이 커지는 기준점
+      fan.style.setProperty('--fy', `${fy}px`)
+      fan.classList.add('fan-hov')
+      svg.querySelector(`#tag-${fan.getAttribute('data-sensor')}`)?.classList.add('tag-fan')
+      addFanRings(svg, fan, shiftOf(h.key), LIFT)
+    }
+  }
+  placeChip(svg, h)
+}
+
+/** 칩 자리: 배기팬 위면 배기팬 바로 위, 아니면 설비 묶음 위쪽 가운데 (마우스를 따라다니지 않아 흔들리지 않음) */
+function placeChip(svg, h) {
+  const els = h.fan ? [svg.querySelector(`#${h.fan}`)] : (PAINT_EQUIPMENT[h.key]?.ids ?? []).map((id) => svg.querySelector(`#${id}`))
+  const rects = els.filter(Boolean).map((el) => el.getBoundingClientRect())
+  if (!rects.length) return
+  const r = box.value.getBoundingClientRect()
+  const left = Math.min(...rects.map((b) => b.left))
+  const right = Math.max(...rects.map((b) => b.right))
+  const top = Math.min(...rects.map((b) => b.top))
+  chipAt.value = { x: (left + right) / 2 - r.left, y: top - r.top - (h.fan ? 10 : 0) }
 }
 
 /* ───────── 클릭: 배기팬이면 팬 창, 아니면 설비 선택 ───────── */
@@ -317,7 +373,7 @@ function onClick(event) {
       class="svg"
       :class="{ editable }"
       @mousemove="onMove"
-      @mouseleave="tip = null"
+      @mouseleave="onLeave"
       @click="onClick"
       @pointerdown="onDown"
       @pointermove="onDrag"
@@ -326,10 +382,14 @@ function onClick(event) {
       v-html="paintSvg"
     />
 
-    <div v-if="tip" class="tip" :style="{ left: `${tip.x}px`, top: `${tip.y}px` }">
-      <b>{{ tip.eq.name }}</b> · {{ LEVEL_META[tip.eq.level]?.label }}<br />
-      <span class="mono">{{ tipValues(tip.eq) }}</span>
-    </div>
+    <!-- 이름 칩: 설비 위(이름 · 상태 · 묶인 부품 · 센서 값) / 배기팬 위(전류 · 회전수 · 누르면 조절) -->
+    <PaintHoverChip
+      v-if="hover && byKey(hover.key)"
+      :key="`${hover.key}-${hover.fan ?? ''}`"
+      :equipment="byKey(hover.key)"
+      :fan-sensor="hover.fan ? (box?.querySelector(`#${hover.fan}`)?.getAttribute('data-sensor') ?? '') : ''"
+      :at="chipAt"
+    />
   </div>
 </template>
 
@@ -362,9 +422,7 @@ function onClick(event) {
   cursor: grab;
 }
 
-/* 칸 이동은 0.15초에 따라감 */
-.svg :deep(.eqh),
-.svg :deep(.halo),
+/* 칸 이동은 0.15초에 따라감 (설비·상태 테두리는 아래 '마우스 올림'에서 들어 올림 움직임과 같이 정함) */
 .svg :deep([id^='tag-']) {
   transition:
     transform 150ms ease-out,
@@ -376,8 +434,115 @@ function onClick(event) {
   filter: drop-shadow(0 0 6px rgba(37, 99, 235, 0.9)) drop-shadow(0 0 2px rgba(37, 99, 235, 0.9));
 }
 
-.svg :deep(.eqh:hover) {
-  filter: brightness(0.96) drop-shadow(0 4px 8px rgba(15, 23, 42, 0.25));
+/* ───────── 마우스 올림 (paintHover.js, 시안 A) ───────── */
+/* 초록 면 덮개: 평소에는 투명, 마우스를 받지 않음 */
+.svg :deep(.over) {
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity var(--m-hover),
+    translate var(--m-panel);
+}
+
+/* 1단계: 설비 묶음(부품 + 덮개 + 상태 테두리)을 4px 들어 올리고 덮개를 보임
+   - translate 속성을 써서 공장 관리 위치 이동(style.transform)과 겹치지 않게 함 */
+.svg :deep(.eqh),
+.svg :deep(.halo) {
+  transition:
+    transform 150ms ease-out,
+    opacity 250ms,
+    translate var(--m-panel);
+}
+
+.svg :deep(.eqh.hov),
+.svg :deep(.over.hov),
+.svg :deep(.halo.hov) {
+  translate: 0 -4px;
+}
+
+.svg :deep(.over.hov) {
+  opacity: 1;
+}
+
+/* 그 설비 센서 이름표 테두리 초록 (주의·경보 이름표는 상태 색 그대로) */
+.svg :deep(.tag.hov[data-level='normal'] .pill) {
+  stroke: var(--color-level-normal);
+  stroke-width: 2.4;
+}
+
+/* 2단계: 배기팬 안쪽 부품을 팬 윗면 가운데(--fx, --fy) 기준으로 1.12배 */
+.svg :deep([id^='fan-'] > *) {
+  transform-box: view-box;
+  transform-origin: var(--fx, 0) var(--fy, 0);
+  transition: scale var(--m-panel);
+}
+
+.svg :deep(.fan-hov > *) {
+  scale: 1.12;
+}
+
+/* 배기팬 전류 이름표는 더 굵게 */
+.svg :deep(.tag.tag-fan .pill) {
+  stroke-width: 3.2;
+}
+
+/* 배기팬 둘레 고리: 고정 고리 + 1.4초마다 퍼져 나가는 고리 */
+.svg :deep(.fan-ring) {
+  fill: none;
+  stroke: var(--color-level-normal);
+  pointer-events: none;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.svg :deep(.fan-ring.solid) {
+  stroke-width: 2.4;
+  animation: ring-in 200ms ease-out both;
+}
+
+.svg :deep(.fan-ring.wave) {
+  stroke-width: 2;
+  animation: ring-wave 1.4s ease-out infinite;
+}
+
+@keyframes ring-in {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+}
+
+@keyframes ring-wave {
+  from {
+    opacity: 0.8;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.6);
+  }
+}
+
+/* 센서 이름표의 연결선·점은 마우스를 받지 않음
+   (배기팬 한가운데에 CT 이름표 연결점이 있어 배기팬 올림·누르기를 가로막지 않게) */
+.svg :deep(.tag .anchor),
+.svg :deep(.tag .lead) {
+  pointer-events: none;
+}
+
+/* 움직임 줄이기 설정: 들어 올림·확대·퍼지는 고리 없이 색만 */
+@media (prefers-reduced-motion: reduce) {
+  .svg :deep(.hov) {
+    translate: none !important;
+  }
+
+  .svg :deep(.fan-hov > *) {
+    scale: none;
+  }
+
+  .svg :deep(.fan-ring) {
+    animation: none;
+  }
 }
 
 /* 주의·경보 테두리만 빛번짐 + 천천히 깜빡임 */
@@ -399,30 +564,5 @@ function onClick(event) {
   50% {
     opacity: 0.6;
   }
-}
-
-/* 마우스 말풍선 */
-.tip {
-  position: absolute;
-  z-index: 8;
-  transform: translate(-50%, calc(-100% - 12px));
-  padding: 8px 11px;
-  border-radius: var(--radius-sm);
-  background: var(--color-text);
-  color: #fff;
-  font-size: 12.5px;
-  line-height: 19px;
-  white-space: nowrap;
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.28);
-  pointer-events: none;
-  animation: pop-in var(--m-pop-in) both; /* motion.css */
-}
-
-.tip b {
-  font-size: 13.5px;
-}
-
-.tip .mono {
-  color: #cbd5e1;
 }
 </style>

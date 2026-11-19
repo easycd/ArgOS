@@ -251,7 +251,7 @@ public class StatsService {
             currentUser.checkFactory(scope, c.factoryId());
         }
         // TODO(백엔드, 2026-11-19): 조회 기간 최대 1년 → 30일로 변경 요청. 366 → 30, 메시지 "한 번에 30일까지 조회할 수 있습니다."
-        //   프론트는 이미 30일로 막음. 자세한 건 frontend/docs/stats-history-api.md 0장, backend-notes.md
+        //   프론트는 이미 30일로 막음. 자세한 건 docs/api/stats-history-30days.md
         if (c.days() > 366) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "RANGE_TOO_LARGE", "한 번에 1년까지 조회할 수 있습니다.");
         }

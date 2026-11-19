@@ -139,6 +139,7 @@ export function alarmDetail(alarmId) {
     causeCandidates: ['베어링 마모', '구동 벨트 장력 이상', '배기 덕트 댐퍼 막힘'],
     equipmentType: 'OVEN',
     sensorType: 'CURRENT',
+    hazard: 'FIRE', // 전류·온도 → 화재 (백엔드 alarm.hazard)
     processId: 12,
     equipmentId: 31,
   }
@@ -181,6 +182,7 @@ function gasAlarmDetail(a) {
     causeCandidates: ['버너 공연비 이상 (불완전 연소)', '배기 덕트 댐퍼 막힘', '배기팬 회전수 부족'],
     equipmentType: 'OVEN',
     sensorType: 'CO',
+    hazard: 'GAS', // CO → 가스
     processId: 12,
     equipmentId: 31,
     fanAuto: fanAutoOf({ equipmentId: 31, level: LEVEL.WARN, at: raisedAt }),
@@ -266,9 +268,10 @@ export function alarmResponse(alarmId) {
   return {
     id,
     level: fire ? LEVEL.FIRE : LEVEL.ALARM,
+    hazard: fire ? 'FIRE' : 'GAS', // 경보 예시는 CO 경보 기준 초과 → 가스
     status: fire ? (scenario.fire.status === 'CLEARED' ? 'CLOSED' : 'OPEN') : inc.status,
     fireId: fire ? scenario.fire.id : null,
-    title: fire ? '상도 건조로 버너실에서 화재가 감지되었습니다' : '상도 건조로에서 경보가 발생했습니다',
+    title: fire ? '상도 건조로 버너실에서 화재가 감지되었습니다' : '상도 건조로에서 가스 경보가 발생했습니다',
     location: '울산공장 · 5공장 · 도장 공정 · 상도 건조로' + (fire ? ' 버너실' : ''),
     raisedAt: todayAt(fire ? scenario.fire.detectedAt : inc.raisedAt),
     reason: fire

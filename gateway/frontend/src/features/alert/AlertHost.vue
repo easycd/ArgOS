@@ -1,7 +1,7 @@
 <!--
   알림 대응 창·알림 띠·화면 테두리를 그리는 곳 (MainLayout 에 한 번)
   - body 로 통째로 옮겨 그림(Teleport): 화면 전환 확대·축소, 본문 잘림(overflow)에 영향 안 받게
-  - 열린 창: stores/alert.js 의 modal (주의 알림 → 주의 상세 → 센서·열화상 확인 / 체크리스트 진행)
+  - 열린 창: stores/alert.js 의 modal (주의 알림 → 주의 상세(센서 데이터·열화상 포함) / 체크리스트 진행)
   - 하는 일
     · 처음 + 데이터가 바뀔 때마다 대응 중인 알림·체크리스트를 다시 받음 (useLiveReload)
     · 새 알림이 생기면 (화재 > 경보 > 주의 중 높은 것 하나)
@@ -17,7 +17,6 @@ import { useRouter } from 'vue-router'
 import AlarmResponseModal from './AlarmResponseModal.vue'
 import { placeOf, siteNameOf } from './alarmPlace'
 import ChecklistProgressModal from './ChecklistProgressModal.vue'
-import ThermalCheckModal from './ThermalCheckModal.vue'
 import WarnDetailModal from './WarnDetailModal.vue'
 import WarnNoticeModal from './WarnNoticeModal.vue'
 import AppToasts from '@/components/AppToasts.vue'
@@ -143,7 +142,6 @@ onBeforeUnmount(() => {
     <Transition name="modal" :duration="{ enter: 300, leave: 200 }">
       <WarnNoticeModal v-if="alert.modal?.type === 'warn' && modalAlarm" :key="`warn-${alert.modal.alarmId}`" :alarm="modalAlarm" />
       <WarnDetailModal v-else-if="alert.modal?.type === 'detail'" :key="`detail-${alert.modal.alarmId}`" :alarm-id="alert.modal.alarmId" />
-      <ThermalCheckModal v-else-if="alert.modal?.type === 'thermal'" :key="`thermal-${alert.modal.alarmId}`" :alarm-id="alert.modal.alarmId" />
       <AlarmResponseModal v-else-if="alert.modal?.type === 'alarm'" :key="`alarm-${alert.modal.alarmId}`" :alarm-id="alert.modal.alarmId" />
       <ChecklistProgressModal
         v-else-if="alert.modal?.type === 'checklist'"

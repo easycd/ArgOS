@@ -12,6 +12,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AlarmHead from './AlarmHead.vue'
+import { hazardLabelOf } from './alarmView'
 import { placeOf } from './alarmPlace'
 import BroadcastBand from './BroadcastBand.vue'
 import EmergencySensors from './EmergencySensors.vue'
@@ -69,6 +70,8 @@ const place = computed(() => {
   return { ...p, siteId: p.siteId ?? r.siteId, factoryId: p.factoryId ?? r.factoryId, processId: p.processId ?? r.processId }
 })
 // 머리 위치 문구: 화재는 화재 응답, 경보는 응답 → 없으면 목록 줄 location
+// 유형 문구 '가스 경보' · '화재 경보': 응답의 hazard, 없으면 알림 목록 줄의 센서 종류로
+const hazardLabel = computed(() => hazardLabelOf({ hazard: response.value?.hazard ?? row.value?.hazard, sensorType: row.value?.sensorType }))
 const location = computed(() => fire.value?.location ?? response.value?.location ?? row.value?.location ?? '')
 // 정지한 설비 이름: 셧다운한 설비들 (공정 전체면 '도장 공정 전체'), 모르면 알림 설비
 const stoppedName = computed(() => {
@@ -156,6 +159,7 @@ function shake() {
         :stopped="stopped"
         :stopped-name="stoppedName"
         :location="location"
+        :hazard-label="hazardLabel"
         :elapsed="elapsed"
         @collapse="onCollapse"
       />

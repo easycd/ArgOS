@@ -1,6 +1,6 @@
 <!--
   주의 알림 창 (화면설계안 js/v-modals.js mWarn(), 화면설계서 C1)
-  - 위쪽 주황 띠, 숨쉬듯 빛나는 경고 아이콘, '주의 상태가 감지되었습니다', 위치
+  - 위쪽 주황 띠, 숨쉬듯 빛나는 경고 아이콘, '가스 주의 상태가 감지되었습니다'(CO) · '화재 주의 …'(전류·온도), 위치
   - 센서 · 지금 값 / 주의 기준 / 발생 시각
   - 가스(CO) 주의면 센서 칸 아래 '배기팬 자동 가동 75%' 줄 (알림의 fanAuto, FanAutoNotice) — 2026-11-19
   - 2초 길게 누르기 → POST /alarms/{id}/ack → 주의 상세 창으로 바뀜
@@ -14,6 +14,7 @@ import BaseModal from '@/components/BaseModal.vue'
 import HoldButton from '@/components/HoldButton.vue'
 import FanAutoNotice from './FanAutoNotice.vue'
 import { siteNameOf } from './alarmPlace'
+import { hazardLabelOf } from './alarmView'
 import { useAlertStore } from '@/stores/alert'
 import { useAuthStore } from '@/stores/auth'
 import { sensorTypeOf } from '@/types/codes'
@@ -29,6 +30,8 @@ const auth = useAuthStore()
 
 const type = computed(() => sensorTypeOf(props.alarm.sensorType))
 const time = computed(() => props.alarm.raisedAt.slice(11, 19))
+// 유형 문구: CO 가 높으면 '가스 주의', 전류·온도가 높으면 '화재 주의'
+const kind = computed(() => [hazardLabelOf(props.alarm), '주의'].filter(Boolean).join(' '))
 // 위치 앞에 사업장 이름 (알림 응답의 location 은 공장부터 → siteId 로 사업장 이름을 받음)
 const siteName = ref('')
 siteNameOf(props.alarm.siteId).then((n) => (siteName.value = n))
@@ -53,8 +56,8 @@ async function onDone() {
     <div class="band" />
     <div class="body">
       <div class="ico"><AppIcon name="tri" :size="30" /></div>
-      <div class="step">2단계 · 주의</div>
-      <h2>주의 상태가 감지되었습니다</h2>
+      <div class="step">2단계 · {{ kind }}</div>
+      <h2>{{ kind }} 상태가 감지되었습니다</h2>
       <div class="loc">{{ location }}</div>
 
       <div class="m-box cells">

@@ -19,6 +19,8 @@ const props = defineProps({
   elapsed: { type: String, default: '' },
   /** 정지한 설비 이름 ('상도 건조로', 공정 전체면 '도장 공정 전체') — 창이 응답에서 꺼내 줌 */
   stoppedName: { type: String, default: '' },
+  /** 유형 이름 '가스' · '화재' (경보만: '3단계 · 가스 경보') — 모르면 '' */
+  hazardLabel: { type: String, default: '' },
   /** 위치 '5공장 · 도장 공정 · 상도 건조로' (경보 대응 응답에는 없을 수 있어 창이 알림 목록 줄에서 채움) */
   location: { type: String, default: '' },
 })
@@ -37,7 +39,7 @@ const time = computed(() => props.response.raisedAt.slice(11, 19))
         <div class="sub">{{ location }}</div>
       </template>
       <template v-else>
-        <div class="step">{{ stopped ? '셧다운 완료' : '3단계 · 경보' }}</div>
+        <div class="step">{{ stopped ? '셧다운 완료' : `3단계 · ${hazardLabel ? `${hazardLabel} ` : ''}경보` }}</div>
         <div class="title">{{ stopped ? `${stoppedName || '설비'}를 정지했습니다` : response.title }}</div>
       </template>
     </div>

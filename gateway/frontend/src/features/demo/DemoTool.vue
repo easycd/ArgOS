@@ -60,7 +60,7 @@ const checklist = computed(() => activeChecklist())
         <button type="button" :disabled="!checklist || checklist.status === 'REPORTED'" @click="tickChecklist(99)">모두 완료</button>
       </div>
 
-      <p class="hint">처음 상황 = 주의 · 김도현 2/5 진행 중. 가스 주의·경보 때 배기팬 자동/수동은 공장 관리 › 설비 정보 스위치를 따름. 전송하면 5.2초마다 한 항목씩 자동 진행. 화재 해제 비밀번호 = 로그인 비밀번호</p>
+      <p class="hint">처음 상황 = 주의 · 김도현 2/5 진행 중. 가스 주의·경보 때 배기팬 자동/수동은 설비 기준값 관리 창의 스위치를 따름. 전송하면 5.2초마다 한 항목씩 자동 진행. 화재 해제 비밀번호 = 로그인 비밀번호</p>
     </div>
 
     <button type="button" class="toggle" :aria-expanded="open" @click="open = !open">

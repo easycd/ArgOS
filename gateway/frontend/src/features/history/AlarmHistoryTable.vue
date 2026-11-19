@@ -1,13 +1,13 @@
 <!--
-  알림 이력 표 (화면설계안 vStats() table())
-  - 탭: 전체 / 조치 중 / 해제, 한 쪽 6행, '86건 중 1~6' + 쪽 번호
-  - 열: 발생 시각, 공정·설비, 센서, 측정값(기준), 등급, 조치, 조치 시간(막대), 상태
-  - 행을 누르면 open(row) → 화면이 설비 상세로 이동 (도장 공정 설비만, 나머지는 '준비 중')
+  알림 이력 표 (2026-11-19 개편: 왼쪽 열 전체 높이)
+  - 머리줄: 유형 거르기(전체 / 화재 / 가스) + 상태 탭(전체 / 조치 중 / 해제), 한 쪽 14행, '89건 중 1~14' + 쪽 번호
+  - 열: 발생 시각, 유형, 공정·설비, 등급, 조치, 조치 시간(막대), 상태, 상세 (센서·측정값 열은 뺌 → 상세 패널에서 봄)
+  - 상세 단추(또는 줄)를 누르면 open(row) → 화면 오른쪽에 상세 패널. 열린 줄은 파란 바탕 + 왼쪽 선
   - 쪽을 넘기면 표 내용이 0.15초 흐려졌다 돌아옴
 -->
 <script setup>
 import { computed } from 'vue'
-import { SENSOR_ICON, SENSOR_LABEL, actionText, isActive, minutesOf, placeOf, shortTime } from './historyFilter'
+import { HAZARDS, HAZARD_META, actionText, hazardOf, isActive, minutesOf, placeOf, shortTime } from './historyFilter'
 import AppIcon from '@/components/AppIcon.vue'
 import BaseCard from '@/components/BaseCard.vue'
 import LevelBadge from '@/components/LevelBadge.vue'
@@ -21,11 +21,15 @@ const props = defineProps({
   busy: { type: Boolean, default: false },
   /** 응답의 서버 시각 (있으면 조치 중 '경과' 분을 이걸로 셈) */
   serverTime: { type: String, default: '' },
+  /** 상세 패널이 열린 알림 id (없으면 null) */
+  selectedId: { type: Number, default: null },
 })
 
 const emit = defineEmits(['open'])
 /** 탭: '' 전체 / 'ACTIVE' 조치 중 / 'CLOSED' 해제 */
 const tab = defineModel('tab', { type: String, default: '' })
+/** 유형: '' 전체 / 'FIRE' 화재 / 'GAS' 가스 */
+const hazard = defineModel('hazard', { type: String, default: '' })
 /** 쪽 (1부터) */
 const page = defineModel('page', { type: Number, default: 1 })
 
@@ -59,6 +63,7 @@ const view = computed(() => {
       row: r,
       key: r.id,
       time: shortTime(r.raisedAt),
+      hazard: HAZARD_META[hazardOf(r)],
       equipment: place.equipment,
       process: place.process,
       active,
@@ -72,36 +77,42 @@ const view = computed(() => {
 </script>
 
 <template>
-  <BaseCard title="알림 이력" :sub="`${total}건`">
+  <BaseCard title="알림 이력" :sub="`${total}건`" class="history-card">
     <template #actions>
+      <SegButtons v-model="hazard" :options="HAZARDS" small @update:model-value="page = 1" />
       <SegButtons v-model="tab" :options="TABS" small @update:model-value="page = 1" />
     </template>
 
     <div class="body" :class="{ busy }">
       <table v-if="view.length" class="tb">
+        <colgroup>
+          <col class="c-time" /><col class="c-hz" /><col /><col class="c-lv" /><col class="c-act" /><col class="c-dur" /><col class="c-state" /><col class="c-more" />
+        </colgroup>
         <thead>
           <tr>
-            <th class="t-time">발생 시각</th>
+            <th>발생 시각</th>
+            <th>유형</th>
             <th>공정 · 설비</th>
-            <th>센서</th>
-            <th>측정값</th>
             <th>등급</th>
             <th>조치</th>
             <th>조치 시간</th>
-            <th class="t-state">상태</th>
+            <th>상태</th>
+            <th class="t-more">상세</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="v in view" :key="v.key" class="row" tabindex="0" @click="emit('open', v.row)" @keydown.enter="emit('open', v.row)">
+          <tr
+            v-for="v in view"
+            :key="v.key"
+            class="row"
+            :class="{ sel: v.key === selectedId }"
+            @click="emit('open', v.row)"
+          >
             <td class="mono t-time">{{ v.time }}</td>
-            <td><b>{{ v.equipment }}</b> <span class="sub">{{ v.process }}</span></td>
             <td>
-              <span class="sn"><AppIcon :name="SENSOR_ICON[v.row.sensorType] ?? 'info'" :size="15" />{{ SENSOR_LABEL[v.row.sensorType] ?? '-' }}<span class="mono">{{ v.row.sensorTag }}</span></span>
+              <span class="hz" :class="v.row.hazard"><AppIcon :name="v.hazard.icon" :size="14" />{{ v.hazard.label }}</span>
             </td>
-            <td>
-              <span class="mono val" :class="v.row.level === 'WARN' ? 'warn' : 'alarm'">{{ v.row.value }} {{ v.row.unit }}</span>
-              <span class="sub mono">기준 {{ v.row.threshold }}</span>
-            </td>
+            <td class="t-place"><b>{{ v.equipment }}</b> <span class="sub">{{ v.process }}</span></td>
             <td><LevelBadge :level="v.row.level" /></td>
             <td>{{ v.action }}</td>
             <td>
@@ -112,6 +123,12 @@ const view = computed(() => {
             </td>
             <td>
               <span class="dotc" :class="{ on: v.active }"><i />{{ v.active ? '조치 중' : '해제' }}</span>
+            </td>
+            <td class="t-more">
+              <!-- 줄 누르기와 같은 동작 (단추를 눌러도 줄 클릭이 한 번만 일어나게 .stop) -->
+              <button type="button" class="more" :aria-label="`${v.equipment} 알림 상세`" @click.stop="emit('open', v.row)">
+                상세<AppIcon name="cr" :size="14" />
+              </button>
             </td>
           </tr>
         </tbody>
@@ -137,8 +154,16 @@ const view = computed(() => {
 </template>
 
 <style scoped>
+/* 카드가 왼쪽 열 높이를 다 채우고, 쪽 번호 줄은 맨 아래에 붙음 */
+.history-card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
 .body {
-  min-height: 288px; /* 6행 + 머리줄 — 쪽마다 높이가 흔들리지 않게 */
+  flex: 1;
+  min-height: 684px; /* 14행 + 머리줄 — 쪽마다 높이가 흔들리지 않게 */
   transition: opacity 150ms;
 }
 
@@ -149,8 +174,18 @@ const view = computed(() => {
 .tb {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
   font-size: 13.5px;
 }
+
+/* 열 너비 (공정·설비 열이 남는 폭을 가짐) */
+.c-time { width: 128px; }
+.c-hz { width: 92px; }
+.c-lv { width: 92px; }
+.c-act { width: 140px; }
+.c-dur { width: 160px; }
+.c-state { width: 100px; }
+.c-more { width: 88px; }
 
 th {
   height: 40px;
@@ -169,6 +204,13 @@ td {
   padding: 0 12px;
   border-bottom: 1px solid #f1f5f9;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.t-more {
+  padding-right: 16px;
+  text-align: right;
 }
 
 th:first-child,
@@ -177,12 +219,7 @@ td:first-child {
 }
 
 .t-time {
-  width: 128px;
   font-size: 13px;
-}
-
-.t-state {
-  width: 96px;
 }
 
 .row {
@@ -190,9 +227,67 @@ td:first-child {
   transition: background var(--m-hover);
 }
 
-.row:hover,
-.row:focus-visible {
+.row:hover {
   background: var(--color-surface-sub);
+}
+
+/* 상세 패널이 열린 줄 */
+.row.sel {
+  background: var(--color-primary-soft);
+}
+
+.row.sel td:first-child {
+  box-shadow: inset 3px 0 0 var(--color-primary);
+}
+
+/* 유형 칩: 등급(주황·빨강)과 헷갈리지 않게 회색 바탕 + 아이콘 */
+.hz {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 9px 0 7px;
+  border-radius: 12px;
+  background: #f1f5f9;
+  color: #334155;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.hz.FIRE svg {
+  color: #7c3aed;
+}
+
+.hz.GAS svg {
+  color: #0d9488;
+}
+
+/* 상세 단추 */
+.more {
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 8px 0 10px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--color-text-sub);
+  cursor: pointer;
+  transition: color var(--m-hover), border-color var(--m-hover);
+}
+
+.more:hover {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.row.sel .more {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #fff;
 }
 
 b {
@@ -202,34 +297,6 @@ b {
 .sub {
   font-size: 12px;
   color: var(--color-text-weak);
-}
-
-.sn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.sn svg {
-  color: var(--color-text-sub);
-}
-
-.sn .mono {
-  font-size: 12px;
-  color: var(--color-text-weak);
-}
-
-.val {
-  margin-right: 6px; /* 뒤의 '기준 21.6' 과 띄움 */
-  font-weight: 600;
-}
-
-.val.warn {
-  color: var(--color-level-warn-text);
-}
-
-.val.alarm {
-  color: var(--color-level-alarm-text);
 }
 
 .dur {
@@ -288,7 +355,7 @@ b {
 }
 
 .noval {
-  height: 288px;
+  height: 684px;
   display: flex;
   flex-direction: column;
   align-items: center;

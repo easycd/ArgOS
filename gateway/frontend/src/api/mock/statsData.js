@@ -6,7 +6,7 @@
  *     - 오늘: 지금 예시 상황의 알림(mockAlarms) 그대로 → 상단 바·알림 목록과 같은 건이 '조치 중'으로 보임
  *     - 어제부터 29일 전: 설계안의 일별 건수(W30 · D30) 그대로
  *     - 그 이전 1년: 비슷한 수준으로 고정 난수 (직전 기간 대비 · 직접 선택 기간용)
- *  2) 조건(기간·공장·공정·센서·등급·근무조)으로 거른 뒤 summary / trend / by-process / heatmap / alarms 를 셈
+ *  2) 조건(기간·공장·공정·센서·등급·근무조)으로 거른 뒤 summary / trend / by-process / alarms 를 셈
  *     (백엔드 StatsService 와 같은 방식)
  *
  * 5공장만 지난 기록이 있음 (설계안도 5공장·전체 공장 말고는 '조건에 맞는 알림이 없습니다')
@@ -171,7 +171,19 @@ function allAlarms() {
     row.actionMinutes = row.closedAt ? Math.max(1, Math.round((new Date(row.closedAt) - new Date(row.raisedAt)) / 60000)) : null
     return row
   })
-  return [...today, ...pastAlarms()].sort((a, b) => b.raisedAt.localeCompare(a.raisedAt))
+  // 유형(hazard): 백엔드 alarm.hazard 와 같은 값. CO → 가스(GAS), 전류·온도·열화상 → 화재(FIRE)
+  return [...today, ...pastAlarms()]
+    .map((a) => (a.hazard ? a : { ...a, hazard: a.sensorType === 'CO' ? 'GAS' : 'FIRE' }))
+    .sort((a, b) => b.raisedAt.localeCompare(a.raisedAt))
+}
+
+/** 알림 한 건 찾기 (상세 패널 예시 데이터용) */
+export const findStatsAlarm = (id) => allAlarms().find((a) => a.id === Number(id)) ?? null
+
+/** 센서 태그 → [주의 기준, 경보 기준] (예시 설비 목록에 있는 태그만, 없으면 null) */
+export function ruleOfTag(tag) {
+  const p = POOL.find((x) => x[4] === tag)
+  return p ? [p[7], p[8]] : null
 }
 
 /* ───────── 조건으로 거르기 (백엔드 AlarmCriteria.matches) ───────── */
@@ -189,6 +201,7 @@ function filtered(c) {
       (!c.processId || a.processId === Number(c.processId)) &&
       (!c.sensorType || a.sensorType === c.sensorType) &&
       (!c.level || a.level === c.level) &&
+      (!c.hazard || a.hazard === c.hazard) &&
       (!c.shift || (c.shift === 'DAY') === isDayShift(a.raisedAt)),
   )
 }
@@ -295,22 +308,6 @@ export function byProcess(c) {
   return [...rows.values()].map((r) => ({ ...r, total: r.CURRENT + r.TEMP + r.CO + r.IR })).sort((a, b) => b.total - a.total)
 }
 
-/* ───────── GET /stats/heatmap ───────── */
-export function heatmap(c) {
-  const cells = new Map()
-  for (const a of filtered(c)) {
-    const d = parseDay(dayOf(a.raisedAt))
-    const key = `${((d.getDay() + 6) % 7) + 1}:${hourOf(a.raisedAt)}` // 월=1 … 일=7
-    cells.set(key, (cells.get(key) ?? 0) + 1)
-  }
-  const list = [...cells].map(([k, count]) => {
-    const [dow, hour] = k.split(':').map(Number)
-    return { dow, hour, count }
-  })
-  list.sort((a, b) => a.dow - b.dow || a.hour - b.hour)
-  return { max: Math.max(0, ...list.map((x) => x.count)), cells: list }
-}
-
 /* ───────── GET /stats/alarms ───────── */
 /**
  * @param {object} c 조건 + status(추가 요청: ACTIVE | CLOSED), sort, page(0부터), size
@@ -326,31 +323,35 @@ export function alarms(c) {
   return { items: list.slice(page * size, page * size + size), page, size, total: list.length, serverTime: todayAt(scenarioNow()) }
 }
 
-/* ───────── GET /stats/export (CSV, 백엔드 StatsService.export 와 같은 열) ───────── */
-const CSV_HEAD = '발생 시각,공장,공정,위치,센서,센서 종류,측정값,기준,단위,단계,상태,확인자,조치 담당자,체크리스트,조치 시간(분),종료 시각'
+/* ───────── GET /stats/export (알림 이력 상세 CSV — 열은 docs/stats-history-api.md 와 같음) ───────── */
+const CSV_HEAD = '알림 번호,발생 시각,해제 시각,유형,공장,공정,설비,등급,알림 센서,센서 종류,발생 값,기준값,단위,상태,확인자,조치,조치 담당자,체크리스트,조치 시간(분)'
 const csvCell = (v) => {
   if (v == null) return ''
   const s = String(v)
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
 }
 const csvTime = (isoText) => (isoText ? `${isoText.slice(0, 10)} ${isoText.slice(11, 19)}` : '')
+const HAZARD_NAME = { FIRE: '화재', GAS: '가스' }
+const SENSOR_NAME = { CURRENT: '전류', TEMP: '온도', CO: 'CO', IR: '열화상' }
+const STATUS_NAME = { OPEN: '확인 대기', ACKED: '확인함', ACTING: '조치 중', CLOSED: '해제' }
 
 export function exportCsv(c) {
   const list = filtered(c)
   if (list.length > 50000) return { error: { code: 'EXPORT_TOO_LARGE', message: '5만 건을 넘습니다. 기간을 줄여 주세요.', status: 400 } }
   const lines = list.map((a) => {
-    const [factory, process] = a.location.split(' · ')
+    const [factory, process, ...rest] = a.location.split(' · ')
     return [
-      csvTime(a.raisedAt), factory, process, a.location, a.sensorTag, a.sensorType, a.value, a.threshold, a.unit,
-      a.level === 'WARN' ? '주의' : '경보', a.status, a.ackedBy, a.assignee,
-      a.checklist ? `${a.checklist.doneCount}/${a.checklist.totalCount}` : '', a.actionMinutes, csvTime(a.closedAt),
+      a.id, csvTime(a.raisedAt), csvTime(a.closedAt), HAZARD_NAME[a.hazard], factory, process, rest.join(' · '),
+      a.level === 'WARN' ? '주의' : '경보', a.sensorTag, SENSOR_NAME[a.sensorType], a.value, a.threshold, a.unit,
+      STATUS_NAME[a.status], a.ackedBy, a.checklist ? '체크리스트' : '설비 셧다운', a.assignee,
+      a.checklist ? `${a.checklist.doneCount}/${a.checklist.totalCount}` : '', a.actionMinutes,
     ].map(csvCell).join(',')
   })
   return {
     data: {
-      // 백엔드와 같은 파일 이름 · UTF-8 BOM (엑셀에서 한글이 깨지지 않게)
-      fileName: `ArgOS_alarm_${c.from.replace(/-/g, '')}_${c.to.replace(/-/g, '')}.csv`,
-      text: `﻿${CSV_HEAD}\n${lines.join('\n')}\n`,
+      fileName: `알림이력_${c.from.replace(/-/g, '')}-${c.to.replace(/-/g, '')}.csv`,
+      // UTF-8 BOM (엑셀에서 한글이 깨지지 않게)
+      text: `\ufeff${CSV_HEAD}\n${lines.join('\n')}\n`,
       rows: list.length,
     },
   }

@@ -28,6 +28,18 @@ export const SENSOR_TYPES = [
 export const SENSOR_LABEL = { CURRENT: '전류', TEMP: '온도', CO: 'CO', IR: '열화상' }
 export const SENSOR_ICON = { CURRENT: 'zap', TEMP: 'temp', CO: 'wind', IR: 'cam' }
 
+/**
+ * 유형 (백엔드 alarm.hazard 값): 화재 / 가스
+ * - 서버가 hazard 를 안 주면 센서 종류로 정함: CO → 가스, 전류·온도·열화상 → 화재
+ */
+export const HAZARDS = [
+  { value: '', label: '유형 전체' },
+  { value: 'FIRE', label: '화재' },
+  { value: 'GAS', label: '가스' },
+]
+export const HAZARD_META = { FIRE: { label: '화재', icon: 'flame' }, GAS: { label: '가스', icon: 'wind' } }
+export const hazardOf = (row) => row.hazard ?? (row.sensorType === 'CO' ? 'GAS' : 'FIRE')
+
 /** 등급 (백엔드 level 값) */
 export const LEVELS = [
   { value: '', label: '전체' },

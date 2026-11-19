@@ -8,7 +8,7 @@
 -->
 <script setup>
 import { computed, ref } from 'vue'
-import { LEVELS, PERIODS, SENSOR_TYPES, SHIFTS, daysBetween } from './historyFilter'
+import { LEVELS, MAX_RANGE_DAYS, PERIODS, SENSOR_TYPES, SHIFTS, daysBetween } from './historyFilter'
 import AppIcon from '@/components/AppIcon.vue'
 import SegButtons from '@/components/SegButtons.vue'
 
@@ -52,8 +52,8 @@ function applyPicker() {
     pickError.value = '시작일이 종료일보다 늦습니다.'
     return
   }
-  if (daysBetween(d1.value, d2.value) > 366) {
-    pickError.value = '최대 1년까지 조회할 수 있습니다.'
+  if (daysBetween(d1.value, d2.value) > MAX_RANGE_DAYS) {
+    pickError.value = `최대 ${MAX_RANGE_DAYS}일까지 조회할 수 있습니다.`
     return
   }
   picker.value = false

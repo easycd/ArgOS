@@ -271,3 +271,15 @@ API 명세서 기준으로 구현한 것과, 명세서와 다르게 한 점입�
 
 Kafka(엣지 → 수집 서버)·Redis(수집 서버 → 중앙 서버) 연동 (지금은 HTTP 와 1초 폴링), `thermal.frame`,
 점검 서류 PDF 를 쪽 그림으로 바꾸기.
+
+
+## API 명세서 자동 생성 (springdoc)
+
+| 주소 | 내용 |
+| --- | --- |
+| `GET /swagger-ui.html` | Swagger UI. 로그인 없이 열림. 컨트롤러별로 화면 이름 태그(01 로그인 … 18 시스템) |
+| `GET /v3/api-docs` | OpenAPI 3 JSON. Postman Import 가능 |
+
+- 응답 본문 스키마는 대부분 `Map` 이라 필드 목록이 자세히 나오지 않는다. 필드 설명은 이 문서를 기준으로 본다.
+- Postman 컬렉션: `docs/postman/ArgOS-gateway.postman_collection.json` (로그인하면 토큰 자동 저장)
+- 환경 변수 `ARGOS_API_DOCS=false` 면 두 주소 모두 꺼진다.

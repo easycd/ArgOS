@@ -4,11 +4,9 @@
  *   (묶음은 paintLayout.js PAINT_EQUIPMENT 의 ids 그대로)
  * - 1단계(설비 위): 설비 면을 옅은 초록으로 덮고 4px 들어 올림 + 그 설비 센서 이름표 테두리 초록
  *   · 상태 테두리 색(정상 초록 / 주의 주황 / 경보 빨강)은 그대로 둠 — 면만 덮음
- * - 2단계(배기팬 위): 배기팬이 1.12배 커지고 둘레에 고리 2개(고정 + 퍼져 나가는 고리), 배기팬 전류 이름표 더 굵게
+ * - (2026-11-19 배기팬 2단계 표시는 대시보드 배기팬 조절 창과 함께 삭제)
  * - 그리는 일만 여기서, 언제 켜고 끌지는 PaintMap.vue 가 정함
  */
-const NS = 'http://www.w3.org/2000/svg'
-
 /** 설비 면 덮개 색 (시안 A: 정상 초록 #16A34A 를 옅게) */
 const OVER_FILL = 'rgba(22, 163, 74, 0.2)'
 const OVER_LINE = 'rgba(22, 163, 74, 0.55)'
@@ -43,37 +41,7 @@ export function buildOverlays(svg, equipmentMap) {
   }
 }
 
-/**
- * 배기팬 둘레 고리 2개 (고정 + 퍼져 나가는 고리) — 그림 맨 위에 붙임
- * @param {SVGSVGElement} svg
- * @param {SVGGElement} fan 배기팬 그림 (id 'fan-…')
- * @param {[number, number]} shift 공장 관리에서 옮긴 만큼 [dx, dy] (PaintMap shiftOf)
- * @param {number} lift 들어 올린 만큼 (위로 -4)
- */
-export function addFanRings(svg, fan, [dx, dy], lift) {
-  const b = fan.getBBox() // 옮기기 전 그려진 자리
-  const cx = b.x + b.width / 2 + dx
-  const cy = b.y + b.height * 0.6 + dy + lift // 팬 윗면(그림 위쪽 60%) 가운데
-  const rx = b.width / 2 + 9
-  for (const kind of ['solid', 'wave']) {
-    const ring = document.createElementNS(NS, 'ellipse')
-    ring.setAttribute('class', `fan-ring ${kind}`)
-    ring.setAttribute('cx', cx)
-    ring.setAttribute('cy', cy)
-    ring.setAttribute('rx', rx)
-    ring.setAttribute('ry', rx * 0.62)
-    svg.appendChild(ring)
-  }
-}
-
-/** 배기팬을 키울 기준점: 팬 윗면 가운데 (그림 좌표). 팬 안쪽 부품들이 이 점을 기준으로 커짐 */
-export function fanCenter(fan) {
-  const b = fan.getBBox()
-  return [b.x + b.width / 2, b.y + b.height * 0.6]
-}
-
-/** 표시 지우기: 들어 올림·배기팬 강조 클래스, 고리 */
+/** 표시 지우기: 들어 올림 클래스 */
 export function clearHover(svg) {
-  svg.querySelectorAll('.hov, .fan-hov, .tag-fan').forEach((n) => n.classList.remove('hov', 'fan-hov', 'tag-fan'))
-  svg.querySelectorAll('.fan-ring').forEach((n) => n.remove())
+  svg.querySelectorAll('.hov').forEach((n) => n.classList.remove('hov'))
 }

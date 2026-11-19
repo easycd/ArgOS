@@ -1,6 +1,7 @@
 <!--
   주의 상세 · 체크리스트 전송 창 (화면설계안 js/v-modals.js mWarnDetail(), 화면설계서 C2)
   - 왼쪽: 발생 원인(문장·기준 띠) / 센서 추이(최근 40분 — 전류·온도·CO 중 알림이 난 센서) / 예상 원인 / '센서 데이터 · 열화상 확인' 단추
+    가스(CO) 주의면 발생 원인 아래 '배기팬 자동 가동 75%' 줄 (detail.fanAuto, FanAutoNotice) — 2026-11-19
   - 오른쪽: 조치 체크리스트(빼기·추가) / 전송 대상(공정 담당자) / 닫기 · 공정 담당자 앱으로 전송
   - 데이터: GET /alarms/{id}/detail, GET /checklist-templates, GET /processes/{id}/workers
   - 전송: POST /checklists → '보내는 중' → 알림 띠 → 창 닫힘 (상단 바에 체크리스트 진행이 나타남)
@@ -10,6 +11,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { placeOf, sensorTypeOfDetail, trendInfo } from './alarmPlace'
 import ChecklistEditor from './ChecklistEditor.vue'
+import FanAutoNotice from './FanAutoNotice.vue'
 import MiniTrend from './MiniTrend.vue'
 import WarnCause from './WarnCause.vue'
 import WorkerPicker from './WorkerPicker.vue'
@@ -102,6 +104,8 @@ async function send() {
         <section class="left">
           <div class="m-sect"><AppIcon name="info" :size="15" />발생 원인</div>
           <WarnCause :detail="detail" class="gap" />
+          <!-- 가스 주의: 배기팬 자동 제어 결과 -->
+          <FanAutoNotice v-if="detail.fanAuto" :fan="detail.fanAuto" tone="warn" class="gap-s" />
           <MiniTrend v-if="detail.trend" :trend="detail.trend" :title="trend.title" :dec="trend.dec" :sub="`${trend.tag} · 최근 40분`" class="gap-s" />
 
           <div class="m-sect top"><AppIcon name="gear" :size="15" />예상 원인</div>

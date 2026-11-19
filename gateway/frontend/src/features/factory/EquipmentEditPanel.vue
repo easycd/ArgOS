@@ -2,7 +2,10 @@
   설비 정보 (화면설계안 vLayout() panel())
   - 사용 상태 스위치(DB is_active), 설비 이름, 종류(DB equipment_type 코드 — 화면에는 한글 이름),
     위치 X · Y (DB pos_x · pos_y, 배치도 화면 좌표 — 숫자로 고치면 배치도도 옮겨짐)
+  - 배기팬 자동 제어 스위치 (배기팬이 있는 설비만, DB equipment.fan_auto) — 2026-11-19 추가
+    자동이면 가스(CO) 주의 75% · 경보 100% 로 서버가 배기팬을 올림, 수동이면 알림 창에 안내만
   - 담당자 · 연결된 센서(지금 값·단계) — 보기만
+  - '설비 기준값 관리' 단추 → thresholds 이벤트 → 화면이 기준값 관리 창을 엶 (예전 '설비 기준값 관리' 메뉴를 여기로 옮김)
   - 이 설비의 변경 내용 (저장 전)
   - 고른 설비가 없으면 '선택한 설비가 없습니다'
   - 바꾼 값은 change(필드, 값) 로 화면에 알림 → 화면이 저장 전 변경에 모음
@@ -11,11 +14,11 @@
 import { computed } from 'vue'
 import { EQUIPMENT_TYPES, typeLabel as equipmentTypeLabel } from './layoutDraft'
 import AppIcon from '@/components/AppIcon.vue'
-import { LEVEL_META, SENSOR_TYPES } from '@/types/codes'
+import { FAN_AUTO_PERCENT, LEVEL_META, SENSOR_TYPES } from '@/types/codes'
 import { toast } from '@/utils/toast'
 
 const props = defineProps({
-  /** 고른 설비 { id, key, name, type, active, pos, sensors, managers } (지금 값) — 없으면 null */
+  /** 고른 설비 { id, key, name, type, active, fanAuto, pos, sensors, managers } (지금 값) — 없으면 null */
   eq: { type: Object, default: null },
   /** 지금 보이는 위치 { x, y } (pos 가 없으면 그림에 그려진 자리) */
   place: { type: Object, default: null },
@@ -23,7 +26,10 @@ const props = defineProps({
   changes: { type: Array, default: () => [] },
 })
 
-const emit = defineEmits(['change'])
+const emit = defineEmits(['change', 'thresholds'])
+
+/** 배기팬 자동 제어 단계 (codes.js) — 안내 문구용 */
+const FAN_TEXT = `가스(CO) 주의 ${FAN_AUTO_PERCENT.WARN}% · 경보 ${FAN_AUTO_PERCENT.ALARM}%`
 
 const typeLabel = (t) => SENSOR_TYPES.find((x) => x.type === t)?.label ?? t
 const TYPE_BADGE = { move: '위치 변경됨', name: '이름 변경됨', meta: '정보 변경됨' }
@@ -79,6 +85,19 @@ const typeOptions = computed(() => {
         <button type="button" class="tg" :class="{ on: eq.active }" role="switch" :aria-checked="eq.active" aria-label="사용 상태" @click="emit('change', 'active', !eq.active)" />
       </div>
 
+      <!-- 배기팬 자동 제어 (배기팬이 있는 설비만) -->
+      <template v-if="eq.fanAuto !== null">
+        <div class="lrow fanrow">
+          <span>배기팬 자동 제어</span>
+          <b :class="{ ok: eq.fanAuto }">{{ eq.fanAuto ? '자동' : '수동' }}</b>
+          <button type="button" class="tg" :class="{ on: eq.fanAuto }" role="switch" :aria-checked="eq.fanAuto" aria-label="배기팬 자동 제어" @click="emit('change', 'fanAuto', !eq.fanAuto)" />
+        </div>
+        <p class="fan-hint">
+          <template v-if="eq.fanAuto">{{ FAN_TEXT }}로 배기팬 회전수를 자동으로 올립니다.</template>
+          <template v-else>가스 알림이 와도 배기팬은 그대로 두고, 알림 창에 안내만 합니다.</template>
+        </p>
+      </template>
+
       <label class="fl" for="eq-name">설비 이름</label>
       <input id="eq-name" class="inp" :value="eq.name" maxlength="30" @change="onName" @keydown.enter="$event.target.blur()" />
 
@@ -109,6 +128,10 @@ const typeOptions = computed(() => {
         </div>
       </div>
       <p v-else class="weak">연결된 센서가 없습니다</p>
+      <!-- 기준값 관리 창 열기 (센서별 주의·경보 기준, 계절, 변경 이력) -->
+      <button type="button" class="btn th-btn" @click="emit('thresholds')">
+        <AppIcon name="slider" :size="16" />설비 기준값 관리
+      </button>
 
       <div class="fl">변경 내용</div>
       <TransitionGroup v-if="changes.length" tag="div" name="chg" class="chgs">
@@ -215,6 +238,30 @@ const typeOptions = computed(() => {
 
 .lrow b.ok {
   color: var(--color-level-normal-text);
+}
+
+/* 배기팬 자동 제어 줄: 사용 상태 줄 바로 아래 */
+.lrow.fanrow {
+  padding-top: 14px;
+  padding-bottom: 6px;
+  border-bottom: none;
+}
+
+.fan-hint {
+  margin: 0;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 12.5px;
+  line-height: 18px;
+  color: var(--color-text-weak);
+}
+
+/* 설비 기준값 관리 단추: 센서 목록 아래 한 줄 가득 */
+.th-btn {
+  width: 100%;
+  height: 40px;
+  margin-top: 10px;
+  justify-content: center;
 }
 
 .fl {

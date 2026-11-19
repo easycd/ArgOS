@@ -29,7 +29,7 @@ public class AuthService {
             String firstPage, UserView user, String refreshToken, Instant sessionExpiry) {}
     public record RefreshResult(String accessToken, long expiresIn, String refreshToken,
             String client, Instant sessionExpiry) {}
-    public record ExtendResult(String client, Instant sessionExpiry) {}
+    public record ExtendResult(String accessToken, long expiresIn, Instant sessionExpiry) {}
     public record Scope(Long siteId, List<Long> factoryIds, List<Long> processIds) {}
     public record UserView(long id, String loginId, String name, String role, Scope scope) {}
     public record MeView(long id, String loginId, String name, String phone,
@@ -111,22 +111,24 @@ public class AuthService {
     }
 
     @Transactional
-    public ExtendResult extend(long userId, long sessionId, String webRefreshToken) {
+    public ExtendResult extend(long userId, long sessionId) {
         RefreshSession session = repository.findSession(sessionId, userId);
         if (session == null || session.revokedAt() != null
                 || !session.expiresAt().isAfter(Instant.now())) {
             throw new AuthFailure(401, "AUTH_REQUIRED", "다시 로그인해 주세요.");
         }
-        if ("WEB".equals(session.client())) {
-            if (webRefreshToken == null || webRefreshToken.isBlank()) {
-                throw new AuthFailure(401, "REFRESH_EXPIRED", "다시 로그인해 주세요.");
-            }
-            RefreshSession cookieSession = repository.findRefreshSession(tokens.hash(webRefreshToken));
-            if (cookieSession == null || cookieSession.id() != sessionId) {
-                throw new AuthFailure(401, "REFRESH_EXPIRED", "다시 로그인해 주세요.");
-            }
+        if (repository.findActiveUser(userId) == null) {
+            throw new AuthFailure(401, "AUTH_REQUIRED", "다시 로그인해 주세요.");
         }
-        return new ExtendResult(session.client(), repository.extendSession(sessionId));
+        Instant sessionExpiry = repository.extendSession(sessionId);
+        return new ExtendResult(tokens.accessToken(userId, sessionId, sessionExpiry),
+                expiresIn(Instant.now(), tokens.accessSeconds(), sessionExpiry), sessionExpiry);
+    }
+
+    /** 새 토큰의 남은 초 = min(토큰 유효 시간, 세션 만료까지) */
+    static long expiresIn(Instant now, long accessSeconds, Instant sessionExpiry) {
+        long untilSession = Math.max(0, sessionExpiry.getEpochSecond() - now.getEpochSecond());
+        return Math.min(accessSeconds, untilSession);
     }
 
     @Transactional(readOnly = true)

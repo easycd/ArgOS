@@ -50,9 +50,15 @@ function onAct(alarm) {
   if (!alert.openFor(alarm)) toast('주의 확인과 조치는 공장 담당자 화면에서 합니다.', { type: 'info' })
 }
 
-/** '과거 알림' 단추 → 통계·이력 관리 화면 (어제 이전 알림은 그 화면에서 기간을 골라 봄) */
+/**
+ * '과거 알림' 단추 → 통계·이력 관리 화면 (어제 이전 알림은 그 화면에서 기간을 골라 봄)
+ * - 2026-11-19: 누른 화면의 범위가 미리 골라진 채로 열림 (주소 ?factoryId=&processId=, HistoryPage 가 읽음)
+ *   공정 화면 → 그 공장·공정 / 공장 대시보드 → 그 공장 / 사업장 현황 → 전체 공장(factoryId=all)
+ */
 function goHistory() {
-  router.push({ name: 'history', params: { siteId: route.params.siteId } })
+  const { siteId, factoryId, processId } = route.params
+  const query = processId ? { factoryId, processId } : factoryId ? { factoryId } : { factoryId: 'all' }
+  router.push({ name: 'history', params: { siteId }, query })
 }
 
 /** 끝난 알림 → 통계·이력 관리 (이 알림 조건) */

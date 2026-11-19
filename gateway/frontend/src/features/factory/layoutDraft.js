@@ -1,12 +1,11 @@
 /**
  * 공장 관리 — 저장 전 변경 모으기 (화면설계안 v-pages2.js vLayout() changes())
- * - saved: GET layout 의 설비 (저장된 값), draft: 화면에서 고친 값 { 설비 id: { pos, name, type, active, fanAuto } }
+ * - saved: GET layout 의 설비 (저장된 값), draft: 화면에서 고친 값 { 설비 id: { pos, name, type, active } }
  * - 값 이름은 DB 명세(equipment 테이블) · 백엔드 layout 응답과 같음
  *   · pos { x, y }: equipment.pos_x · pos_y — 배치도 화면 좌표 (PaintMap 그림 좌표). 비어 있으면 그림에 그려진 자리
  *   · type: equipment.equipment_type 코드 (OVEN · FAN …) — 화면에는 한글 이름
  *   · active: equipment.is_active
- *   · fanAuto: equipment.fan_auto — 배기팬 자동(true)/수동(false), 배기팬이 없는 설비는 null (2026-11-19 추가)
- *     자동이면 가스(CO) 주의 때 75%, 경보 때 100% 로 서버가 배기팬을 올림
+ *   (배기팬 자동 제어 equipment.fan_auto 는 2026-11-19부터 '설비 기준값 관리' 창에서 바로 저장 — 여기서는 안 다룸)
  * - 변경 줄: 위치 이동(좌표 + 함께 옮겨지는 센서), 이름 변경, 정보 변경(종류 · 사용 상태)
  * - 저장 본문: PUT /processes/{id}/layout 의 equipment.update
  */
@@ -39,7 +38,7 @@ const fmt = (v) => String(Math.round(v))
 
 /** 설비 하나의 지금 값 (저장값 위에 고친 값) */
 export function currentOf(eq, draft) {
-  return { pos: posOf(eq.pos), name: eq.name, type: eq.type ?? null, active: eq.active !== false, fanAuto: eq.fanAuto ?? null, ...draft[eq.id] }
+  return { pos: posOf(eq.pos), name: eq.name, type: eq.type ?? null, active: eq.active !== false, ...draft[eq.id] }
 }
 
 /** 화면에 쓰는 위치: 저장된(또는 고친) 위치, 없으면 그림에 그려진 자리 (defaults: PaintMap.defaultPositions) */
@@ -68,7 +67,6 @@ export function changesOf(equipment, draft, defaults = {}) {
     const meta = []
     if (now.type !== was.type) meta.push(`종류 ${typeLabel(now.type)}`)
     if (now.active !== was.active) meta.push(now.active ? '사용 상태 사용' : '사용 상태 사용 안 함')
-    if (now.fanAuto !== was.fanAuto) meta.push(now.fanAuto ? '배기팬 자동' : '배기팬 수동')
     if (meta.length) out.push({ id: eq.id, key: eq.key, type: 'meta', title: `${now.name} 정보 변경`, detail: meta.join(' · ') })
   }
   return out
@@ -76,7 +74,7 @@ export function changesOf(equipment, draft, defaults = {}) {
 
 /**
  * 저장 본문 (바뀐 설비만) — PUT /processes/{id}/layout
- * - update 한 줄: { id, pos: { x, y }, name, type, active, fanAuto } (pos 는 정해진 경우만, fanAuto 는 배기팬 있는 설비만)
+ * - update 한 줄: { id, pos: { x, y }, name, type, active } (pos 는 정해진 경우만)
  */
 export function bodyOf(version, equipment, draft) {
   const update = equipment
@@ -86,7 +84,6 @@ export function bodyOf(version, equipment, draft) {
       // 화면 반응형 값이라 보통 객체로 복사 (예시 데이터가 structuredClone 으로 복사함)
       const row = { id: eq.id, name: now.name, type: now.type, active: now.active }
       if (now.pos) row.pos = { x: now.pos.x, y: now.pos.y }
-      if (now.fanAuto !== null) row.fanAuto = now.fanAuto
       return row
     })
   return { version, equipment: { create: [], update, delete: [] }, sensors: { create: [], update: [], delete: [] } }

@@ -711,3 +711,11 @@
 - 알림 응답(`GET /alarms` items, `/alarms/{id}/detail`, `/alarms/{id}/response`)에 `fanAuto` 한 칸, layout GET/PUT 에 `fanAuto` 한 칸.
 - '설비 기준값 관리' 메뉴·화면 삭제 → 공장 관리 › 설비 정보 › '설비 기준값 관리' 창. 기준값 API 는 그대로.
 - 자세한 내용: **`docs/fan-auto-api.md`**(API), **`docs/fan-auto-db.md`**(DB: `equipment.fan_auto`, `equipment_command.source`).
+
+## 21. 설비 설정 스위치 이동 · 대시보드 배기팬 조절 삭제 (2026-11-19 2차, 재원님 요청)
+
+- 대시보드(공정 배치도 · 설비 상세)에서 배기팬을 눌러 회전수를 바꾸던 창 삭제 → 웹은 `POST /equipment/{id}/fan` 을 더는 안 부름 (API는 지우지 않음).
+- 설비 상세에 '설비 기준값 관리' 버튼 → 같은 창이 설비 상세 위에 뜸 (화면 이동 없음, API 변경 없음).
+- 사용 상태 · 배기팬 자동 제어 스위치를 기준값 관리 창으로 옮김 → **새 `PATCH /equipment/{id}/settings`** `{ active?, fanAuto? }`, `GET /equipment/{id}/thresholds` 에 `active` · `fanAuto`, SSE `equipment.updated`.
+- DB 변경 없음. 자세한 내용: **`docs/equipment-settings-api.md`**.
+

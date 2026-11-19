@@ -17,6 +17,20 @@ export const LAYOUT = {
 export const editsOf = (id) => LAYOUT.edits[id] ?? {}
 
 /**
+ * PATCH /equipment/{equipmentId}/settings — 설비 설정 바로 저장 (2026-11-19, 설비 기준값 관리 창의 스위치 2개)
+ * - 바꾼 값만 옴: { active?, fanAuto? }. 배치 저장과 따로라 배치 판 번호(version)는 올리지 않음
+ *   (공장 관리에서 배치를 고치는 중에 저장해도 배치 저장이 409 로 막히지 않게)
+ */
+export function saveSettings(equipmentId, body) {
+  const cur = { ...LAYOUT.edits[equipmentId] }
+  if (body.active !== undefined) cur.active = body.active
+  if (body.fanAuto !== undefined) cur.fanAuto = body.fanAuto
+  LAYOUT.edits[equipmentId] = cur
+  // 응답의 fanAuto 는 배기팬 유무를 아는 fanAuto.js 가 채움 (api/equipment.js)
+  return { equipmentId: Number(equipmentId), active: cur.active ?? true }
+}
+
+/**
  * PUT /processes/{processId}/layout
  * @param {{ version, equipment: { update: [{ id, pos?: { x, y }, name?, type?, active?, fanAuto? }] } }} body
  */

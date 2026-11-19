@@ -5,7 +5,8 @@
     { fanName, mode: 'AUTO'|'MANUAL', percent, rpm, beforeRpm, status: 'APPLIED'|'SENT'|'FAILED'|'SKIPPED' }
   - 자동(AUTO): '배기팬 자동 가동 75%' + '1,180 → 1,350 rpm' (팬 아이콘이 돎)
     수동(MANUAL): 안내만 ('수동 모드라 바꾸지 않았습니다')
-  - 자동/수동은 공장 관리 › 설비 정보의 '배기팬 자동 제어' 스위치로 정함
+  - 자동/수동은 '설비 기준값 관리' 창 › 설비 설정의 '배기팬 자동 제어' 스위치로 정함 (2026-11-19 설비 정보 카드에서 옮김)
+  - 대시보드에서 팬을 손으로 조절하는 창은 2026-11-19 삭제 → 수동·실패 때는 현장 확인 안내
 -->
 <script setup>
 import { computed } from 'vue'
@@ -38,8 +39,8 @@ const title = computed(() => {
 /** 아래 설명 줄 */
 const text = computed(() => {
   const name = props.fan.fanName
-  if (!isAuto.value) return `${name}${eunNeun(name)} 수동이라 자동으로 바꾸지 않았습니다. 필요하면 공정 배치도에서 직접 올려 주세요.`
-  if (props.fan.status === 'FAILED') return `${name} 명령이 전달되지 않았습니다. 공정 배치도에서 직접 올려 주세요.`
+  if (!isAuto.value) return `${name}${eunNeun(name)} 수동이라 자동으로 바꾸지 않았습니다. 필요하면 현장에서 배기팬을 확인해 주세요.`
+  if (props.fan.status === 'FAILED') return `${name} 명령이 전달되지 않았습니다. 현장에서 배기팬을 확인해 주세요.`
   return `${name} 회전수를 자동으로 올렸습니다.`
 })
 </script>

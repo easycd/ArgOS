@@ -1,19 +1,18 @@
 <!--
-  공정 지도 카드: 단계 경로 + 안내·범례 + 3D 설비 배치도 + 배기팬 창 + 아래 설비 줄
+  공정 지도 카드: 단계 경로 + 범례 + 3D 설비 배치도 + 아래 설비 줄
   - 경로: 사업장 › 울산공장 › 5공장 › 도장 공정 (앞 단계는 누르면 이동, CardCrumb)
     · 2026-11-18 제목 '구역 현황' + '도장 공정 3D 설비 배치도' 경로 → 단계 경로 하나로
-  - 설비를 누르면 select-equipment, 배기팬 창의 '적용'은 fan-apply 이벤트로 페이지에 넘김
+  - 설비를 누르면 select-equipment (배기팬을 눌러도 그 설비)
+    · 2026-11-19 재원님 요청: 배기팬을 눌러 회전수·켜기/끄기를 바꾸던 창(FanPopover)과 안내 글자 삭제
 -->
 <script setup>
-import { ref } from 'vue'
 import EquipmentStrip from './EquipmentStrip.vue'
-import FanPopover from './FanPopover.vue'
 import PaintMap from './PaintMap.vue'
 import BaseCard from '@/components/BaseCard.vue'
 import CardCrumb from '@/components/CardCrumb.vue'
 import { STAGES } from '@/features/site/stages'
 
-const props = defineProps({
+defineProps({
   /** 경로('사업장' 다음부터): [{ label, to }] — to 가 있으면 링크 */
   crumbs: { type: Array, required: true },
   /** 화면용 설비 목록 */
@@ -22,22 +21,9 @@ const props = defineProps({
   positions: { type: Object, default: () => ({}) },
   /** 사용 안 함 설비 (흐리게) */
   inactive: { type: Array, default: () => [] },
-  /** 배기팬 명령 보내는 중 */
-  sendingFan: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['select-equipment', 'fan-apply'])
-
-// 열린 배기팬 창: { equipmentId, position }
-const fan = ref(null)
-
-function openFan(eq, position) {
-  fan.value = { equipmentId: eq.id, position }
-}
-
-const fanEquipment = () => props.equipment.find((e) => e.id === fan.value?.equipmentId)
-
-defineExpose({ closeFan: () => (fan.value = null) })
+const emit = defineEmits(['select-equipment'])
 </script>
 
 <template>
@@ -45,21 +31,11 @@ defineExpose({ closeFan: () => (fan.value = null) })
     <template #title><CardCrumb :items="crumbs" /></template>
 
     <template #actions>
-      <span class="hint-text">배기팬을 누르면 회전수 · 켜기/끄기</span>
       <span v-for="s in STAGES" :key="s.level" class="legend"><i :style="{ borderColor: s.color }" />{{ s.label }}</span>
     </template>
 
-    <div class="map-area" @click.self="fan = null">
-      <PaintMap :equipment="equipment" :positions="positions" :inactive="inactive" fan-hint @select="emit('select-equipment', $event)" @fan="openFan" />
-      <FanPopover
-        v-if="fan && fanEquipment()"
-        :equipment="fanEquipment()"
-        :position="fan.position"
-        :sending="sendingFan"
-        @close="fan = null"
-        @detail="emit('select-equipment', fanEquipment())"
-        @apply="emit('fan-apply', fanEquipment(), $event)"
-      />
+    <div class="map-area">
+      <PaintMap :equipment="equipment" :positions="positions" :inactive="inactive" @select="emit('select-equipment', $event)" />
     </div>
 
     <EquipmentStrip :equipment="equipment" @select="emit('select-equipment', $event)" />
@@ -67,10 +43,6 @@ defineExpose({ closeFan: () => (fan.value = null) })
 </template>
 
 <style scoped>
-.hint-text {
-  color: var(--color-text-weak);
-}
-
 .legend {
   display: flex;
   align-items: center;

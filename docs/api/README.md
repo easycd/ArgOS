@@ -4,6 +4,8 @@
 | --- | --- |
 | `ArgOS_API명세서.html` | 화면별로 부르는 API, 요청·응답 예시, 권한, 쓰는 DB 테이블, 에러, SSE 이벤트, 푸시 종류 |
 | `ArgOS_API구성도.png` | 화면 · 연계 서버 · DB · 중앙 서버 · 푸시 사이의 API 흐름 그림 |
+| `stats-history-30days.md` | (2026-11-19 요청) 통계·이력 조회 기간 1년 → 최대 30일, 백엔드 할 일 |
+| `erd-final-frontend-check.md` | (2026-11-19) 최종 ERD ↔ 프론트 대조: 프론트에서 고친 것, ERD에 없는데 화면이 쓰는 값(확인 요청), 아직 화면에 없는 ERD 기능 |
 
 ## 이 문서의 성격
 
@@ -22,3 +24,7 @@
 명세서와 다르게 구현한 점, 추가로 필요한 필드, 정해야 할 점은 아래 문서에 화면별로 정리합니다.
 
 - [`gateway/frontend/docs/backend-notes.md`](../../gateway/frontend/docs/backend-notes.md)
+
+## 백엔드 요청 모음
+
+2026-11-19부터 프론트가 백엔드에 필요한 API 변경·추가 요청은 이 폴더(`docs/api/`)에 파일로 둡니다. 코드에는 `TODO(백엔드` 로 검색되는 주석을 달아 둡니다.

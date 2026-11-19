@@ -450,7 +450,7 @@
 | --- |
 | `siteId` 조건이 없음 → 프론트는 `siteId` 를 같이 보냄 (본사 관리자가 '전체 공장' 을 고르면 그 사업장 공장만 보고 싶음). 서버가 안 받으면 다른 사업장 알림까지 섞일 수 있음 |
 | 공장 담당자는 공장 선택이 담당 공장으로 고정 (`factoryId` 를 늘 보냄). 서버 `scope()` 가 범위 밖 공장이면 막는 것과 맞음 |
-| 기간이 1년 넘으면 `400 RANGE_TOO_LARGE` — 프론트도 달력에서 미리 막음('최대 1년까지 조회할 수 있습니다') |
+| 기간이 30일 넘으면 `400 RANGE_TOO_LARGE` — 프론트도 달력에서 미리 막음('최대 30일까지 조회할 수 있습니다') (2026-11-19 1년 → 30일. **백엔드 변경 필요**: StatsService.scope() 의 TODO 주석 참고) |
 | 내보내기는 파일(Blob)로 받아서, 서버가 `400 EXPORT_TOO_LARGE` 같은 JSON 오류를 주면 공통 처리(`http.js`)가 내용을 읽지 못해 '요청을 처리하지 못했습니다' 로만 보임 → 백엔드 연결 때 내보내기 오류만 Blob 을 글자로 읽어 보여 주도록 고칠 예정 (지금은 공통 처리를 건드리지 않음) |
 | 행의 공정·설비 이름은 `location`('5공장 · 도장 공정 · 상도 건조로 배기팬')을 나눠서 씀 → `processName` · `equipmentName` 을 따로 주면 더 안전 |
 | 표의 '조치' 칸(체크리스트 n/n · 설비 셧다운 · 확인 대기)을 정할 필드가 없음 → 체크리스트가 있으면 'n/n', 경보이고 끝났으면 '설비 셧다운', 그 밖은 상태로 정함. `actionType` (CHECKLIST · SHUTDOWN) 이 있으면 좋음 |
@@ -718,4 +718,10 @@
 - 설비 상세에 '설비 기준값 관리' 버튼 → 같은 창이 설비 상세 위에 뜸 (화면 이동 없음, API 변경 없음).
 - 사용 상태 · 배기팬 자동 제어 스위치를 기준값 관리 창으로 옮김 → **새 `PATCH /equipment/{id}/settings`** `{ active?, fanAuto? }`, `GET /equipment/{id}/thresholds` 에 `active` · `fanAuto`, SSE `equipment.updated`.
 - DB 변경 없음. 자세한 내용: **`docs/equipment-settings-api.md`**.
+
+## 22. 주의·경보 창 유형 문구 · 주의 상세 창 합치기 (2026-11-19, 재원님 요청)
+
+- 주의·경보 창에 유형 문구: `hazard` GAS → '가스 주의/경보', FIRE → '화재 주의/경보' (없으면 센서 종류로).
+- '센서 데이터 · 열화상 확인' 창을 주의 상세 창에 합침 (`GET /alarms/{id}/detail` 한 번으로 그림). 새 API·DB 없음.
+- 요청 1개: `GET /alarms/{id}/response` 의 `title` 에 유형 넣기. 자세한 내용: 저장소 **`docs/api/alarm-modal-hazard.md`**.
 

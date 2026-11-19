@@ -10,7 +10,7 @@
 | 1 | 그대로 씀 | `alarm.hazard` | 유형(화재·가스)은 이미 있는 `hazard ('FIRE','GAS')` 를 씀. **새 컬럼 없음** |
 | 2 | **신규** | `alarm_sensor_sample` | 알림이 열려 있는 동안 그 설비 센서 전부의 5초 값 (상세 그래프·센서값 CSV) |
 | 3 | 인덱스 추가 | `alarm` | 유형 거르기 + 기간 조회용 `(hazard, raised_at)` |
-| 4 | 보관 기간 확인 | `sensor_trend` | 1분 평균을 최소 1년 남겨야 지난 알림(30분 넘는 것) 그래프가 나옴 |
+| 4 | 보관 기간 확인 | `sensor_trend`, `alarm_sensor_sample` | 조회가 최대 30일이라 최소 31일만 남기면 됨 |
 
 ---
 
@@ -68,9 +68,18 @@ CREATE INDEX ix_alarm_hazard_raised ON alarm (hazard, raised_at DESC);
 
 ## 4. `sensor_trend` 보관 기간
 
-- 통계·이력은 1년까지 조회할 수 있습니다(`RANGE_TOO_LARGE` 366일).
-- 30분이 넘는 알림의 상세 그래프는 `sensor_trend` 1분 평균으로 그리므로, 이 테이블을 **최소 1년** 남겨야 합니다.
-- 파티션을 지우는 작업이 있다면 1년보다 짧지 않은지 확인해 주세요.
+- 통계·이력은 **한 번에 최대 30일**까지 조회합니다(`RANGE_TOO_LARGE`, 2026-11-19 1년 → 30일로 바꿈).
+- 30분이 넘는 알림의 상세 그래프는 `sensor_trend` 1분 평균, 30분 이하는 `alarm_sensor_sample` 5초 값으로 그립니다.
+- 오늘 기준 30일 전 알림까지 상세 그래프가 나오려면 두 테이블 모두 **최소 31일**(달 경계 여유를 두면 2개월 파티션) 남기면 됩니다.
+- 요약 카드의 '이전 기간보다'는 `alarm` 테이블만 쓰므로 센서 값 보관 기간과는 상관없습니다.
+
+### 4-1. 보관 기간 이후 정리 (제안)
+
+```sql
+-- 월별 파티션이면: 2개월 지난 파티션을 DETACH 후 DROP
+-- 파티션이 없으면 (매일 새벽 한 번)
+DELETE FROM alarm_sensor_sample WHERE ts < now() - interval '31 days';
+```
 
 ## 그대로 쓰는 테이블 (참고)
 

@@ -13,6 +13,7 @@
  */
 import { mockAlarms, mockSiteTrees, todayAt } from './data'
 import { scenarioNow } from './scenario'
+import { MAX_RANGE_DAYS } from '@/features/history/historyFilter'
 
 /* ───────── 고정 난수 (새로고침해도 같은 값) ───────── */
 let seed = 20261117
@@ -214,9 +215,11 @@ function previous(c) {
 }
 const daysOf = (c) => Math.round((parseDay(c.to) - parseDay(c.from)) / 86400000) + 1
 
-/** 기간이 1년을 넘으면 백엔드처럼 400 RANGE_TOO_LARGE */
+/** 기간이 30일을 넘으면 백엔드처럼 400 RANGE_TOO_LARGE */
 export function rangeError(c) {
-  return daysOf(c) > 366 ? { code: 'RANGE_TOO_LARGE', message: '한 번에 1년까지 조회할 수 있습니다.', status: 400 } : null
+  return daysOf(c) > MAX_RANGE_DAYS
+    ? { code: 'RANGE_TOO_LARGE', message: `한 번에 ${MAX_RANGE_DAYS}일까지 조회할 수 있습니다.`, status: 400 }
+    : null
 }
 
 /* ───────── GET /stats/summary ───────── */

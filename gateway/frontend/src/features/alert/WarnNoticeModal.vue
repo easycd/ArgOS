@@ -2,6 +2,7 @@
   주의 알림 창 (화면설계안 js/v-modals.js mWarn(), 화면설계서 C1)
   - 위쪽 주황 띠, 숨쉬듯 빛나는 경고 아이콘, '주의 상태가 감지되었습니다', 위치
   - 센서 · 지금 값 / 주의 기준 / 발생 시각
+  - 가스(CO) 주의면 센서 칸 아래 '배기팬 자동 가동 75%' 줄 (알림의 fanAuto, FanAutoNotice) — 2026-11-19
   - 2초 길게 누르기 → POST /alarms/{id}/ack → 주의 상세 창으로 바뀜
   - 꼭 확인해야 하는 창이라 바깥 누르기·Esc 로 안 닫힘 (lock, 누르면 흔들림)
 -->
@@ -11,6 +12,7 @@ import { ackAlarm } from '@/api/alarms'
 import AppIcon from '@/components/AppIcon.vue'
 import BaseModal from '@/components/BaseModal.vue'
 import HoldButton from '@/components/HoldButton.vue'
+import FanAutoNotice from './FanAutoNotice.vue'
 import { siteNameOf } from './alarmPlace'
 import { useAlertStore } from '@/stores/alert'
 import { useAuthStore } from '@/stores/auth'
@@ -69,6 +71,9 @@ async function onDone() {
           <b class="mono">{{ time }}</b>
         </div>
       </div>
+
+      <!-- 가스 주의: 배기팬 자동 제어 결과 (자동이면 75%로 올림, 수동이면 안내만) -->
+      <FanAutoNotice v-if="alarm.fanAuto" :fan="alarm.fanAuto" tone="warn" class="fan" />
 
       <div class="hold-wrap">
         <HoldButton :size="148" color="#F97316" label="길게 눌러 확인" @progress="heldMs = $event" @done="onDone" />
@@ -160,6 +165,10 @@ h2 {
   font-style: normal;
   font-size: 13px;
   color: var(--color-text-weak);
+}
+
+.fan {
+  margin-top: 10px;
 }
 
 .hold-wrap {

@@ -1,6 +1,6 @@
 <!--
   이벤트 이력 한 줄 (설계안 css/base.css .tlg .e: 세로 선 위의 점 + 시각 + 제목·설명 + 오른쪽 배지)
-  - 기준값 조정 줄은 '기준값 관리' 링크가 붙어, 누르면 설비 기준값 관리 화면으로 이동
+  - 기준값 조정 줄은 '기준값 관리' 링크가 붙어, 누르면 공장 관리로 가서 이 설비의 기준값 관리 창이 열림 (2026-11-19 화면 → 창)
 -->
 <script setup>
 import { computed } from 'vue'
@@ -10,7 +10,7 @@ import AppIcon from '@/components/AppIcon.vue'
 const props = defineProps({
   /** { at, type, level, text, detail, by, status } */
   event: { type: Object, required: true },
-  /** 기준값 관리 화면 라우트 (기준값 조정 줄에만 씀) */
+  /** 기준값 관리 창을 여는 공장 관리 라우트 (기준값 조정 줄에만 씀) */
   thresholdTo: { type: Object, required: true },
   /** 몇 번째 줄인지 (차례로 나타나는 지연) */
   index: { type: Number, default: 0 },

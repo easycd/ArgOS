@@ -7,7 +7,8 @@
  * - 센서 19개 = 전류 9 + 온도 6 + CO 4 (CO-14 는 예비 센서라 그림에 위치 없음)
  */
 import { LAYOUT, editsOf } from './layoutData'
-import { scenario, topOvenValue } from './scenario'
+import { autoRpmOf, fanAutoMode } from './fanAuto'
+import { isGasWarn, scenario, topOvenValue } from './scenario'
 import { seasonThreshold } from './thresholdRules'
 import { LEVEL } from '@/types/codes'
 
@@ -97,17 +98,25 @@ export function runStateOf(equipmentId) {
   return sd.steps.every(Boolean) ? 'STOPPED' : 'STOPPING'
 }
 
-/** 배기팬이 있는 설비 → 팬 상태 (상도 건조로는 주의 이상이면 회전수를 올려 둔 상태, 정지되면 꺼짐) */
+/**
+ * 배기팬이 있는 설비 → 팬 상태 (상도 건조로는 주의 이상이면 회전수를 올려 둔 상태, 정지되면 꺼짐)
+ * - 가스(CO) 알림 + 배기팬 자동이면 자동 회전수 (주의 75% 1,350 rpm · 경보 100% 1,800 rpm, fanAuto.js)
+ *   수동이면 그동안처럼 1,240 rpm (사람이 올려 둔 값)
+ */
 function fansNow(topLevel) {
   const fan = { power: 'ON', rpm: 1180, targetRpm: 1180 }
   const fanOf = (id, normalFan) =>
     runStateOf(id) === 'STOPPED' || (id === 31 && scenario.shut) ? { power: 'OFF', rpm: 0, targetRpm: 0 } : normalFan
+  const on = (rpm) => ({ power: 'ON', rpm, targetRpm: rpm })
+  // 상도 건조로 가스 알림: 가스 주의(1042 GAS) 또는 CO 경보(1051, 경보 상황)
+  const gasLevel = isGasWarn() ? WARN : scenario.state === ALARM && scenario.incident?.status === 'OPEN' ? ALARM : null
+  const topFan = topLevel === NORMAL ? fan : gasLevel && fanAutoMode(31) ? on(autoRpmOf(gasLevel)) : on(1240)
   return {
     26: fanOf(26, fan),
     28: fanOf(28, fan),
     29: fanOf(29, fan),
     30: fanOf(30, fan),
-    31: fanOf(31, topLevel === NORMAL ? fan : { power: 'ON', rpm: 1240, targetRpm: 1240 }),
+    31: fanOf(31, topFan),
   }
 }
 
@@ -148,6 +157,8 @@ export function mockProcess(processId) {
         pos: { x: null, y: null, z: null },
         active: true,
         managers: [{ id: 0, name: manager, primary: true }],
+        // 배기팬 자동(true)/수동(false), 배기팬이 없는 설비는 null (2026-11-19 추가, DB equipment.fan_auto)
+        fanAuto: fanAutoMode(e.id),
         ...editsOf(e.id),
       })),
       sensors: sensors.map(({ id, tag, type, unit, equipmentId }) => ({ id, tag, type, unit, equipmentId, active: true })),

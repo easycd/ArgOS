@@ -6,6 +6,7 @@
  * - 바뀌는 곳은 5공장 도장 공정 상도 건조로 센서 3개(processData.js)와 그 알림(아래 mockAlarms) 뿐,
  *   나머지 공장·공정은 늘 정상
  */
+import { fanAutoOf } from './fanAuto'
 import { maxLevel, sensorsNow } from './processData'
 import { activeChecklist, designAt, scenario, workerName } from './scenario'
 import { LEVEL, ROLE } from '@/types/codes'
@@ -233,6 +234,7 @@ const alarm = (id, factoryId, status, title, location, sensorTag, sensorType, va
   siteId: 1, factoryId, processId: factoryId === 5 ? 12 : null, id, level: LEVEL.WARN, status, title, location,
   equipmentId: id - 1000, sensorId: id - 900, sensorTag, sensorType, value, unit, threshold, raisedAt: todayAt(time),
   ackedBy: null, ackedAt: null, closedAt: null, checklist: null, assignee: null,
+  fanAuto: null, // 가스 알림 때 배기팬 자동 제어 결과 (fanAuto.js) — 그 밖의 알림은 null
   // 설비 이름 (백엔드 AlarmViews unitName) — 위치 마지막 칸에서 부품 이름을 뺀 것
   unitName: location.split(' · ').at(-1).replace(/ (배기팬|버너실|순환펌프)$/, ''),
 })
@@ -256,11 +258,18 @@ const PAST_ALARMS = [
 function topOvenAlarm() {
   const a = scenario.alarm
   if (!a) return null
-  const title = a.status === 'CLOSED' ? '전류 주의 해제' : '전류 주의 기준 초과'
-  const row = { ...alarm(1042, 5, a.status, title, '5공장 · 도장 공정 · 상도 건조로 배기팬', 'CT-17', 'CURRENT', 22.4, 'A', 21.6, a.raisedAt), equipmentId: 31 }
+  // 가스 주의(kind GAS, 2026-11-19 추가)면 버너실 CO-13 24 ppm, 아니면 그동안의 배기팬 전류 CT-17 22.4 A
+  const gas = a.kind === 'GAS'
+  const name = gas ? 'CO 주의' : '전류 주의'
+  const title = a.status === 'CLOSED' ? `${name} 해제` : `${name} 기준 초과`
+  const row = gas
+    ? { ...alarm(1042, 5, a.status, title, '5공장 · 도장 공정 · 상도 건조로 버너실', 'CO-13', 'CO', 24, 'ppm', 20, a.raisedAt), equipmentId: 31 }
+    : { ...alarm(1042, 5, a.status, title, '5공장 · 도장 공정 · 상도 건조로 배기팬', 'CT-17', 'CURRENT', 22.4, 'A', 21.6, a.raisedAt), equipmentId: 31 }
   const c = scenario.checklist
   return {
     ...row,
+    // 가스 알림이면 배기팬 자동 제어 결과 (서버가 알림을 만들 때 함께 정함, fanAuto.js)
+    fanAuto: gas ? fanAutoOf({ equipmentId: 31, level: LEVEL.WARN, at: row.raisedAt }) : null,
     ackedBy: a.ackedBy,
     ackedAt: a.ackedAt && todayAt(a.ackedAt),
     closedAt: a.closedAt && todayAt(a.closedAt),
@@ -287,6 +296,8 @@ function emergencyAlarms() {
     level,
     equipmentId: 31, // 상도 건조로
     closedAt: closed ? todayAt(inc.closedAt) : null,
+    // 가스(CO) 경보면 배기팬 자동 제어 결과 (100%), 그 밖에는 null
+    fanAuto: type === 'CO' ? fanAutoOf({ equipmentId: 31, level, at: todayAt(time) }) : null,
   })
   const list = [
     row(1051, LEVEL.ALARM, 'CO 경보 기준 초과', `${loc} 버너실`, 'CO-13', 'CO', 34, 'ppm', 30, designAt('16:52:08')), // 설계안 시각 → 지금 상황 기준 (scenario.js anchorAt)

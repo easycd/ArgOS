@@ -75,6 +75,7 @@ API 명세서 기준으로 구현한 것과, 명세서와 다르게 한 점입�
 - `reset`: 시연 리셋·중앙 재시작 때. 화면은 전부 다시 불러오면 됨
 - `Last-Event-ID` 로 놓친 이벤트 다시 받기는 아직 없음
 - `fire.started` · `fire.updated` · `fire.cleared` · `chat.message` 추가 (아래 화재·채팅 참고)
+- `master.changed` `{ what: PLANT|FACTORY|PROCESS|LAYOUT, id }`: 명세서에 없던 이벤트. 공장 관리에서 바뀌면 트리·배치도를 다시 불러오면 됨
 - `thermal.frame` 은 아직 없음
 
 ### 기준값 관리 (D2)
@@ -106,9 +107,9 @@ API 명세서 기준으로 구현한 것과, 명세서와 다르게 한 점입�
 | `GET /stats/by-process` | 공정별 `CURRENT·TEMP·CO·IR·total`, 많은 순 |
 | `GET /stats/heatmap` | `cells[{ dow(월=1), hour, count }]`(0건 칸 생략), `max` |
 | `GET /stats/alarms?sort=raisedAt,desc·actionMinutes,desc&page=&size=` | 이력 표. 줄 모양은 `/alarms` 와 같음 (명세서의 `/alarms` 필터 추가 대신 별도 주소) |
-| `GET /stats/export?format=csv` | 지금 조건 그대로 CSV (UTF-8 BOM, 엑셀에서 바로 열림). **`format=xlsx` 도 지금은 CSV 로 줍니다.** 5만 건 초과는 400 `EXPORT_TOO_LARGE`. 이용 로그 `EXPORT` |
+| `GET /stats/export?format=csv\|xlsx` | 지금 조건 그대로 CSV (UTF-8 BOM) 또는 엑셀(.xlsx). 5만 건 초과는 400 `EXPORT_TOO_LARGE`. 이용 로그 `EXPORT` |
 
-- 월간 보고서 PDF (`/reports/monthly`) 는 아직 없습니다.
+- 월간 보고서는 아래 '월간 보고서' 참고
 - 계산은 연계 서버에서 합니다: 기간 경보를 중앙에서 500건씩 받아 거른 뒤 셉니다 (시연 데이터 규모 기준).
 
 ### 열화상 · 오늘 점검 (시연용 최소 구현)
@@ -195,7 +196,68 @@ API 명세서 기준으로 구현한 것과, 명세서와 다르게 한 점입�
 - 열화상 `min`·`avg` 와 대피 확인(EVACUATED) 입력 API 는 아직 없음. 대피 수는 조치 이력의 `EVACUATED` 를 셈
 - 테이블: `V4__gateway_chat_fire.sql` (`chat_message`, `chat_read`, `fire_incident`, 테이블 명세서 v5 기준)
 
+### 화재 대피 확인 (M2)
+
+| API | 권한 | 비고 |
+| --- | --- | --- |
+| `POST /fires/{fireId}/evacuated` | 공정 담당자 (그 공정) | 조치 이력 `EVACUATED` (한 사람 한 번). `{ evacuatedCount, totalCount }`, SSE `fire.updated` |
+
+- 화재가 나면 그 공정 담당자에게 푸시 `FIRE`, 해제하면 `FIRE_CLEARED` (`data.fireId`)
+
+### 점검 관리 · 수기 서류 (E1) · 오늘 점검 (B3)
+
+권한: 본사·공장 관리자 (공장 관리자는 담당 공정만). 테이블: `V5__gateway_files_inspection.sql`
+(`file_asset`, `doc_form` F01~F05, `inspection_schedule` 시연용 일정, `ocr_result`, `safety_grade`).
+
+| API | 비고 |
+| --- | --- |
+| `GET /inspections/today?processId=` | 시연 시계 오늘의 점검 일정. 예정 시각이 지났는데 안 했으면 `DELAYED` |
+| `GET /inspections/summary?month=&factoryId=` | 이행률 = 완료 ÷ (완료+예정+지연), `byForm`, `calendar` |
+| `GET /doc-forms` | 양식별 칸 정의 |
+| `POST /inspections` (multipart: `file`, `formType`, `scheduleId`, `processId`) | 202. PDF·JPG·PNG 20MB 이하 (400 `FILE_TYPE_NOT_ALLOWED`, 413 `FILE_TOO_LARGE`). 양식을 비우면 파일 이름으로 짐작 |
+| `GET /inspections/{id}/ocr` | `RECOGNIZING` → `REVIEW`. 칸마다 `value`, `box`(비율), `needCheck`, `reason`. 실패면 422 `OCR_FAILED`. `engine`(SAMPLE·CLOVA) 추가 |
+| `GET /inspections/{id}/file` | 원본. **PDF 는 쪽 그림으로 바꾸지 않고 PDF 그대로** |
+| `PUT /inspections/{id}` `{ status: REVIEW\|DONE, fields: [{ key, value, checked }] }` | DONE 인데 확인 필요 칸이 남으면 409 `NEED_CHECK_REMAINS`, 형식 오류는 400 + `fields`. DONE 이면 연결된 일정 완료, 이용 로그 `INSPECTION` |
+| `POST /inspections/{id}/ocr` | 다시 인식 (202) |
+| `GET /inspections?from=&to=&formType=&status=&page=&size=` | 등록 목록 |
+
+- 글자 인식: `CLOVA_OCR_URL`·`CLOVA_OCR_SECRET` 가 있으면 CLOVA OCR, **없으면 시연용 인식기가 그럴듯한 값을 채움**(실제로 읽지 않음, 숫자 칸 하나를 확인 필요로 표시)
+- CLOVA 템플릿 OCR 의 필드 이름을 양식 칸 key(`workDate`, `co` …)와 같게 만들면 칸이 채워짐. 신뢰도 90% 미만·숫자 아님·기준 초과면 확인 필요
+
+### 공장 관리 · 설비 재배치 (H1)
+
+| API | 권한 | 비고 |
+| --- | --- | --- |
+| `POST /sites` `{ name, code, address, lat, lng }` | 본사 | 201. 같은 이름·코드면 409 `CODE_TAKEN` |
+| `POST /factories` `{ siteId, code, name }` · `POST /processes` `{ factoryId, code, name, tagPrefix }` | 본사·공장 | 201 |
+| `GET /processes/{id}/layout` | | `version`, `floorplan { url, widthM, depthM }`, 설비 `rot`, `managers` 가 이제 실제 값 |
+| `PUT /processes/{id}/layout` | 본사·공장 | 명세서 모양 그대로. 버전이 다르면 409 `LAYOUT_CONFLICT`, `TAG_TAKEN`, `SENSOR_HAS_OPEN_ALARM`. 하나라도 틀리면 전부 되돌림 |
+| `POST /processes/{id}/floorplan` (multipart: `file`, `widthM`, `depthM`) | 본사·공장 | PNG·JPG·SVG 10MB. `{ fileId, url: "/files/{id}", widthM, depthM }` |
+| `GET /files/{fileId}` | 로그인 | 배치도 그림 등 |
+
+- 설비·센서 **삭제**는 기록(추이·이벤트·관제 단위)이 있으면 지우지 않고 사용 안 함으로 바꿈
+- 센서 종류는 `TEMP`·`CURRENT`·`CO`·`IR` (또는 TE·IT·AT·IR). 저장하면 판정 엔진에 바로 반영
+- 설비 담당자(`managerIds`, `primaryManagerId`)는 중앙 서버 DB `equipment_manager` 에 저장
+
+### 월간 보고서 (D1)
+
+| API | 비고 |
+| --- | --- |
+| `GET /reports/monthly?factoryId=&month=2026-10` | PDF 내려받기. 미래 달이면 404 `REPORT_NOT_READY`. 이용 로그 `EXPORT`, 파일 기록(`REPORT`) |
+
+- 안전 등급: 점수 = 100 − 경보 5점×건수 − 주의 1점×건수 − 점검 지연 2점×건수, A ≥ 90 · B ≥ 70 · C. `safety_grade` 에 저장
+- 한글 글꼴: `ARGOS_REPORT_FONT`(.ttf) → 없으면 맑은 고딕(Windows) · 나눔고딕 · Noto CJK 순서. 다 없으면 500 `REPORT_FONT_MISSING`
+
+### 외부 연동 설정 (비우면 로그만)
+
+| 환경 변수 | 하는 일 |
+| --- | --- |
+| `FCM_CREDENTIALS_PATH` | Firebase 서비스 계정 JSON. 있으면 FCM HTTP v1 로 실제 푸시 |
+| `BROADCAST_API_URL` | 방송 시스템. `POST {url}/start`, `POST {url}/stop` (방송 시스템 API 가 정해지면 경로만 맞추면 됨) |
+| `CLOVA_OCR_URL` · `CLOVA_OCR_SECRET` | CLOVA OCR |
+| `ARGOS_FILES_DIR` | 올린 파일 저장 위치 (기본 `./data/files`) |
+
 ## 아직 없는 것
 
-월간 보고서 PDF, xlsx 내보내기, 점검·OCR(`/inspections/*`, 오늘 점검은 빈 목록만), 공장 관리(배치 저장),
-대피 확인 입력, 실제 FCM 전송·방송 시스템 연동, `thermal.frame`.
+Kafka(엣지 → 수집 서버)·Redis(수집 서버 → 중앙 서버) 연동 (지금은 HTTP 와 1초 폴링), `thermal.frame`,
+점검 서류 PDF 를 쪽 그림으로 바꾸기.

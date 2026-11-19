@@ -212,6 +212,11 @@ public class FeedPoller {
                 masterCache.invalidate();
                 hub.publish("reset", Map.of("reason", "SIM_RESET"), s -> true);
             }
+            case "MASTER_CHANGED" -> {
+                // 공장 관리에서 사업장·공장·공정·배치가 바뀜 → 마스터 캐시를 비우고 화면에 알림
+                masterCache.invalidate();
+                hub.publish("master.changed", id, d, s -> true);
+            }
             default -> {
                 // EVENT_* 는 level.changed 로만 알린다
             }

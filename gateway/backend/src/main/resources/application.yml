@@ -11,6 +11,11 @@ spring:
     open-in-view: false
   flyway:
     enabled: true
+  # 점검 서류 20MB · 배치도 10MB (서비스에서 다시 확인)
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 21MB
 
 server:
   port: ${GATEWAY_SERVER_PORT:8080}
@@ -38,3 +43,25 @@ argos:
     base-url: ${CENTRAL_SERVER_BASE_URL:http://localhost:8081}
     api-key: ${CENTRAL_API_KEY:}
     feed-enabled: ${CENTRAL_FEED_ENABLED:true}
+
+  # 올린 파일 (점검 서류 스캔, 배치도, 월간 보고서)
+  files:
+    dir: ${ARGOS_FILES_DIR:./data/files}
+
+  # CLOVA OCR. 비워 두면 시연용 인식기(SampleOcrEngine)가 값을 채움
+  ocr:
+    clova:
+      url: ${CLOVA_OCR_URL:}
+      secret: ${CLOVA_OCR_SECRET:}
+
+  # 월간 보고서 한글 글꼴 (.ttf). 비우면 맑은 고딕 · 나눔고딕 · Noto 순서로 찾음
+  report:
+    font: ${ARGOS_REPORT_FONT:}
+
+  # FCM 실제 전송: Firebase 서비스 계정 JSON 경로. 비우면 로그만
+  fcm:
+    credentials: ${FCM_CREDENTIALS_PATH:}
+
+  # 방송 시스템 REST API 주소. 비우면 로그만
+  broadcast:
+    url: ${BROADCAST_API_URL:}

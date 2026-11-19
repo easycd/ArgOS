@@ -344,32 +344,37 @@ init()
               <b>연결된 센서가 없습니다</b>
               {{ equipmentRow?.name }} 설비에는 기준값을 정할 센서가 없습니다.
             </div>
+          </div>
 
-            <SimulationCard
-              v-if="focusSensor"
+          <!-- 변경 이력: 왼쪽(머리~센서 카드)과 같은 높이, 길면 목록만 스크롤 -->
+          <div class="history-box">
+            <HistoryCard
+              class="history"
+              :equipment-name="equipmentRow?.name ?? ''"
+              :sensors="sensors"
+              :rows="history"
+              :pending="changes.filter((c) => c.after !== null)"
               :sensor="focusSensor"
-              :field="focus.field"
-              :saved="savedOf(focusSensor, season)"
-              :next="nextOf(focusSensor)"
-              :series="weekCache[focusSensor.sensorId] ?? null"
-              :sim="sim"
-              :busy="simBusy"
+              :saved-warn="focusSensor ? savedOf(focusSensor, season).warn : null"
+              :next-warn="focusSensor ? nextOf(focusSensor).warn : null"
+              :range="historyRange"
+              :user-label="userLabel"
+              :busy="historyBusy"
+              @query="onHistoryQuery"
             />
           </div>
 
-          <HistoryCard
-            class="history"
-            :equipment-name="equipmentRow?.name ?? ''"
-            :sensors="sensors"
-            :rows="history"
-            :pending="changes.filter((c) => c.after !== null)"
+          <!-- 변경 시뮬레이션: 아래 줄 전체 너비 -->
+          <SimulationCard
+            v-if="focusSensor"
+            class="sim"
             :sensor="focusSensor"
-            :saved-warn="focusSensor ? savedOf(focusSensor, season).warn : null"
-            :next-warn="focusSensor ? nextOf(focusSensor).warn : null"
-            :range="historyRange"
-            :user-label="userLabel"
-            :busy="historyBusy"
-            @query="onHistoryQuery"
+            :field="focus.field"
+            :saved="savedOf(focusSensor, season)"
+            :next="nextOf(focusSensor)"
+            :series="weekCache[focusSensor.sensorId] ?? null"
+            :sim="sim"
+            :busy="simBusy"
           />
         </div>
       </BaseModal>
@@ -396,7 +401,9 @@ init()
 
 <style scoped>
 /*
- * 창 안 배치: 가운데(머리·계절·카드·시뮬레이션) 1100 | 변경 이력 418 — 예전 화면의 오른쪽 두 칸과 같은 비율
+ * 창 안 배치 (2026-11-19 재원님 요청으로 바꿈)
+ *   윗줄: 가운데(머리·설비 설정·계절·센서 카드) 1100 | 변경 이력 418 — 변경 이력은 센서 카드 줄 끝에 높이를 맞춤
+ *   아랫줄: 변경 시뮬레이션이 창 너비 전체
  * 1400px 이하 화면에서는 한 줄에 하나씩
  */
 .hico {
@@ -407,14 +414,33 @@ init()
   display: grid;
   grid-template-columns: minmax(0, 1100fr) minmax(0, 418fr);
   gap: 16px;
-  align-items: start;
   padding: 20px 24px 24px;
   background: var(--color-bg, #f6f7f9);
+}
+
+/* 변경 이력 칸: 높이는 왼쪽 칸이 정하고(내용이 길어도 줄을 늘리지 않게 absolute), 카드는 그 칸을 가득 채움 */
+.history-box {
+  position: relative;
+  min-width: 0;
+}
+
+.history-box .history {
+  position: absolute;
+  inset: 0;
+}
+
+.sim {
+  grid-column: 1 / -1;
 }
 
 @media (max-width: 1400px) {
   .th-body {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .history-box .history {
+    position: static;
+    max-height: 640px; /* 한 줄 배치에서는 이력이 길어도 이 높이까지만 (목록이 스크롤) */
   }
 }
 
@@ -429,7 +455,6 @@ init()
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
-  margin-bottom: 8px;
 }
 
 /* 센서가 없는 칸 (설계안 .slot) */

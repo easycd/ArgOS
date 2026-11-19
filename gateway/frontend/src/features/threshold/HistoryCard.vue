@@ -209,13 +209,13 @@ function query() {
 }
 
 .chart {
+  flex: none;
   height: 180px;
 }
 
 .list {
   flex: 1;
-  min-height: 200px;
-  max-height: 520px;
+  min-height: 0; /* 카드 높이는 기준값 관리 창이 정함(센서 카드 줄에 맞춤) → 남는 만큼만 차지하고 길면 스크롤 */
   overflow-y: auto;
   padding: 10px 20px 0;
   transition: opacity var(--m-value);

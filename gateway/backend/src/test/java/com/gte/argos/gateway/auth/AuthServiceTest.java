@@ -49,12 +49,51 @@ class AuthServiceTest {
         Instant oldExpiry = Instant.now().plus(10, ChronoUnit.HOURS);
         RefreshSession session = new RefreshSession(42, 7, "WEB", oldExpiry, null);
         when(repository.findSession(42, 7)).thenReturn(session);
-        when(repository.findRefreshSession(tokens.hash("refresh"))).thenReturn(session);
+        when(repository.findActiveUser(7)).thenReturn(activeUser());
         when(repository.extendSession(42)).thenReturn(oldExpiry.plus(1, ChronoUnit.HOURS));
 
-        AuthService.ExtendResult result = service.extend(7, 42, "refresh");
+        AuthService.ExtendResult result = service.extend(7, 42);
 
         assertThat(result.sessionExpiry()).isEqualTo(oldExpiry.plus(1, ChronoUnit.HOURS));
+        assertThat(tokens.decoder().decode(result.accessToken()).getClaimAsString("sessionId")).isEqualTo("42");
+    }
+
+    @Test
+    void extendNearEndIssuesTokenValidUntilNewSessionExpiry() {
+        AuthTokens thirteenHours = new AuthTokens(SECRET, 46800, 46800);
+        AuthService svc = new AuthService(repository, thirteenHours, passwords);
+        // 로그인 12시간 50분 뒤: 세션은 10분 남음 → 연장하면 1시간 10분
+        Instant oldExpiry = Instant.now().plus(10, ChronoUnit.MINUTES).truncatedTo(ChronoUnit.SECONDS);
+        Instant newExpiry = oldExpiry.plus(1, ChronoUnit.HOURS);
+        when(repository.findSession(42, 7)).thenReturn(new RefreshSession(42, 7, "WEB", oldExpiry, null));
+        when(repository.findActiveUser(7)).thenReturn(activeUser());
+        when(repository.extendSession(42)).thenReturn(newExpiry);
+
+        AuthService.ExtendResult result = svc.extend(7, 42);
+
+        assertThat(thirteenHours.decoder().decode(result.accessToken()).getExpiresAt()).isEqualTo(newExpiry);
+        assertThat(result.expiresIn()).isBetween(4190L, 4200L);
+    }
+
+    @Test
+    void extendRejectsInactiveUser() {
+        when(repository.findSession(42, 7)).thenReturn(
+                new RefreshSession(42, 7, "WEB", Instant.now().plus(1, ChronoUnit.HOURS), null));
+        when(repository.findActiveUser(7)).thenReturn(null);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.extend(7, 42))
+                .isInstanceOf(AuthFailure.class);
+    }
+
+    @Test
+    void expiresInIsCappedBySession() {
+        Instant now = Instant.parse("2026-11-16T00:00:00Z");
+        assertThat(AuthService.expiresIn(now, 46800, now.plusSeconds(3600))).isEqualTo(3600);
+        assertThat(AuthService.expiresIn(now, 1800, now.plusSeconds(3600))).isEqualTo(1800);
+    }
+
+    private static User activeUser() {
+        return new User(7, 1L, "admin", "hash", "관리자", null, "PLANT_ADMIN", true, false);
     }
 
     @Test

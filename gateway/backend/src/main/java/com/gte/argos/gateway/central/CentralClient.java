@@ -196,6 +196,35 @@ public class CentralClient {
                 new ParameterizedTypeReference<Envelope<Map<String, Object>>>() { });
     }
 
+    // 공장 관리 (H1) --------------------------------------------------
+
+    public Map<String, Object> createPlant(Map<String, Object> body) {
+        return post("/api/v1/internal/plants", body, new ParameterizedTypeReference<Envelope<Map<String, Object>>>() { });
+    }
+
+    public Map<String, Object> createFactory(Map<String, Object> body) {
+        return post("/api/v1/internal/factories", body, new ParameterizedTypeReference<Envelope<Map<String, Object>>>() { });
+    }
+
+    public Map<String, Object> createProcess(Map<String, Object> body) {
+        return post("/api/v1/internal/processes", body, new ParameterizedTypeReference<Envelope<Map<String, Object>>>() { });
+    }
+
+    public Map<String, Object> layoutMeta(long processId) {
+        return get(u -> u.path("/api/v1/internal/processes/{id}/layout-meta").build(processId),
+                new ParameterizedTypeReference<Envelope<Map<String, Object>>>() { });
+    }
+
+    public Map<String, Object> saveLayout(long processId, Map<String, Object> body) {
+        return send("PUT", "/api/v1/internal/processes/" + processId + "/layout", body,
+                new ParameterizedTypeReference<Envelope<Map<String, Object>>>() { });
+    }
+
+    public Map<String, Object> setFloorplan(long processId, Map<String, Object> body) {
+        return send("PUT", "/api/v1/internal/processes/" + processId + "/floorplan", body,
+                new ParameterizedTypeReference<Envelope<Map<String, Object>>>() { });
+    }
+
     public FeedPage feed(long after, int limit) {
         return get(u -> u.path("/api/v1/internal/feed").queryParam("after", after).queryParam("limit", limit).build(),
                 new ParameterizedTypeReference<Envelope<FeedPage>>() { });

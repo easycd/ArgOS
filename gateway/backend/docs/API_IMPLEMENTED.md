@@ -26,6 +26,16 @@ API 명세서 기준으로 구현한 것과, 명세서와 다르게 한 점입�
 
 ## API
 
+### 로그인 (2026-11-18 변경)
+
+| API | 비고 |
+| --- | --- |
+| `POST /auth/login` | 웹은 refresh 쿠키(`argos_rt`)를 굽지 않음. JWT(Bearer, 13시간) 하나로 인증. 앱(`client: APP`)만 응답에 `refreshToken` |
+| `POST /auth/extend` | 세션 1시간 연장 + 새 `accessToken`·`expiresIn`·`sessionExpiresAt`. 새 토큰 만료 = min(지금 + 13시간, 늘어난 세션 만료). 쿠키 확인 없음 |
+| `POST /auth/refresh` | 앱 전용 (본문 `{ refreshToken }`). 웹은 쓰지 않음 |
+| `POST /auth/logout` | 쿠키 지우는 헤더 없음 |
+
+
 | 화면 | API | 권한 | 비고 |
 | --- | --- | --- | --- |
 | 공통 | `GET /system/clock` | 로그인 | 시연 시계. 화면의 "오늘"은 이 값 기준 |
@@ -35,12 +45,12 @@ API 명세서 기준으로 구현한 것과, 명세서와 다르게 한 점입�
 | H1 | `GET /factories?siteId=` · `GET /processes?factoryId=` | 본사·공장 | 담당 범위만 |
 | B2 | `GET /factories/{id}/overview` | 본사·공장 | `equipmentLevels`, `siteId`, `siteName` 추가 |
 | B3 | `GET /processes/{id}/layout` | 전체 | `version` 은 1 고정, `floorplan` 은 null (파일 없음) |
-| B3 | `GET /processes/{id}/status` | 전체 | 센서마다 `lowWarn`·`lowAlarm` 추가 (전류는 아래쪽 기준도 있음) |
+| B3 | `GET /processes/{id}/status` | 전체 | 센서마다 `lowWarn`·`lowAlarm` 추가 (전류는 아래쪽 기준도 있음). `limitType`: `UPPER`(상한만, 오를수록 위험) · `LOWER`(하한만, 내려갈수록 위험) · `BOTH`(둘 다, 전류) · 기준 없으면 null. `/layout` 의 `sensors[]`, 설비 상세·추이 센서에도 있음 |
 | B4 | `GET /equipment/{id}` | 전체 | 센서 게이지 `max` 는 경보 기준 × 1.3 |
 | B4 | `GET /equipment/{id}/events?date=&type=` | 전체 | ALARM(시작·해제), ACTION(조치 이력). THRESHOLD 는 아직 (변경 이력은 `/thresholds/history`) |
 | B4 | `GET /sensors/series?ids=&from=&to=&step=&compare=yesterday` | 전체 | 최근 1시간은 5초, 그 이상은 1분·10분 |
 | B1 | `GET /alarms?siteId·factoryId·processId&date=&from=&to=&status=&minLevel=&page=&size=` | 전체 | 줄마다 `checklist`(진행), `assignee`, `actionMinutes`, `valueStillOver` 추가 |
-| B1 | `GET /alarms/hourly?siteId·factoryId&date=` | 본사·공장 | |
+| B1 | `GET /alarms/hourly?siteId·factoryId&date=` | 본사·공장 | 전일 시간대별 알림. `date` 를 비우면 **어제**(`yesterday`·`today`·`2026-11-15` 도 됨). 집계 범위 = 그날 07:00 ~ 다음 날 07:00: 주간 07~19시, 야간 그날 19시 ~ 다음 날 07시. 응답에 `date`·`from`·`to` 추가. 조치 수는 확인 시각이 범위 안인 것만 |
 | B1 | `GET /alarms/{id}` | 전체 | 조치 내역 timeline |
 | C1 | `GET /alarms/{id}/detail` | 전체 | `templateId`, `usual`(주 센서 직전 7일 평균), `rule.max`(경보 × 1.3), `trend.unit·warn·alarm` 추가. `thermal` 은 IR 센서 값 요약 (아래 '열화상') |
 | C4 | `GET /alarms/{id}/response` | 전체 | `fireId` 는 null (화재 판정 전). `location`, `reasonDetail`('TE-305 163.9 ℃ (평소의 117%)', 평소 = 직전 7일 평균), `thermal`(주의 상세와 같은 IR 요약), `shutdown` 추가 (아래 '경보 셧다운 진행') |
@@ -74,7 +84,9 @@ API 명세서 기준으로 구현한 것과, 명세서와 다르게 한 점입�
 - `threshold.changed` `{ equipmentId, processId, season, at }`: 명세서에 없던 이벤트. 기준값이 바뀌면 B3·B4 게이지 기준을 다시 불러오면 됨
 - `reset`: 시연 리셋·중앙 재시작 때. 화면은 전부 다시 불러오면 됨
 - `Last-Event-ID` 로 놓친 이벤트 다시 받기는 아직 없음
-- `thermal.frame`, `fire.*`, `chat.message` 는 아직 없음
+- `fire.started` · `fire.updated` · `fire.cleared` · `chat.message` 추가 (아래 화재·채팅 참고)
+- `master.changed` `{ what: PLANT|FACTORY|PROCESS|LAYOUT, id }`: 명세서에 없던 이벤트. 공장 관리에서 바뀌면 트리·배치도를 다시 불러오면 됨
+- `thermal.frame` 은 아직 없음
 
 ### 기준값 관리 (D2)
 
@@ -105,9 +117,9 @@ API 명세서 기준으로 구현한 것과, 명세서와 다르게 한 점입�
 | `GET /stats/by-process` | 공정별 `CURRENT·TEMP·CO·IR·total`, 많은 순 |
 | `GET /stats/heatmap` | `cells[{ dow(월=1), hour, count }]`(0건 칸 생략), `max` |
 | `GET /stats/alarms?sort=raisedAt,desc·actionMinutes,desc&page=&size=` | 이력 표. 줄 모양은 `/alarms` 와 같음 (명세서의 `/alarms` 필터 추가 대신 별도 주소) |
-| `GET /stats/export?format=csv` | 지금 조건 그대로 CSV (UTF-8 BOM, 엑셀에서 바로 열림). **`format=xlsx` 도 지금은 CSV 로 줍니다.** 5만 건 초과는 400 `EXPORT_TOO_LARGE`. 이용 로그 `EXPORT` |
+| `GET /stats/export?format=csv\|xlsx` | 지금 조건 그대로 CSV (UTF-8 BOM) 또는 엑셀(.xlsx). 5만 건 초과는 400 `EXPORT_TOO_LARGE`. 이용 로그 `EXPORT` |
 
-- 월간 보고서 PDF (`/reports/monthly`) 는 아직 없습니다.
+- 월간 보고서는 아래 '월간 보고서' 참고
 - 계산은 연계 서버에서 합니다: 기간 경보를 중앙에서 500건씩 받아 거른 뒤 셉니다 (시연 데이터 규모 기준).
 
 ### 열화상 · 오늘 점검 (시연용 최소 구현)
@@ -156,7 +168,106 @@ API 명세서 기준으로 구현한 것과, 명세서와 다르게 한 점입�
 - 변경은 이용 로그(`activity_log`, 유형 `USER`)에 "이름(아이디) · 내용"으로 남고, 상세의 `history` 는 그중 "내용"만 보여 줌. 기록 시각은 시연 시계 기준
 - `PUT /me/password` 에서 지금 비밀번호가 틀릴 때 401 → 화면이 로그아웃되는 문제(프론트 backend-notes 14장 1번)는 로그인 코드라 아직 그대로
 
+### 이용 로그 (G2)
+
+권한: 본사·공장 관리자 (공장 관리자는 자기 사업장·담당 공정 범위만).
+
+| API | 비고 |
+| --- | --- |
+| `GET /logs?from=&to=&factoryId=&processId=&userId=&type=&q=&page=&size=` | `items[{ id, at, loginId, name, role, scopeText, type, message, before, after }]`, `countsByType`, `byHour`(0~23시 24칸), `topUsers`(많이 쓴 4명, 명세서에 없음), `page`, `size`, `total` |
+| `GET /logs/export` | 같은 조건 CSV (UTF-8 BOM). 내려받은 것도 `EXPORT` 로 남음 |
+
+- `activity_log` 와 로그인 성공 기록(`login_history`)을 합쳐 보여 줌. 로그인 줄은 유형 `LOGIN`, id 는 음수(-이력 id)
+- `type` 은 `LOGIN,LOGOUT` 처럼 쉼표로 여러 개. `countsByType` 은 유형 조건을 빼고 셈 (화면에서 다른 유형 칸으로 바꿀 수 있게)
+- 로그인 기록 시각은 실제 시각, 다른 작업 로그는 시연 시계 시각
+
+### 채팅 (I2)
+
+권한: 본사·공장 관리자 (공정 담당자는 403 `CHAT_NOT_ALLOWED`). 대화방 = 사업장, `roomId` = 사업장 id.
+
+| API | 비고 |
+| --- | --- |
+| `GET /chat/rooms` | 본사는 사업장 전부, 공장 담당자는 자기 사업장 방 하나. `peer`(상대 대표 1명, `online` = SSE 접속 중), `lastMessage`, `unreadCount` |
+| `GET /chat/rooms/{roomId}/messages?before=&size=` | 오래된 것 → 최근 순, 기본 30개, `hasMore`. 내 글의 `read` 는 상대가 읽었는지 |
+| `POST /chat/rooms/{roomId}/messages` `{ body, alarmId }` | 1~1,000자 (400 `VALIDATION_FAILED`). 보내면 SSE `chat.message` `{ roomId, id, senderId, senderName, body, alarmId, sentAt }` |
+| `POST /chat/rooms/{roomId}/read` `{ lastReadMessageId }` | `{ unreadCount }` |
+
+### 화재 대응 (C4F · C5)
+
+| API | 권한 | 비고 |
+| --- | --- | --- |
+| `GET /fires?status=ACTIVE|CLEARED&siteId=` | 전체 (담당 범위만) | 진행 중 화재 목록 (지도 위치 `lat`·`lng` 는 사업장 좌표) |
+| `GET /fires/{fireId}` | 전체 (담당 범위만) | 위치, 판정 근거, 열화상 최고 온도, 방송 상태, `unlock`, `actions`(DETECTED · BROADCAST · SHUTDOWN · EVACUATED) |
+| `POST /fires/{fireId}/clear` `{ password, memo }` | 공장 담당자 | 로그인한 사람 비밀번호 재확인. 401 `FIRE_PASSWORD_MISMATCH`(`remaining`), 5회 틀리면 423 `FIRE_UNLOCK_LOCKED`, 본사는 403 `ACTION_NOT_ALLOWED`. 해제하면 방송 종료, 경보 종료, 이용 로그 `FIRE_CLEAR`, SSE `fire.cleared` |
+| `POST /fires/{fireId}/approve-unlock` | 본사 관리자 | 실패 횟수 0으로. SSE `fire.updated` |
+
+- **화재 판정 (가정)**: 위험 종류 화재(FIRE) 경보가 3단계이고 근거에 열화상(IR) 센서 이벤트가 있으면 화재. 중앙 경보 피드를 보다가 그 순간 `fire_incident` 를 만들고 SSE `fire.started` 를 보냄. 판정 기준이 바뀌면 `FireService.isFire` 한 곳만 고치면 됨
+- 경고 방송은 방송 시스템 API 가 정해지기 전까지 로그만 남김 (`BroadcastSender`). 조치 이력에는 `BROADCAST` 로 남음
+- 열화상 `min`·`avg` 와 대피 확인(EVACUATED) 입력 API 는 아직 없음. 대피 수는 조치 이력의 `EVACUATED` 를 셈
+- 테이블: `V4__gateway_chat_fire.sql` (`chat_message`, `chat_read`, `fire_incident`, 테이블 명세서 v5 기준)
+
+### 화재 대피 확인 (M2)
+
+| API | 권한 | 비고 |
+| --- | --- | --- |
+| `POST /fires/{fireId}/evacuated` | 공정 담당자 (그 공정) | 조치 이력 `EVACUATED` (한 사람 한 번). `{ evacuatedCount, totalCount }`, SSE `fire.updated` |
+
+- 화재가 나면 그 공정 담당자에게 푸시 `FIRE`, 해제하면 `FIRE_CLEARED` (`data.fireId`)
+
+### 점검 관리 · 수기 서류 (E1) · 오늘 점검 (B3)
+
+권한: 본사·공장 관리자 (공장 관리자는 담당 공정만). 테이블: `V5__gateway_files_inspection.sql`
+(`file_asset`, `doc_form` F01~F05, `inspection_schedule` 시연용 일정, `ocr_result`, `safety_grade`).
+
+| API | 비고 |
+| --- | --- |
+| `GET /inspections/today?processId=` | 시연 시계 오늘의 점검 일정. 예정 시각이 지났는데 안 했으면 `DELAYED` |
+| `GET /inspections/summary?month=&factoryId=` | 이행률 = 완료 ÷ (완료+예정+지연), `byForm`, `calendar` |
+| `GET /doc-forms` | 양식별 칸 정의 |
+| `POST /inspections` (multipart: `file`, `formType`, `scheduleId`, `processId`) | 202. PDF·JPG·PNG 20MB 이하 (400 `FILE_TYPE_NOT_ALLOWED`, 413 `FILE_TOO_LARGE`). 양식을 비우면 파일 이름으로 짐작 |
+| `GET /inspections/{id}/ocr` | `RECOGNIZING` → `REVIEW`. 칸마다 `value`, `box`(비율), `needCheck`, `reason`. 실패면 422 `OCR_FAILED`. `engine`(SAMPLE·CLOVA) 추가 |
+| `GET /inspections/{id}/file` | 원본. **PDF 는 쪽 그림으로 바꾸지 않고 PDF 그대로** |
+| `PUT /inspections/{id}` `{ status: REVIEW\|DONE, fields: [{ key, value, checked }] }` | DONE 인데 확인 필요 칸이 남으면 409 `NEED_CHECK_REMAINS`, 형식 오류는 400 + `fields`. DONE 이면 연결된 일정 완료, 이용 로그 `INSPECTION` |
+| `POST /inspections/{id}/ocr` | 다시 인식 (202) |
+| `GET /inspections?from=&to=&formType=&status=&page=&size=` | 등록 목록 |
+
+- 글자 인식: `CLOVA_OCR_URL`·`CLOVA_OCR_SECRET` 가 있으면 CLOVA OCR, **없으면 시연용 인식기가 그럴듯한 값을 채움**(실제로 읽지 않음, 숫자 칸 하나를 확인 필요로 표시)
+- CLOVA 템플릿 OCR 의 필드 이름을 양식 칸 key(`workDate`, `co` …)와 같게 만들면 칸이 채워짐. 신뢰도 90% 미만·숫자 아님·기준 초과면 확인 필요
+
+### 공장 관리 · 설비 재배치 (H1)
+
+| API | 권한 | 비고 |
+| --- | --- | --- |
+| `POST /sites` `{ name, code, address, lat, lng }` | 본사 | 201. 같은 이름·코드면 409 `CODE_TAKEN` |
+| `POST /factories` `{ siteId, code, name }` · `POST /processes` `{ factoryId, code, name, tagPrefix }` | 본사·공장 | 201 |
+| `GET /processes/{id}/layout` | | `version`, `floorplan { url, widthM, depthM }`, 설비 `rot`, `managers` 가 이제 실제 값 |
+| `PUT /processes/{id}/layout` | 본사·공장 | 명세서 모양 그대로. 버전이 다르면 409 `LAYOUT_CONFLICT`, `TAG_TAKEN`, `SENSOR_HAS_OPEN_ALARM`. 하나라도 틀리면 전부 되돌림 |
+| `POST /processes/{id}/floorplan` (multipart: `file`, `widthM`, `depthM`) | 본사·공장 | PNG·JPG·SVG 10MB. `{ fileId, url: "/files/{id}", widthM, depthM }` |
+| `GET /files/{fileId}` | 로그인 | 배치도 그림 등 |
+
+- 설비·센서 **삭제**는 기록(추이·이벤트·관제 단위)이 있으면 지우지 않고 사용 안 함으로 바꿈
+- 센서 종류는 `TEMP`·`CURRENT`·`CO`·`IR` (또는 TE·IT·AT·IR). 저장하면 판정 엔진에 바로 반영
+- 설비 담당자(`managerIds`, `primaryManagerId`)는 중앙 서버 DB `equipment_manager` 에 저장
+
+### 월간 보고서 (D1)
+
+| API | 비고 |
+| --- | --- |
+| `GET /reports/monthly?factoryId=&month=2026-10` | PDF 내려받기. 미래 달이면 404 `REPORT_NOT_READY`. 이용 로그 `EXPORT`, 파일 기록(`REPORT`) |
+
+- 안전 등급: 점수 = 100 − 경보 5점×건수 − 주의 1점×건수 − 점검 지연 2점×건수, A ≥ 90 · B ≥ 70 · C. `safety_grade` 에 저장
+- 한글 글꼴: `ARGOS_REPORT_FONT`(.ttf) → 없으면 맑은 고딕(Windows) · 나눔고딕 · Noto CJK 순서. 다 없으면 500 `REPORT_FONT_MISSING`
+
+### 외부 연동 설정 (비우면 로그만)
+
+| 환경 변수 | 하는 일 |
+| --- | --- |
+| `FCM_CREDENTIALS_PATH` | Firebase 서비스 계정 JSON. 있으면 FCM HTTP v1 로 실제 푸시 |
+| `BROADCAST_API_URL` | 방송 시스템. `POST {url}/start`, `POST {url}/stop` (방송 시스템 API 가 정해지면 경로만 맞추면 됨) |
+| `CLOVA_OCR_URL` · `CLOVA_OCR_SECRET` | CLOVA OCR |
+| `ARGOS_FILES_DIR` | 올린 파일 저장 위치 (기본 `./data/files`) |
+
 ## 아직 없는 것
 
-화재(fire_incident), 월간 보고서 PDF, xlsx 내보내기, 점검·OCR(`/inspections/*`, 오늘 점검은 빈 목록만),
-이용 로그(`/logs`), 채팅, 공장 관리(배치 저장), 실제 FCM 전송.
+Kafka(엣지 → 수집 서버)·Redis(수집 서버 → 중앙 서버) 연동 (지금은 HTTP 와 1초 폴링), `thermal.frame`,
+점검 서류 PDF 를 쪽 그림으로 바꾸기.

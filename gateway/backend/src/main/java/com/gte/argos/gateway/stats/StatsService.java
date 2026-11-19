@@ -201,8 +201,9 @@ public class StatsService {
         }
         MasterCache.Snapshot m = masterCache.get();
         List<Map<String, Object>> rows = alarms.items(list, m);
-        StringBuilder sb = new StringBuilder("﻿");
-        sb.append("발생 시각,공장,공정,위치,센서,센서 종류,측정값,기준,단위,단계,상태,확인자,조치 담당자,체크리스트,조치 시간(분),종료 시각\n");
+        List<String> header = List.of("발생 시각", "공장", "공정", "위치", "센서", "센서 종류", "측정값", "기준", "단위", "단계",
+                "상태", "확인자", "조치 담당자", "체크리스트", "조치 시간(분)", "종료 시각");
+        List<List<Object>> table = new ArrayList<>();
         for (int i = 0; i < list.size(); i++) {
             Alarm a = list.get(i);
             Map<String, Object> r = rows.get(i);
@@ -210,30 +211,35 @@ public class StatsService {
             CentralDto.Process p = m.process(a.processId());
             @SuppressWarnings("unchecked")
             Map<String, Object> ck = (Map<String, Object>) r.get("checklist");
-            sb.append(csv(a.raisedAt() == null ? "" : CSV_TIME.format(a.raisedAt().atZoneSameInstant(SimTime.ZONE)))).append(',')
-                    .append(csv(f == null ? "" : f.name())).append(',')
-                    .append(csv(p == null ? "" : p.name())).append(',')
-                    .append(csv(r.get("location"))).append(',')
-                    .append(csv(r.get("sensorTag"))).append(',')
-                    .append(csv(r.get("sensorType"))).append(',')
-                    .append(csv(r.get("value"))).append(',')
-                    .append(csv(r.get("threshold"))).append(',')
-                    .append(csv(r.get("unit"))).append(',')
-                    .append(csv(Codes.stageName(a.stage()))).append(',')
-                    .append(csv(a.status())).append(',')
-                    .append(csv(r.get("ackedBy"))).append(',')
-                    .append(csv(r.get("assignee"))).append(',')
-                    .append(csv(ck == null ? "" : ck.get("doneCount") + "/" + ck.get("totalCount"))).append(',')
-                    .append(csv(r.get("actionMinutes"))).append(',')
-                    .append(csv(a.closedAt() == null ? "" : CSV_TIME.format(a.closedAt().atZoneSameInstant(SimTime.ZONE))))
-                    .append('\n');
+            table.add(java.util.Arrays.asList(
+                    a.raisedAt() == null ? "" : CSV_TIME.format(a.raisedAt().atZoneSameInstant(SimTime.ZONE)),
+                    f == null ? "" : f.name(), p == null ? "" : p.name(), r.get("location"), r.get("sensorTag"),
+                    r.get("sensorType"), r.get("value"), r.get("threshold"), r.get("unit"), Codes.stageName(a.stage()),
+                    a.status(), r.get("ackedBy"), r.get("assignee"),
+                    ck == null ? "" : ck.get("doneCount") + "/" + ck.get("totalCount"), r.get("actionMinutes"),
+                    a.closedAt() == null ? "" : CSV_TIME.format(a.closedAt().atZoneSameInstant(SimTime.ZONE))));
         }
-        String name = "ArgOS_alarm_" + c.from().toString().replace("-", "") + "_" + c.to().toString().replace("-", "") + ".csv";
+        boolean xlsx = "xlsx".equalsIgnoreCase(format);
+        String base = "ArgOS_alarm_" + c.from().toString().replace("-", "") + "_" + c.to().toString().replace("-", "");
         activity.log(scope.userId(), "EXPORT", null, c.processId(), "alarm", null,
-                "알림 이력 내보내기 " + c.from() + " ~ " + c.to() + " (" + list.size() + "건"
-                        + ("xlsx".equalsIgnoreCase(format) ? ", xlsx 요청 → csv" : "") + ")");
-        return new Export(name, sb.toString().getBytes(StandardCharsets.UTF_8));
+                "알림 이력 내보내기 " + c.from() + " ~ " + c.to() + " (" + list.size() + "건, " + (xlsx ? "xlsx" : "csv") + ")");
+        if (xlsx) {
+            return new Export(base + ".xlsx", com.gte.argos.gateway.report.SimpleXlsx.write("알림 이력", header, table), XLSX);
+        }
+        StringBuilder sb = new StringBuilder("\uFEFF").append(String.join(",", header)).append('\n');
+        for (List<Object> row : table) {
+            for (int k = 0; k < row.size(); k++) {
+                if (k > 0) {
+                    sb.append(',');
+                }
+                sb.append(csv(row.get(k)));
+            }
+            sb.append('\n');
+        }
+        return new Export(base + ".csv", sb.toString().getBytes(StandardCharsets.UTF_8), "text/csv; charset=UTF-8");
     }
+
+    static final String XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
     // ---------------------------------------------------------------
 
@@ -345,6 +351,6 @@ public class StatsService {
         Double doneRate;
     }
 
-    public record Export(String fileName, byte[] body) {
+    public record Export(String fileName, byte[] body, String contentType) {
     }
 }

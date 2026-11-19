@@ -1,31 +1,35 @@
 <!--
   통계·이력 관리 화면 (화면설계안 v-pages.js vStats(), 화면설계서 '통계·이력 관리', API 명세서 D1)
   - 이 화면은 조건을 들고 데이터를 불러오고 화면을 옮기는 일만 함. 그리는 부분은 features/history/
-  - 배치 (설계안 1920): 조건 줄 / 요약 4칸 / 일별 추이 1180 | 공정별 684 / 알림 이력 1180 | 요일·시간대 684
+  - 배치 (2026-11-19 개편): 조건 줄 / 요약 4칸 / 왼쪽 알림 이력(두 줄 높이) | 오른쪽 위 일별 추이 · 아래 공정별 알림
+    요일·시간대 카드는 뺌. 알림 이력의 '상세'를 누르면 오른쪽 두 카드 위에 상세 패널이 덮임
+  - 오른쪽 위 '내보내기': 지금 기간·조건의 알림 이력 상세를 CSV 로 바로 저장 (바탕화면 저장 창, utils/saveFile.js)
   - 기간 단추·선택 상자를 바꾸면 바로 조회 (설계안), '조회' 단추는 같은 조건으로 다시 불러오기
   - 공장 담당자는 공장이 담당 공장으로 고정, 본사 관리자는 '전체 공장' 도 고를 수 있음 (처음은 5공장 — 설계안)
+  - 주소에 ?factoryId=&processId= 가 있으면 그 공장·공정을 골라 둔 채로 시작 (factoryId=all → 전체 공장)
+    (대시보드 '오늘 알림 내역' 카드의 '과거 알림' 단추, 2026-11-19)
   - 알림 상황이 바뀌면 조용히 다시 불러옴 (useLiveReload)
 -->
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getSiteTree } from '@/api/sites'
-import { getStatsAlarms, getStatsByProcess, getStatsHeatmap, getStatsSummary, getStatsTrend } from '@/api/stats'
+import { exportStats, getStatsAlarms, getStatsByProcess, getStatsSummary, getStatsTrend } from '@/api/stats'
 import { useAuthStore } from '@/stores/auth'
 import { ROLE } from '@/types/codes'
+import { saveFile } from '@/utils/saveFile'
 import { toast } from '@/utils/toast'
 import { useLiveReload } from '@/utils/useLiveReload'
+import AlarmDetailPanel from '@/features/history/AlarmDetailPanel.vue'
 import AlarmHistoryTable from '@/features/history/AlarmHistoryTable.vue'
-import ExportModal from '@/features/history/ExportModal.vue'
 import FilterBar from '@/features/history/FilterBar.vue'
-import HeatmapCard from '@/features/history/HeatmapCard.vue'
 import KpiCards from '@/features/history/KpiCards.vue'
 import MonthlyReportModal from '@/features/history/MonthlyReportModal.vue'
 import ProcessCard from '@/features/history/ProcessCard.vue'
 import TrendCard from '@/features/history/TrendCard.vue'
 import { PERIOD_LABEL, criteriaOf, rangeOf, ymd } from '@/features/history/historyFilter'
 
-const PER_PAGE = 6 // 표 한 쪽 행 수 (설계안)
+const PER_PAGE = 14 // 표 한 쪽 행 수 (왼쪽 열 전체 높이)
 
 const route = useRoute()
 const router = useRouter()
@@ -45,8 +49,8 @@ function change(patch) {
   query()
 }
 
-/* ───────── 카드 데이터 (요약·추이·공정별·요일시간) ───────── */
-const data = reactive({ summary: null, trend: null, byProcess: null, heatmap: null })
+/* ───────── 카드 데이터 (요약·추이·공정별) ───────── */
+const data = reactive({ summary: null, trend: null, byProcess: null })
 const busy = ref(false)
 let seq = 0 // 늦게 온 이전 조회 결과는 버림
 
@@ -55,14 +59,9 @@ async function query({ silent = false } = {}) {
   if (!silent) busy.value = true
   const c = criteria.value
   try {
-    const [summary, trend, byProcess, heatmap] = await Promise.all([
-      getStatsSummary(c),
-      getStatsTrend(c),
-      getStatsByProcess(c),
-      getStatsHeatmap(c),
-    ])
+    const [summary, trend, byProcess] = await Promise.all([getStatsSummary(c), getStatsTrend(c), getStatsByProcess(c)])
     if (my !== seq) return
-    Object.assign(data, { summary, trend, byProcess, heatmap })
+    Object.assign(data, { summary, trend, byProcess })
   } catch (error) {
     // 조회 실패: 이전 결과는 그대로 두고 알림만 (화면설계서 '조회 실패')
     if (my === seq) toast(`조회하지 못했습니다. ${error.message}`, { type: 'err' })
@@ -75,15 +74,15 @@ async function query({ silent = false } = {}) {
   else loadTable()
 }
 
-/* ───────── 알림 이력 표 (탭·쪽은 표만 다시 불러옴) ───────── */
-const table = reactive({ rows: null, total: 0, tab: '', page: 1, busy: false, serverTime: '' })
+/* ───────── 알림 이력 표 (유형·탭·쪽은 표만 다시 불러옴) ───────── */
+const table = reactive({ rows: null, total: 0, hazard: '', tab: '', page: 1, busy: false, serverTime: '' })
 let tableSeq = 0
 
 async function loadTable() {
   const my = ++tableSeq
   table.busy = true
   try {
-    const r = await getStatsAlarms({ ...criteria.value, status: table.tab, page: table.page - 1, size: PER_PAGE })
+    const r = await getStatsAlarms({ ...criteria.value, hazard: table.hazard, status: table.tab, page: table.page - 1, size: PER_PAGE })
     if (my !== tableSeq) return
     table.rows = r.items
     table.total = r.total
@@ -94,12 +93,19 @@ async function loadTable() {
     if (my === tableSeq) table.busy = false
   }
 }
-watch(() => [table.tab, table.page], loadTable)
+watch(() => [table.hazard, table.tab, table.page], loadTable)
 
-/** 행 누르기 → 설비 상세 (지금 화면이 있는 5공장 도장 공정 설비만) */
+/* ───────── 알림 상세 패널 ───────── */
+const selectedId = ref(null)
+/** 상세 단추(또는 줄) → 패널 열기, 열린 줄을 다시 누르면 닫기 */
 function openRow(row) {
-  if (row.factoryId === 5 && row.processId === 12 && row.equipmentId) {
-    router.push({ name: 'equipment', params: { siteId: siteId.value, factoryId: 5, processId: 12, equipmentId: row.equipmentId } })
+  selectedId.value = selectedId.value === row.id ? null : row.id
+}
+
+/** 패널의 '설비 상세 화면' → 설비 상세 (지금 화면이 있는 5공장 도장 공정 설비만) */
+function openEquipment(d) {
+  if (d.factoryId === 5 && d.processId === 12 && d.equipmentId) {
+    router.push({ name: 'equipment', params: { siteId: siteId.value, factoryId: 5, processId: 12, equipmentId: d.equipmentId } })
     return
   }
   toast('이 설비의 상세 화면은 준비 중입니다. 지금은 5공장 도장 공정만 볼 수 있습니다.', { type: 'info' })
@@ -118,12 +124,42 @@ const trendView = computed(() => {
   return { ...t, points: t.points.filter((p) => hourOf(p) <= end) }
 })
 const trendSub = computed(() => periodLabel.value + ({ HOUR: ' · 시간별', WEEK: ' · 주별' }[data.trend?.unit] ?? ''))
-const factoryName = computed(() => factories.value.find((f) => f.id === Number(filter.factoryId))?.name ?? '전체 공장')
-const rangeText = computed(() => (filter.from === filter.to ? filter.from : `${filter.from} ~ ${filter.to}`))
 
-/* ───────── 내보내기 · 월별 보고서 창 ───────── */
-const exportOpen = ref(false)
+/* ───────── 내보내기 (알림 이력 상세 CSV) · 월별 보고서 창 ───────── */
+const exporting = ref(false)
+async function exportHistory() {
+  if (exporting.value) return
+  exporting.value = true
+  const c = criteria.value
+  const name = `알림이력_${c.from.replace(/-/g, '')}-${c.to.replace(/-/g, '')}.csv`
+  try {
+    // 저장 창부터 열고(바탕화면), 파일 내용은 그다음 서버에서 받음
+    const result = await saveFile(name, async () => (await exportStats(c)).blob)
+    if (result === 'saved') toast(`${name} 파일을 저장했습니다.`)
+    if (result === 'downloaded') toast(`${name} 파일을 다운로드 폴더에 저장했습니다.`)
+  } catch (error) {
+    toast(`내보내지 못했습니다. ${error.message}`, { type: 'err' })
+  } finally {
+    exporting.value = false
+  }
+}
 const reportOpen = ref(false)
+
+/**
+ * 주소로 받은 공장·공정 미리 고르기 (대시보드 '과거 알림' 단추)
+ * - 고를 수 있는 공장·공정일 때만 반영 (공장 담당자의 다른 공장 · 없는 공정은 무시하고 처음 값 그대로)
+ */
+function applyQuery() {
+  const { factoryId, processId } = route.query
+  if (factoryId === 'all') {
+    if (!lockFactory.value) filter.factoryId = ''
+    return
+  }
+  const factory = factories.value.find((f) => String(f.id) === String(factoryId))
+  if (!factory) return
+  filter.factoryId = String(factory.id)
+  if (factory.processes?.some((p) => String(p.id) === String(processId))) filter.processId = String(processId)
+}
 
 /* ───────── 처음 불러오기 ───────── */
 onMounted(async () => {
@@ -134,6 +170,7 @@ onMounted(async () => {
     // 공장 담당자: 담당 공장 / 본사 관리자: 5공장(설계안 처음 값), 없으면 전체 공장
     const first = lockFactory.value ? factories.value[0] : factories.value.find((f) => f.id === 5)
     filter.factoryId = first ? String(first.id) : ''
+    applyQuery()
   } catch (error) {
     toast(error.message, { type: 'err' })
   }
@@ -153,20 +190,16 @@ useLiveReload(() => query({ silent: true }))
       :busy="busy"
       @change="change"
       @query="query()"
-      @export="exportOpen = true"
+      @export="exportHistory"
       @report="reportOpen = true"
     />
 
     <div class="cards" :class="{ loading: busy }">
       <KpiCards :summary="data.summary" :points="data.trend?.points ?? []" :today="filter.period === 'today'" />
-
-      <div class="row">
-        <TrendCard :trend="trendView" :sub="trendSub" :show-shift="!filter.shift" />
-        <ProcessCard :rows="data.byProcess" :sub="`센서 종류별 · ${periodLabel} 합계`" />
-      </div>
-
-      <div class="row">
+      <div class="main">
+        <!-- 왼쪽: 알림 이력 (두 줄 높이) -->
         <AlarmHistoryTable
+          v-model:hazard="table.hazard"
           v-model:tab="table.tab"
           v-model:page="table.page"
           :rows="table.rows"
@@ -174,19 +207,25 @@ useLiveReload(() => query({ silent: true }))
           :per-page="PER_PAGE"
           :busy="table.busy"
           :server-time="table.serverTime"
+          :selected-id="selectedId"
           @open="openRow"
         />
-        <HeatmapCard :heatmap="data.heatmap" :sub="`${periodLabel} 누적`" />
+        <!-- 오른쪽: 일별 추이 · 공정별 알림, 상세 패널이 그 위를 덮음 -->
+        <div class="side">
+          <TrendCard :trend="trendView" :sub="trendSub" :show-shift="!filter.shift" />
+          <ProcessCard :rows="data.byProcess" :sub="`센서 종류별 · ${periodLabel} 합계`" />
+          <Transition name="panel">
+            <AlarmDetailPanel
+              v-if="selectedId"
+              class="detail"
+              :alarm-id="selectedId"
+              @close="selectedId = null"
+              @equipment="openEquipment"
+            />
+          </Transition>
+        </div>
       </div>
     </div>
-
-    <ExportModal
-      :open="exportOpen"
-      :criteria="criteria"
-      :where="`${factoryName} · ${rangeText}`"
-      :row-count="data.summary?.alarmCount.value ?? 0"
-      @close="exportOpen = false"
-    />
     <MonthlyReportModal :open="reportOpen" :factory-id="filter.factoryId" @close="reportOpen = false" />
   </div>
 </template>
@@ -214,15 +253,40 @@ useLiveReload(() => query({ silent: true }))
   opacity: 0.6;
 }
 
-.row {
+.main {
   display: grid;
   grid-template-columns: minmax(0, 1180fr) minmax(0, 684fr);
   gap: 16px;
-  align-items: start;
+  align-items: stretch;
+}
+
+.side {
+  position: relative; /* 상세 패널이 이 칸을 꽉 채워 덮음 */
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.detail {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+}
+
+/* 상세 패널: 오른쪽에서 24px 밀려 들어오며 나타남 (--m-panel 0.24초) */
+.panel-enter-active,
+.panel-leave-active {
+  transition: opacity var(--m-panel), transform var(--m-panel);
+}
+
+.panel-enter-from,
+.panel-leave-to {
+  opacity: 0;
+  transform: translateX(24px);
 }
 
 @media (max-width: 1400px) {
-  .row {
+  .main {
     grid-template-columns: minmax(0, 1fr);
   }
 }

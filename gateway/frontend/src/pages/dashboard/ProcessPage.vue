@@ -1,7 +1,7 @@
 <!--
   공정 3D 설비 배치도 화면 (예: 5공장 도장 공정 — 화면설계안 js/v-dash.js vProcess() 기준)
   - 왼쪽: 구역 현황(3D 설비 배치도 + 배기팬 창 + 설비 줄, ProcessMapCard)
-  - 오른쪽: 기준값 근접 센서(이 공정, 2026-11-18 센서별 단계 현황 대신), 실시간 알림(이 공정), 오늘 설비 점검
+  - 오른쪽: 기준값 근접 센서(이 공정, 2026-11-18 센서별 단계 현황 대신), 오늘 알림 내역(이 공정), 오늘 설비 점검
   - 이 파일은 데이터 불러오기·합치기와 화면 이동, 배기팬 명령 보내기만 담당
   - 데이터 (지금은 예시 데이터): GET /processes/{id}/layout, /status, GET /alarms?processId=, GET /inspections/today
 -->
@@ -180,7 +180,7 @@ async function onFanApply(eq, { power, rpm }) {
 /*
  * 배치: 사업장·공장 화면과 같음 (왼쪽 넓은 열 + 오른쪽 628px 열)
  * - 오른쪽 열 높이를 왼쪽 배치도 카드에 맞춤(stretch)
- * - 실시간 알림이 남는 높이를 채워 오른쪽 아래 빈칸이 생기지 않게 함
+ * - 오늘 알림 내역이 남는 높이를 채워 오른쪽 아래 빈칸이 생기지 않게 함
  */
 .process-page {
   display: grid;
@@ -203,7 +203,7 @@ async function onFanApply(eq, { power, rpm }) {
   min-width: 0;
 }
 
-/* 실시간 알림: 남는 높이를 채우고 목록만 스크롤 (AlarmListCard 의 .list, 구역 현황과 같은 방식) */
+/* 오늘 알림 내역: 남는 높이를 채우고 목록만 스크롤 (AlarmListCard 의 .list, 구역 현황과 같은 방식) */
 .fill {
   flex: 1 1 0;
   min-height: 240px;

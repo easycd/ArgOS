@@ -80,4 +80,17 @@ public final class Codes {
     public static String stageName(int stage) {
         return stage >= 3 ? "경보" : stage == 2 ? "주의" : "정상";
     }
+
+    /**
+     * 기준 방향 (화면 '기준값 근접 센서'용).
+     * UPPER = 상한만 (값이 오를수록 위험), LOWER = 하한만 (값이 내려갈수록 위험), BOTH = 둘 다 (전류처럼 양방향), 기준 없으면 null
+     */
+    public static String limitType(Double warn, Double alarm, Double lowWarn, Double lowAlarm) {
+        boolean upper = warn != null || alarm != null;
+        boolean lower = lowWarn != null || lowAlarm != null;
+        if (upper && lower) {
+            return "BOTH";
+        }
+        return upper ? "UPPER" : lower ? "LOWER" : null;
+    }
 }

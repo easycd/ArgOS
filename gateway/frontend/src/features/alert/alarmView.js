@@ -1,6 +1,6 @@
 /**
  * 알림 한 줄을 화면에 보일 때 쓰는 값 (GET /alarms 의 items 하나 → 아이콘 · 색 · 진행 상태 칩)
- * - 실시간 알림 카드(features/dashboard/AlarmRow.vue)와 상단 알림 종 목록(components/AppBellMenu.vue)이 같이 씀
+ * - 오늘 알림 내역 카드(features/dashboard/AlarmRow.vue)와 상단 알림 종 목록(components/AppBellMenu.vue)이 같이 씀
  */
 import { ALARM_STATUS_LABEL, LEVEL_META, SENSOR_TYPES } from '@/types/codes'
 

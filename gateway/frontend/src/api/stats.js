@@ -3,22 +3,23 @@
  * - GET /stats/summary    : 요약 4칸 (직전 같은 길이 기간 대비 diff)
  * - GET /stats/trend      : 알림 추이 (unit HOUR · DAY · WEEK — 비우면 서버가 기간으로 정함)
  * - GET /stats/by-process : 공정별 · 센서 종류별 건수
- * - GET /stats/heatmap    : 요일(월=1) × 시간(0~23) 건수
- * - GET /stats/alarms     : 알림 이력 표 (page 는 0부터)
- * - GET /stats/export     : CSV 파일 (format=xlsx 도 지금은 CSV)
+ * - GET /stats/alarms     : 알림 이력 표 (page 는 0부터, hazard=FIRE|GAS 추가 요청)
+ * - GET /stats/alarms/{id}: 알림 상세 패널 (센서 3종 시계열·열화상·조치 이력·체크리스트, 새 API)
+ * - GET /stats/export     : 알림 이력 상세 CSV (열 추가 요청)
+ * - 새로 바뀐 API 는 docs/stats-history-api.md 에 정리
  * - GET /reports/monthly  : 월별 보고서 PDF (명세서에만 있음, 백엔드 아직 없음)
  *
- * 조건(criteria) 모양: { from, to ('YYYY-MM-DD'), siteId, factoryId, processId, sensorType, level, shift }
+ * 조건(criteria) 모양: { from, to ('YYYY-MM-DD'), siteId, factoryId, processId, sensorType, level, shift } (+ 표는 hazard)
  * - 빈 값('' · null)은 보내지 않음
  * - siteId 는 백엔드가 아직 받지 않음 (backend-notes 12장) — 예시 데이터는 사업장으로 거름
  */
 import http from './http'
+import { historyDetail } from './mock/historyDetail'
 import { USE_MOCK, mockFail, mockOk } from './mock'
 import {
   alarms as mockAlarmsPage,
   byProcess,
   exportCsv,
-  heatmap,
   monthlyReport,
   monthlyReports,
   rangeError,
@@ -52,12 +53,6 @@ export function getStatsByProcess(c) {
   return http.get('/stats/by-process', { params: clean(c) })
 }
 
-/** @returns {{ max, cells: [{ dow, hour, count }] }} 0건 칸은 없음 */
-export function getStatsHeatmap(c) {
-  if (USE_MOCK) return mock(c, heatmap)
-  return http.get('/stats/heatmap', { params: clean(c) })
-}
-
 /**
  * 알림 이력 표
  * @param {object} c 조건 + { status: 'ACTIVE' | 'CLOSED' | '' (탭, 추가 요청), page (0부터), size, sort }
@@ -69,8 +64,21 @@ export function getStatsAlarms(c) {
 }
 
 /**
- * 내보내기 → { fileName, blob }
- * - 백엔드는 xlsx 를 골라도 CSV 를 줌 → 파일은 언제나 .csv
+ * 알림 상세 패널 (새 API)
+ * @returns {{ id, level, status, hazard, location, raisedAt, closedAt, actionMinutes, sensorTag, sensorType, value, unit, threshold,
+ *   series: { from, to, intervalSec, sensors: [{ sensorId, tag, type, unit, warn, alarm, trigger, points: [[at, value]] }] },
+ *   thermal, timeline, checklist, shutdown }}
+ */
+export function getStatsAlarmDetail(alarmId) {
+  if (USE_MOCK) {
+    const data = historyDetail(alarmId)
+    return data ? mockOk(data) : mockFail({ code: 'ALARM_NOT_FOUND', message: '없는 알림입니다.', status: 404 })
+  }
+  return http.get(`/stats/alarms/${alarmId}`)
+}
+
+/**
+ * 알림 이력 상세 CSV 내보내기 → { fileName, blob }
  */
 export async function exportStats(c, format = 'csv') {
   if (USE_MOCK) {
@@ -82,7 +90,7 @@ export async function exportStats(c, format = 'csv') {
     return { fileName: data.fileName, blob: new Blob([data.text], { type: 'text/csv;charset=utf-8' }) }
   }
   const blob = await http.get('/stats/export', { params: clean({ ...c, format }), responseType: 'blob' })
-  return { fileName: `ArgOS_alarm_${c.from.replace(/-/g, '')}_${c.to.replace(/-/g, '')}.csv`, blob }
+  return { fileName: `알림이력_${c.from.replace(/-/g, '')}-${c.to.replace(/-/g, '')}.csv`, blob }
 }
 
 /** 고를 수 있는 달 [{ month, ready, issuedAt, willIssueAt }] (예시 데이터만 — 백엔드 목록 API 없음) */
